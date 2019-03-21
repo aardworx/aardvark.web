@@ -15,6 +15,7 @@ module.exports = {
         contentBase: "./public",
         port: 8080,
     },
+	devtool: "eval-source-map",
     module: {
         rules: [{
             test: /\.fs(x|proj)?$/,
