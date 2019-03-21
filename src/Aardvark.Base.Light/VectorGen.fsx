@@ -60,7 +60,7 @@ let run () =
                 | "O" -> d.zero
                 | _ -> n.ToLower()
             )
-            printfn "    member x.%s = %s(%s)" n resName (String.concat ", " values)
+            printfn "    member __.%s = %s(%s)" n resName (String.concat ", " values)
 
 
         // creators
@@ -90,9 +90,70 @@ let run () =
         printfn "    member __.LengthSquared = %s" (names |> Seq.map (fun n -> sprintf "%s*%s" (n.ToLower()) (n.ToLower())) |> String.concat " + ")
         if d.fract then
             printfn "    member __.Length = sqrt (%s)" (names |> Seq.map (fun n -> sprintf "%s*%s" (n.ToLower()) (n.ToLower())) |> String.concat " + ")
+            
+            printfn "    member this.Normalized = let l = this.Length in %s(%s)" name (names |> Seq.map (fun n -> sprintf "%s/l" (n.ToLower())) |> String.concat ", ")
+        
         else
             printfn "    member __.Length = sqrt (float (%s))" (names |> Seq.map (fun n -> sprintf "%s*%s" (n.ToLower()) (n.ToLower())) |> String.concat " + ")
             
+
+        // hashcode/equals
+        printfn "    override __.GetHashCode() = HashCode.Combine(%s)" (names |> Seq.map (fun n -> sprintf "%s.GetHashCode()" (n.ToLower())) |> String.concat ", ")
+        printfn "    override __.Equals(o) = match o with | :? %s as o -> %s | _ -> false" name (names |> Seq.map (fun n -> sprintf "%s = o.%s" (n.ToLower()) n) |> String.concat " && ")
+        
+        // IComparable
+        printfn "    interface System.IComparable with"
+        printfn "        member __.CompareTo(o) = "
+        printfn "            match o with "
+        printfn "            | :? %s as o -> " name
+        let mutable indent = "                "
+        for n in Array.take (names.Length - 1) names do
+            printfn "%slet a = compare %s o.%s" indent (n.ToLower()) n
+            printfn "%sif a <> 0 then a" indent
+            printfn "%selse" indent
+            indent <- indent + "    "
+        let n = names.[names.Length - 1]
+        printfn "%scompare %s o.%s" indent (n.ToLower()) n
+        printfn "            | _ -> failwith \"uncomparable\""
+
+
+        // compares
+        let cmp (all : bool) (op : string) =
+            let nn = if all then "All" else "Any"
+
+            let compose = if all then " && " else " || "
+
+            let nnn =
+                match op with
+                | ">" -> "Greater"
+                | ">=" -> "GreaterOrEqual"
+                | "<" -> "Smaller"
+                | "<=" -> "SmallerOrEqual"
+                | "=" -> "Equal"
+                | "<>" -> "Different"
+                | _ -> failwith "bad"
+
+            printfn "    member __.%s%s(o : %s) = %s" nn nnn name (names |> Seq.map (fun n -> sprintf "%s %s o.%s" (n.ToLower()) op n) |> String.concat compose )
+
+        let ops = [ ">"; ">="; "<"; "<="; "="; "<>" ]
+        for a in [false; true] do
+            for o in ops do
+                cmp a o
+
+
+        if d.dimension > 2 then
+            let sn = sprintf "V%d%s" (d.dimension - 1) d.suffix
+            let els = List.init (d.dimension - 1) (fun i -> sprintf "v.%s" (names.[i]))
+            printfn "    new(v : %s, l : %s) = %s(%s)" sn d.baseType name (els @ [ "l" ] |> String.concat ", ")
+
+
+        if d.fract then
+            let nInt = sprintf "V%di" d.dimension
+
+            printfn "    new(v : %s) = %s(%s)" nInt name (names |> Seq.map (fun v -> sprintf "%s v.%s" d.baseType v) |> String.concat ", ")
+
+
+
     let descs =
         [
     

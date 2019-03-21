@@ -38,29 +38,15 @@ let test (s : Sepp<int>) =
     s2.A <- 10
     s2
 
-[<Emit("Object.getPrototypeOf($0)")>]
-let tt (o : obj) : string = failwith ""
 
 [<EntryPoint>]
 let main argv =
 
-    let s = Sepp(1)
+    let a = V3d(V2d(1.0, 2.0), 3.9) |> Vec.length
 
-    
-    let mutable s2 = s
-    s2.A <- 10
-    let m = s2
-    
-    console.warn s.A
-
-
-    let a = V2d(1.0, 2.0)
-    let b = V2d(3.0, 2.0)
-
-    let c = a + 2.0 * b
-
+    console.warn (a :> obj)
     let a = a :> obj
 
-    console.warn ( tt s :> obj)
+    console.warn (a.GetTypeName())
 
     0 // return an integer exit code

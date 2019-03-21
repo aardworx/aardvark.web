@@ -1,6 +1,7 @@
 ﻿namespace Aardvark.Base
 
 open System
+open Fable.Core
 
 type HashCode =
     static member Combine (a : uint32, b : uint32) =
@@ -14,3 +15,12 @@ type HashCode =
         for r in rest do    
             a <- HashCode.Combine(a, r)
         a
+
+[<AutoOpen>]
+module CoreExtensions =
+
+    [<Emit("Object.getPrototypeOf($0).constructor.name")>]
+    let private tt (o : obj) : string = failwith ""
+    type System.Object with
+        member x.GetTypeName() : string = tt x
+
