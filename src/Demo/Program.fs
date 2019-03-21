@@ -41,12 +41,33 @@ let test (s : Sepp<int>) =
 [<Emit("Object.getPrototypeOf($0)")>]
 let tt (o : obj) : string = failwith ""
 
+let printfn fmt =
+  Printf.kprintf Fable.Import.Browser.console.log fmt
+
+
+module HarriTests = 
+    
+    let a () = 
+        let a = IntMap.ofList [1,"a";2,"b"]
+        printfn "%A" a
+
+        let b = HMap.ofList ["a",1;"b",2]
+        printfn "%A" b
+
+        let c = HDeltaSet.ofHMap b
+        printfn "%A" c
+
+        let d = HSet.ofList [1;2;3]
+        printfn "%A" c
+        
+
 [<EntryPoint>]
 let main argv =
 
-    let s = Sepp(1)
+    let s = Sepp(1) 
 
-    
+    HarriTests.a()
+
     let mutable s2 = s
     s2.A <- 10
     let m = s2
