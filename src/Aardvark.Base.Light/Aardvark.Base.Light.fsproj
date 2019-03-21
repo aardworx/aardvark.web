@@ -9,6 +9,16 @@
     <Compile Include="Utils.fs" />
     <Compile Include="Vectors_auto.fs" />
     <Compile Include="Matrices_auto.fs" />
+    <Compile Include="Prelude/Measures.fs" />
+	<Compile Include="Prelude/Lens.fs" />
+	<Compile Include="Prelude/Monoid.fs" />
+	<Compile Include="Datastructures/SetOperation.fs" />
+	<Compile Include="Datastructures/ElementOperation.fs" />
+	<Compile Include="Datastructures/Index.fs" />
+	<Compile Include="Datastructures/IntMap.fs" />
+	<Compile Include="Datastructures/HMap.fs" />
+	<Compile Include="Datastructures\HDeltaSet.fs" />
+	<Compile Include="Datastructures\HSet.fs" />
     <Compile Include="Vectors.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
