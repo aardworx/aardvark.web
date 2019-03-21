@@ -1,6 +1,8 @@
 namespace Aardvark.Base
 
 open Aardvark.Base
+open Fable.Core
+open Fable.Import.JS
 
 type M22d(m00 : float, m10 : float, m01 : float, m11 : float) =
     member __.M00 : float = m00
@@ -9,8 +11,10 @@ type M22d(m00 : float, m10 : float, m01 : float, m11 : float) =
     member __.M11 : float = m11
     member x.R0 : V2d = V2d(m00, m01)
     member x.R1 : V2d = V2d(m10, m11)
-    static member Zero = M22d(0.0, 0.0, 0.0, 0.0)
-    static member Identity = M22d(1.0, 0.0, 0.0, 1.0)
+    member x.C0 : V2d = V2d(m00, m10)
+    member x.C1 : V2d = V2d(m01, m11)
+    static member Zero = M22d( 0.0 ,  0.0 ,  0.0 ,  0.0 )
+    static member Identity = M22d( 1.0 ,  0.0 ,  0.0 ,  1.0 )
     static member (*) (l : M22d, r : M22d) : M22d =
         M22d(
             l.M00 * r.M00 + l.M01 * r.M10,
@@ -62,6 +66,56 @@ type M22d(m00 : float, m10 : float, m01 : float, m11 : float) =
             m01, m11
         )
     member x.Det : float = m00 * m11 - m01 * m10
+    new(o : M23d) = 
+        M22d(
+            o.M00, o.M01, 
+            o.M10, o.M11
+        )
+    new(o : M24d) = 
+        M22d(
+            o.M00, o.M01, 
+            o.M10, o.M11
+        )
+    new(o : M32d) = 
+        M22d(
+            o.M00, o.M01, 
+            o.M10, o.M11
+        )
+    new(o : M33d) = 
+        M22d(
+            o.M00, o.M01, 
+            o.M10, o.M11
+        )
+    new(o : M34d) = 
+        M22d(
+            o.M00, o.M01, 
+            o.M10, o.M11
+        )
+    new(o : M42d) = 
+        M22d(
+            o.M00, o.M01, 
+            o.M10, o.M11
+        )
+    new(o : M43d) = 
+        M22d(
+            o.M00, o.M01, 
+            o.M10, o.M11
+        )
+    new(o : M44d) = 
+        M22d(
+            o.M00, o.M01, 
+            o.M10, o.M11
+        )
+    member x.ToFloat32Array() : Float32Array =
+        let arr = Float32Array.Create(4.0)
+        arr.[0] <- m00; arr.[1] <- m01
+        arr.[2] <- m10; arr.[3] <- m11
+        arr
+    member x.ToFloat64Array() : Float64Array =
+        let arr = Float64Array.Create(4.0)
+        arr.[0] <- m00; arr.[1] <- m01
+        arr.[2] <- m10; arr.[3] <- m11
+        arr
 and M23d(m00 : float, m10 : float, m01 : float, m11 : float, m02 : float, m12 : float) =
     member __.M00 : float = m00
     member __.M10 : float = m10
@@ -71,8 +125,11 @@ and M23d(m00 : float, m10 : float, m01 : float, m11 : float, m02 : float, m12 : 
     member __.M12 : float = m12
     member x.R0 : V3d = V3d(m00, m01, m02)
     member x.R1 : V3d = V3d(m10, m11, m12)
-    static member Zero = M23d(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-    static member Identity = M23d(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+    member x.C0 : V2d = V2d(m00, m10)
+    member x.C1 : V2d = V2d(m01, m11)
+    member x.C2 : V2d = V2d(m02, m12)
+    static member Zero = M23d( 0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 )
+    static member Identity = M23d( 1.0 ,  0.0 ,  0.0 ,  1.0 ,  0.0 ,  0.0 )
     static member (*) (l : M23d, r : M32d) : M22d =
         M22d(
             l.M00 * r.M00 + l.M01 * r.M10 + l.M02 * r.M20,
@@ -137,6 +194,57 @@ and M23d(m00 : float, m10 : float, m01 : float, m11 : float, m02 : float, m12 : 
             m01, m11, 
             m02, m12
         )
+    new(o : M22d) = 
+        M23d(
+            o.M00, o.M01,  0.0 , 
+            o.M10, o.M11,  0.0 
+        )
+    new(o : M24d) = 
+        M23d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12
+        )
+    new(o : M32d) = 
+        M23d(
+            o.M00, o.M01,  0.0 , 
+            o.M10, o.M11,  0.0 
+        )
+    new(o : M33d) = 
+        M23d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12
+        )
+    new(o : M34d) = 
+        M23d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12
+        )
+    new(o : M42d) = 
+        M23d(
+            o.M00, o.M01,  0.0 , 
+            o.M10, o.M11,  0.0 
+        )
+    new(o : M43d) = 
+        M23d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12
+        )
+    new(o : M44d) = 
+        M23d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12
+        )
+    member x.UpperLeftM22() : M22d = M22d(x)
+    member x.ToFloat32Array() : Float32Array =
+        let arr = Float32Array.Create(6.0)
+        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02
+        arr.[3] <- m10; arr.[4] <- m11; arr.[5] <- m12
+        arr
+    member x.ToFloat64Array() : Float64Array =
+        let arr = Float64Array.Create(6.0)
+        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02
+        arr.[3] <- m10; arr.[4] <- m11; arr.[5] <- m12
+        arr
 and M24d(m00 : float, m10 : float, m01 : float, m11 : float, m02 : float, m12 : float, m03 : float, m13 : float) =
     member __.M00 : float = m00
     member __.M10 : float = m10
@@ -148,8 +256,12 @@ and M24d(m00 : float, m10 : float, m01 : float, m11 : float, m02 : float, m12 : 
     member __.M13 : float = m13
     member x.R0 : V4d = V4d(m00, m01, m02, m03)
     member x.R1 : V4d = V4d(m10, m11, m12, m13)
-    static member Zero = M24d(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-    static member Identity = M24d(1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0)
+    member x.C0 : V2d = V2d(m00, m10)
+    member x.C1 : V2d = V2d(m01, m11)
+    member x.C2 : V2d = V2d(m02, m12)
+    member x.C3 : V2d = V2d(m03, m13)
+    static member Zero = M24d( 0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 )
+    static member Identity = M24d( 1.0 ,  0.0 ,  0.0 ,  1.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 )
     static member (*) (l : M24d, r : M43d) : M23d =
         M23d(
             l.M00 * r.M00 + l.M01 * r.M10 + l.M02 * r.M20 + l.M03 * r.M30,
@@ -206,6 +318,57 @@ and M24d(m00 : float, m10 : float, m01 : float, m11 : float, m02 : float, m12 : 
             m02, m12, 
             m03, m13
         )
+    new(o : M22d) = 
+        M24d(
+            o.M00, o.M01,  0.0 ,  0.0 , 
+            o.M10, o.M11,  0.0 ,  0.0 
+        )
+    new(o : M23d) = 
+        M24d(
+            o.M00, o.M01, o.M02,  0.0 , 
+            o.M10, o.M11, o.M12,  0.0 
+        )
+    new(o : M32d) = 
+        M24d(
+            o.M00, o.M01,  0.0 ,  0.0 , 
+            o.M10, o.M11,  0.0 ,  0.0 
+        )
+    new(o : M33d) = 
+        M24d(
+            o.M00, o.M01, o.M02,  0.0 , 
+            o.M10, o.M11, o.M12,  0.0 
+        )
+    new(o : M34d) = 
+        M24d(
+            o.M00, o.M01, o.M02, o.M03, 
+            o.M10, o.M11, o.M12, o.M13
+        )
+    new(o : M42d) = 
+        M24d(
+            o.M00, o.M01,  0.0 ,  0.0 , 
+            o.M10, o.M11,  0.0 ,  0.0 
+        )
+    new(o : M43d) = 
+        M24d(
+            o.M00, o.M01, o.M02,  0.0 , 
+            o.M10, o.M11, o.M12,  0.0 
+        )
+    new(o : M44d) = 
+        M24d(
+            o.M00, o.M01, o.M02, o.M03, 
+            o.M10, o.M11, o.M12, o.M13
+        )
+    member x.UpperLeftM22() : M22d = M22d(x)
+    member x.ToFloat32Array() : Float32Array =
+        let arr = Float32Array.Create(8.0)
+        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02; arr.[3] <- m03
+        arr.[4] <- m10; arr.[5] <- m11; arr.[6] <- m12; arr.[7] <- m13
+        arr
+    member x.ToFloat64Array() : Float64Array =
+        let arr = Float64Array.Create(8.0)
+        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02; arr.[3] <- m03
+        arr.[4] <- m10; arr.[5] <- m11; arr.[6] <- m12; arr.[7] <- m13
+        arr
 and M32d(m00 : float, m10 : float, m20 : float, m01 : float, m11 : float, m21 : float) =
     member __.M00 : float = m00
     member __.M10 : float = m10
@@ -216,8 +379,10 @@ and M32d(m00 : float, m10 : float, m20 : float, m01 : float, m11 : float, m21 : 
     member x.R0 : V2d = V2d(m00, m01)
     member x.R1 : V2d = V2d(m10, m11)
     member x.R2 : V2d = V2d(m20, m21)
-    static member Zero = M32d(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-    static member Identity = M32d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+    member x.C0 : V3d = V3d(m00, m10, m20)
+    member x.C1 : V3d = V3d(m01, m11, m21)
+    static member Zero = M32d( 0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 )
+    static member Identity = M32d( 1.0 ,  0.0 ,  0.0 ,  0.0 ,  1.0 ,  0.0 )
     static member (*) (l : M32d, r : M22d) : M32d =
         M32d(
             l.M00 * r.M00 + l.M01 * r.M10,
@@ -280,6 +445,67 @@ and M32d(m00 : float, m10 : float, m20 : float, m01 : float, m11 : float, m21 : 
             m00, m10, m20, 
             m01, m11, m21
         )
+    new(o : M22d) = 
+        M32d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+             0.0 ,  0.0 
+        )
+    new(o : M23d) = 
+        M32d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+             0.0 ,  0.0 
+        )
+    new(o : M24d) = 
+        M32d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+             0.0 ,  0.0 
+        )
+    new(o : M33d) = 
+        M32d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+            o.M20, o.M21
+        )
+    new(o : M34d) = 
+        M32d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+            o.M20, o.M21
+        )
+    new(o : M42d) = 
+        M32d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+            o.M20, o.M21
+        )
+    new(o : M43d) = 
+        M32d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+            o.M20, o.M21
+        )
+    new(o : M44d) = 
+        M32d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+            o.M20, o.M21
+        )
+    member x.UpperLeftM22() : M22d = M22d(x)
+    member x.ToFloat32Array() : Float32Array =
+        let arr = Float32Array.Create(6.0)
+        arr.[0] <- m00; arr.[1] <- m01
+        arr.[2] <- m10; arr.[3] <- m11
+        arr.[4] <- m20; arr.[5] <- m21
+        arr
+    member x.ToFloat64Array() : Float64Array =
+        let arr = Float64Array.Create(6.0)
+        arr.[0] <- m00; arr.[1] <- m01
+        arr.[2] <- m10; arr.[3] <- m11
+        arr.[4] <- m20; arr.[5] <- m21
+        arr
 and M33d(m00 : float, m10 : float, m20 : float, m01 : float, m11 : float, m21 : float, m02 : float, m12 : float, m22 : float) =
     member __.M00 : float = m00
     member __.M10 : float = m10
@@ -293,8 +519,11 @@ and M33d(m00 : float, m10 : float, m20 : float, m01 : float, m11 : float, m21 : 
     member x.R0 : V3d = V3d(m00, m01, m02)
     member x.R1 : V3d = V3d(m10, m11, m12)
     member x.R2 : V3d = V3d(m20, m21, m22)
-    static member Zero = M33d(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-    static member Identity = M33d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    member x.C0 : V3d = V3d(m00, m10, m20)
+    member x.C1 : V3d = V3d(m01, m11, m21)
+    member x.C2 : V3d = V3d(m02, m12, m22)
+    static member Zero = M33d( 0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 )
+    static member Identity = M33d( 1.0 ,  0.0 ,  0.0 ,  0.0 ,  1.0 ,  0.0 ,  0.0 ,  0.0 ,  1.0 )
     static member (*) (l : M33d, r : M32d) : M32d =
         M32d(
             l.M00 * r.M00 + l.M01 * r.M10 + l.M02 * r.M20,
@@ -379,6 +608,67 @@ and M33d(m00 : float, m10 : float, m20 : float, m01 : float, m11 : float, m21 : 
     member x.Det : float = 
         m00 * m11 * m22 + m01 * m12 * m20 + m02 * m10 * m21 - 
         m20 * m11 * m02 - m21 * m12 * m00 - m22 * m10 * m01
+    new(o : M22d) = 
+        M33d(
+            o.M00, o.M01,  0.0 , 
+            o.M10, o.M11,  0.0 , 
+             0.0 ,  0.0 ,  1.0 
+        )
+    new(o : M23d) = 
+        M33d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12, 
+             0.0 ,  0.0 ,  1.0 
+        )
+    new(o : M24d) = 
+        M33d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12, 
+             0.0 ,  0.0 ,  1.0 
+        )
+    new(o : M32d) = 
+        M33d(
+            o.M00, o.M01,  0.0 , 
+            o.M10, o.M11,  0.0 , 
+            o.M20, o.M21,  1.0 
+        )
+    new(o : M34d) = 
+        M33d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12, 
+            o.M20, o.M21, o.M22
+        )
+    new(o : M42d) = 
+        M33d(
+            o.M00, o.M01,  0.0 , 
+            o.M10, o.M11,  0.0 , 
+            o.M20, o.M21,  1.0 
+        )
+    new(o : M43d) = 
+        M33d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12, 
+            o.M20, o.M21, o.M22
+        )
+    new(o : M44d) = 
+        M33d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12, 
+            o.M20, o.M21, o.M22
+        )
+    member x.UpperLeftM22() : M22d = M22d(x)
+    member x.ToFloat32Array() : Float32Array =
+        let arr = Float32Array.Create(9.0)
+        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02
+        arr.[3] <- m10; arr.[4] <- m11; arr.[5] <- m12
+        arr.[6] <- m20; arr.[7] <- m21; arr.[8] <- m22
+        arr
+    member x.ToFloat64Array() : Float64Array =
+        let arr = Float64Array.Create(9.0)
+        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02
+        arr.[3] <- m10; arr.[4] <- m11; arr.[5] <- m12
+        arr.[6] <- m20; arr.[7] <- m21; arr.[8] <- m22
+        arr
 and M34d(m00 : float, m10 : float, m20 : float, m01 : float, m11 : float, m21 : float, m02 : float, m12 : float, m22 : float, m03 : float, m13 : float, m23 : float) =
     member __.M00 : float = m00
     member __.M10 : float = m10
@@ -395,8 +685,12 @@ and M34d(m00 : float, m10 : float, m20 : float, m01 : float, m11 : float, m21 : 
     member x.R0 : V4d = V4d(m00, m01, m02, m03)
     member x.R1 : V4d = V4d(m10, m11, m12, m13)
     member x.R2 : V4d = V4d(m20, m21, m22, m23)
-    static member Zero = M34d(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-    static member Identity = M34d(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+    member x.C0 : V3d = V3d(m00, m10, m20)
+    member x.C1 : V3d = V3d(m01, m11, m21)
+    member x.C2 : V3d = V3d(m02, m12, m22)
+    member x.C3 : V3d = V3d(m03, m13, m23)
+    static member Zero = M34d( 0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 )
+    static member Identity = M34d( 1.0 ,  0.0 ,  0.0 ,  0.0 ,  1.0 ,  0.0 ,  0.0 ,  0.0 ,  1.0 ,  0.0 ,  0.0 ,  0.0 )
     static member (*) (l : M34d, r : M43d) : M33d =
         M33d(
             l.M00 * r.M00 + l.M01 * r.M10 + l.M02 * r.M20 + l.M03 * r.M30,
@@ -467,6 +761,68 @@ and M34d(m00 : float, m10 : float, m20 : float, m01 : float, m11 : float, m21 : 
             m02, m12, m22, 
             m03, m13, m23
         )
+    new(o : M22d) = 
+        M34d(
+            o.M00, o.M01,  0.0 ,  0.0 , 
+            o.M10, o.M11,  0.0 ,  0.0 , 
+             0.0 ,  0.0 ,  1.0 ,  0.0 
+        )
+    new(o : M23d) = 
+        M34d(
+            o.M00, o.M01, o.M02,  0.0 , 
+            o.M10, o.M11, o.M12,  0.0 , 
+             0.0 ,  0.0 ,  1.0 ,  0.0 
+        )
+    new(o : M24d) = 
+        M34d(
+            o.M00, o.M01, o.M02, o.M03, 
+            o.M10, o.M11, o.M12, o.M13, 
+             0.0 ,  0.0 ,  1.0 ,  0.0 
+        )
+    new(o : M32d) = 
+        M34d(
+            o.M00, o.M01,  0.0 ,  0.0 , 
+            o.M10, o.M11,  0.0 ,  0.0 , 
+            o.M20, o.M21,  1.0 ,  0.0 
+        )
+    new(o : M33d) = 
+        M34d(
+            o.M00, o.M01, o.M02,  0.0 , 
+            o.M10, o.M11, o.M12,  0.0 , 
+            o.M20, o.M21, o.M22,  0.0 
+        )
+    new(o : M42d) = 
+        M34d(
+            o.M00, o.M01,  0.0 ,  0.0 , 
+            o.M10, o.M11,  0.0 ,  0.0 , 
+            o.M20, o.M21,  1.0 ,  0.0 
+        )
+    new(o : M43d) = 
+        M34d(
+            o.M00, o.M01, o.M02,  0.0 , 
+            o.M10, o.M11, o.M12,  0.0 , 
+            o.M20, o.M21, o.M22,  0.0 
+        )
+    new(o : M44d) = 
+        M34d(
+            o.M00, o.M01, o.M02, o.M03, 
+            o.M10, o.M11, o.M12, o.M13, 
+            o.M20, o.M21, o.M22, o.M23
+        )
+    member x.UpperLeftM22() : M22d = M22d(x)
+    member x.UpperLeftM33() : M33d = M33d(x)
+    member x.ToFloat32Array() : Float32Array =
+        let arr = Float32Array.Create(12.0)
+        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02; arr.[3] <- m03
+        arr.[4] <- m10; arr.[5] <- m11; arr.[6] <- m12; arr.[7] <- m13
+        arr.[8] <- m20; arr.[9] <- m21; arr.[10] <- m22; arr.[11] <- m23
+        arr
+    member x.ToFloat64Array() : Float64Array =
+        let arr = Float64Array.Create(12.0)
+        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02; arr.[3] <- m03
+        arr.[4] <- m10; arr.[5] <- m11; arr.[6] <- m12; arr.[7] <- m13
+        arr.[8] <- m20; arr.[9] <- m21; arr.[10] <- m22; arr.[11] <- m23
+        arr
 and M42d(m00 : float, m10 : float, m20 : float, m30 : float, m01 : float, m11 : float, m21 : float, m31 : float) =
     member __.M00 : float = m00
     member __.M10 : float = m10
@@ -480,8 +836,10 @@ and M42d(m00 : float, m10 : float, m20 : float, m30 : float, m01 : float, m11 : 
     member x.R1 : V2d = V2d(m10, m11)
     member x.R2 : V2d = V2d(m20, m21)
     member x.R3 : V2d = V2d(m30, m31)
-    static member Zero = M42d(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-    static member Identity = M42d(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+    member x.C0 : V4d = V4d(m00, m10, m20, m30)
+    member x.C1 : V4d = V4d(m01, m11, m21, m31)
+    static member Zero = M42d( 0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 )
+    static member Identity = M42d( 1.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  1.0 ,  0.0 ,  0.0 )
     static member (*) (l : M42d, r : M22d) : M42d =
         M42d(
             l.M00 * r.M00 + l.M01 * r.M10,
@@ -556,6 +914,77 @@ and M42d(m00 : float, m10 : float, m20 : float, m30 : float, m01 : float, m11 : 
             m00, m10, m20, m30, 
             m01, m11, m21, m31
         )
+    new(o : M22d) = 
+        M42d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+             0.0 ,  0.0 , 
+             0.0 ,  0.0 
+        )
+    new(o : M23d) = 
+        M42d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+             0.0 ,  0.0 , 
+             0.0 ,  0.0 
+        )
+    new(o : M24d) = 
+        M42d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+             0.0 ,  0.0 , 
+             0.0 ,  0.0 
+        )
+    new(o : M32d) = 
+        M42d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+            o.M20, o.M21, 
+             0.0 ,  0.0 
+        )
+    new(o : M33d) = 
+        M42d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+            o.M20, o.M21, 
+             0.0 ,  0.0 
+        )
+    new(o : M34d) = 
+        M42d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+            o.M20, o.M21, 
+             0.0 ,  0.0 
+        )
+    new(o : M43d) = 
+        M42d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+            o.M20, o.M21, 
+            o.M30, o.M31
+        )
+    new(o : M44d) = 
+        M42d(
+            o.M00, o.M01, 
+            o.M10, o.M11, 
+            o.M20, o.M21, 
+            o.M30, o.M31
+        )
+    member x.UpperLeftM22() : M22d = M22d(x)
+    member x.ToFloat32Array() : Float32Array =
+        let arr = Float32Array.Create(8.0)
+        arr.[0] <- m00; arr.[1] <- m01
+        arr.[2] <- m10; arr.[3] <- m11
+        arr.[4] <- m20; arr.[5] <- m21
+        arr.[6] <- m30; arr.[7] <- m31
+        arr
+    member x.ToFloat64Array() : Float64Array =
+        let arr = Float64Array.Create(8.0)
+        arr.[0] <- m00; arr.[1] <- m01
+        arr.[2] <- m10; arr.[3] <- m11
+        arr.[4] <- m20; arr.[5] <- m21
+        arr.[6] <- m30; arr.[7] <- m31
+        arr
 and M43d(m00 : float, m10 : float, m20 : float, m30 : float, m01 : float, m11 : float, m21 : float, m31 : float, m02 : float, m12 : float, m22 : float, m32 : float) =
     member __.M00 : float = m00
     member __.M10 : float = m10
@@ -573,8 +1002,11 @@ and M43d(m00 : float, m10 : float, m20 : float, m30 : float, m01 : float, m11 : 
     member x.R1 : V3d = V3d(m10, m11, m12)
     member x.R2 : V3d = V3d(m20, m21, m22)
     member x.R3 : V3d = V3d(m30, m31, m32)
-    static member Zero = M43d(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-    static member Identity = M43d(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+    member x.C0 : V4d = V4d(m00, m10, m20, m30)
+    member x.C1 : V4d = V4d(m01, m11, m21, m31)
+    member x.C2 : V4d = V4d(m02, m12, m22, m32)
+    static member Zero = M43d( 0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 )
+    static member Identity = M43d( 1.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  1.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  1.0 ,  0.0 )
     static member (*) (l : M43d, r : M32d) : M42d =
         M42d(
             l.M00 * r.M00 + l.M01 * r.M10 + l.M02 * r.M20,
@@ -673,6 +1105,78 @@ and M43d(m00 : float, m10 : float, m20 : float, m30 : float, m01 : float, m11 : 
             m01, m11, m21, m31, 
             m02, m12, m22, m32
         )
+    new(o : M22d) = 
+        M43d(
+            o.M00, o.M01,  0.0 , 
+            o.M10, o.M11,  0.0 , 
+             0.0 ,  0.0 ,  1.0 , 
+             0.0 ,  0.0 ,  0.0 
+        )
+    new(o : M23d) = 
+        M43d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12, 
+             0.0 ,  0.0 ,  1.0 , 
+             0.0 ,  0.0 ,  0.0 
+        )
+    new(o : M24d) = 
+        M43d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12, 
+             0.0 ,  0.0 ,  1.0 , 
+             0.0 ,  0.0 ,  0.0 
+        )
+    new(o : M32d) = 
+        M43d(
+            o.M00, o.M01,  0.0 , 
+            o.M10, o.M11,  0.0 , 
+            o.M20, o.M21,  1.0 , 
+             0.0 ,  0.0 ,  0.0 
+        )
+    new(o : M33d) = 
+        M43d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12, 
+            o.M20, o.M21, o.M22, 
+             0.0 ,  0.0 ,  0.0 
+        )
+    new(o : M34d) = 
+        M43d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12, 
+            o.M20, o.M21, o.M22, 
+             0.0 ,  0.0 ,  0.0 
+        )
+    new(o : M42d) = 
+        M43d(
+            o.M00, o.M01,  0.0 , 
+            o.M10, o.M11,  0.0 , 
+            o.M20, o.M21,  1.0 , 
+            o.M30, o.M31,  0.0 
+        )
+    new(o : M44d) = 
+        M43d(
+            o.M00, o.M01, o.M02, 
+            o.M10, o.M11, o.M12, 
+            o.M20, o.M21, o.M22, 
+            o.M30, o.M31, o.M32
+        )
+    member x.UpperLeftM22() : M22d = M22d(x)
+    member x.UpperLeftM33() : M33d = M33d(x)
+    member x.ToFloat32Array() : Float32Array =
+        let arr = Float32Array.Create(12.0)
+        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02
+        arr.[3] <- m10; arr.[4] <- m11; arr.[5] <- m12
+        arr.[6] <- m20; arr.[7] <- m21; arr.[8] <- m22
+        arr.[9] <- m30; arr.[10] <- m31; arr.[11] <- m32
+        arr
+    member x.ToFloat64Array() : Float64Array =
+        let arr = Float64Array.Create(12.0)
+        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02
+        arr.[3] <- m10; arr.[4] <- m11; arr.[5] <- m12
+        arr.[6] <- m20; arr.[7] <- m21; arr.[8] <- m22
+        arr.[9] <- m30; arr.[10] <- m31; arr.[11] <- m32
+        arr
 and M44d(m00 : float, m10 : float, m20 : float, m30 : float, m01 : float, m11 : float, m21 : float, m31 : float, m02 : float, m12 : float, m22 : float, m32 : float, m03 : float, m13 : float, m23 : float, m33 : float) =
     member __.M00 : float = m00
     member __.M10 : float = m10
@@ -694,8 +1198,12 @@ and M44d(m00 : float, m10 : float, m20 : float, m30 : float, m01 : float, m11 : 
     member x.R1 : V4d = V4d(m10, m11, m12, m13)
     member x.R2 : V4d = V4d(m20, m21, m22, m23)
     member x.R3 : V4d = V4d(m30, m31, m32, m33)
-    static member Zero = M44d(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-    static member Identity = M44d(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+    member x.C0 : V4d = V4d(m00, m10, m20, m30)
+    member x.C1 : V4d = V4d(m01, m11, m21, m31)
+    member x.C2 : V4d = V4d(m02, m12, m22, m32)
+    member x.C3 : V4d = V4d(m03, m13, m23, m33)
+    static member Zero = M44d( 0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 )
+    static member Identity = M44d( 1.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  1.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  1.0 ,  0.0 ,  0.0 ,  0.0 ,  0.0 ,  1.0 )
     static member (*) (l : M44d, r : M43d) : M43d =
         M43d(
             l.M00 * r.M00 + l.M01 * r.M10 + l.M02 * r.M20 + l.M03 * r.M30,
@@ -797,3 +1305,75 @@ and M44d(m00 : float, m10 : float, m20 : float, m30 : float, m01 : float, m11 : 
            m01 * m12 * m23 + m02 * m13 * m21 + m03 * m11 * m22 -
            m21 * m12 * m03 - m22 * m13 * m01 - m23 * m11 * m02
         )
+    new(o : M22d) = 
+        M44d(
+            o.M00, o.M01,  0.0 ,  0.0 , 
+            o.M10, o.M11,  0.0 ,  0.0 , 
+             0.0 ,  0.0 ,  1.0 ,  0.0 , 
+             0.0 ,  0.0 ,  0.0 ,  1.0 
+        )
+    new(o : M23d) = 
+        M44d(
+            o.M00, o.M01, o.M02,  0.0 , 
+            o.M10, o.M11, o.M12,  0.0 , 
+             0.0 ,  0.0 ,  1.0 ,  0.0 , 
+             0.0 ,  0.0 ,  0.0 ,  1.0 
+        )
+    new(o : M24d) = 
+        M44d(
+            o.M00, o.M01, o.M02, o.M03, 
+            o.M10, o.M11, o.M12, o.M13, 
+             0.0 ,  0.0 ,  1.0 ,  0.0 , 
+             0.0 ,  0.0 ,  0.0 ,  1.0 
+        )
+    new(o : M32d) = 
+        M44d(
+            o.M00, o.M01,  0.0 ,  0.0 , 
+            o.M10, o.M11,  0.0 ,  0.0 , 
+            o.M20, o.M21,  1.0 ,  0.0 , 
+             0.0 ,  0.0 ,  0.0 ,  1.0 
+        )
+    new(o : M33d) = 
+        M44d(
+            o.M00, o.M01, o.M02,  0.0 , 
+            o.M10, o.M11, o.M12,  0.0 , 
+            o.M20, o.M21, o.M22,  0.0 , 
+             0.0 ,  0.0 ,  0.0 ,  1.0 
+        )
+    new(o : M34d) = 
+        M44d(
+            o.M00, o.M01, o.M02, o.M03, 
+            o.M10, o.M11, o.M12, o.M13, 
+            o.M20, o.M21, o.M22, o.M23, 
+             0.0 ,  0.0 ,  0.0 ,  1.0 
+        )
+    new(o : M42d) = 
+        M44d(
+            o.M00, o.M01,  0.0 ,  0.0 , 
+            o.M10, o.M11,  0.0 ,  0.0 , 
+            o.M20, o.M21,  1.0 ,  0.0 , 
+            o.M30, o.M31,  0.0 ,  1.0 
+        )
+    new(o : M43d) = 
+        M44d(
+            o.M00, o.M01, o.M02,  0.0 , 
+            o.M10, o.M11, o.M12,  0.0 , 
+            o.M20, o.M21, o.M22,  0.0 , 
+            o.M30, o.M31, o.M32,  1.0 
+        )
+    member x.UpperLeftM22() : M22d = M22d(x)
+    member x.UpperLeftM33() : M33d = M33d(x)
+    member x.ToFloat32Array() : Float32Array =
+        let arr = Float32Array.Create(16.0)
+        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02; arr.[3] <- m03
+        arr.[4] <- m10; arr.[5] <- m11; arr.[6] <- m12; arr.[7] <- m13
+        arr.[8] <- m20; arr.[9] <- m21; arr.[10] <- m22; arr.[11] <- m23
+        arr.[12] <- m30; arr.[13] <- m31; arr.[14] <- m32; arr.[15] <- m33
+        arr
+    member x.ToFloat64Array() : Float64Array =
+        let arr = Float64Array.Create(16.0)
+        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02; arr.[3] <- m03
+        arr.[4] <- m10; arr.[5] <- m11; arr.[6] <- m12; arr.[7] <- m13
+        arr.[8] <- m20; arr.[9] <- m21; arr.[10] <- m22; arr.[11] <- m23
+        arr.[12] <- m30; arr.[13] <- m31; arr.[14] <- m32; arr.[15] <- m33
+        arr

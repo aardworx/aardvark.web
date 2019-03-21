@@ -47,6 +47,9 @@ let main argv =
     console.warn (a :> obj)
     let a = a :> obj
 
+
+    let arr = Float32Array.Create(16.0)
+    arr.[0] <- 1.0
     console.warn (a.GetTypeName())
 
     0 // return an integer exit code

@@ -22,6 +22,8 @@ let run () =
     printfn "namespace Aardvark.Base"
     printfn ""
     printfn "open Aardvark.Base"
+    printfn "open Fable.Core"
+    printfn "open Fable.Import.JS"
     printfn ""
 
     let getName (d : Description) =
@@ -110,6 +112,7 @@ let run () =
         create true "        " t (fun r c -> sprintf "m%d%d" c r)
         
 
+
         // det
         if d.rows = d.cols then
             if d.rows = 2 then
@@ -138,12 +141,47 @@ let run () =
                 printfn "        )"
 
 
+        for rr in 2 .. 4  do
+            for cc in 2 .. 4 do
+                if rr <> d.rows || cc <> d.cols then
+                    let s = { d with rows = rr; cols = cc }
+                    printfn "    new(o : %s) = " (getName s)
+                    create true "        " d (fun r c -> if r < rr && c < cc then sprintf "o.M%d%d" r c elif r = c then d.one else d.zero)
+
+
+        
+        if (d.rows > 2 && d.cols >= 2) || (d.rows >= 2 && d.cols >2) then
+            printfn "    member x.UpperLeftM22() : M22%s = M22%s(x)" d.suffix d.suffix
+
+        if (d.rows > 3 && d.cols >= 3) || (d.rows >= 3 && d.cols > 3) then
+            printfn "    member x.UpperLeftM33() : M33%s = M33%s(x)" d.suffix d.suffix
+
+
+        printfn "    member x.ToFloat32Array() : Float32Array ="
+        printfn "        let arr = Float32Array.Create(%d.0)" (d.rows * d.cols)
+        let mutable o = 0
+        for r in 0 .. d.rows - 1 do
+            let setAll = List.init d.cols id |> Seq.mapi (fun i c -> sprintf "arr.[%d] <- m%d%d" (o + i) r c) |> String.concat "; "
+            printfn "        %s" setAll
+            o <- o + d.cols
+        printfn "        arr"
+
+        
+        printfn "    member x.ToFloat64Array() : Float64Array ="
+        printfn "        let arr = Float64Array.Create(%d.0)" (d.rows * d.cols)
+        let mutable o = 0
+        for r in 0 .. d.rows - 1 do
+            let setAll = List.init d.cols id |> Seq.mapi (fun i c -> sprintf "arr.[%d] <- m%d%d" (o + i) r c) |> String.concat "; "
+            printfn "        %s" setAll
+            o <- o + d.cols
+        printfn "        arr"
+
 
     let descs =
         [
             for r in 2 .. 4 do
-                for c in 2 .. 4 do
-                    yield { baseType = "float"; suffix = "d"; rows = r; cols = c; zero = "0.0"; one = "1.0"; fract = true }
+                for c in 2 .. 4 do                                                      //o.M00
+                    yield { baseType = "float"; suffix = "d"; rows = r; cols = c; zero = " 0.0 "; one = " 1.0 "; fract = true }
         ]
 
 
