@@ -28,14 +28,14 @@ type V2i(x : int, y : int) =
     member __.Length = sqrt (float (x*x + y*y))
     override __.GetHashCode() = HashCode.Combine(x.GetHashCode(), y.GetHashCode())
     override __.Equals(o) = match o with | :? V2i as o -> x = o.X && y = o.Y | _ -> false
+    override __.ToString() = sprintf "[%d, %d]" x y
     interface System.IComparable with
         member __.CompareTo(o) = 
             match o with 
             | :? V2i as o -> 
-                let a = compare x o.X
-                if a <> 0 then a
-                else
-                    compare y o.Y
+                let mutable a = 0
+                if (a <- compare x o.X; a <> 0) then a
+                else compare y o.Y
             | _ -> failwith "uncomparable"
     member __.AnyGreater(o : V2i) = x > o.X || y > o.Y
     member __.AnyGreaterOrEqual(o : V2i) = x >= o.X || y >= o.Y
@@ -116,17 +116,15 @@ type V3i(x : int, y : int, z : int) =
     member __.Length = sqrt (float (x*x + y*y + z*z))
     override __.GetHashCode() = HashCode.Combine(x.GetHashCode(), y.GetHashCode(), z.GetHashCode())
     override __.Equals(o) = match o with | :? V3i as o -> x = o.X && y = o.Y && z = o.Z | _ -> false
+    override __.ToString() = sprintf "[%d, %d, %d]" x y z
     interface System.IComparable with
         member __.CompareTo(o) = 
             match o with 
             | :? V3i as o -> 
-                let a = compare x o.X
-                if a <> 0 then a
-                else
-                    let a = compare y o.Y
-                    if a <> 0 then a
-                    else
-                        compare z o.Z
+                let mutable a = 0
+                if (a <- compare x o.X; a <> 0) then a
+                elif (a <- compare y o.Y; a <> 0) then a
+                else compare z o.Z
             | _ -> failwith "uncomparable"
     member __.AnyGreater(o : V3i) = x > o.X || y > o.Y || z > o.Z
     member __.AnyGreaterOrEqual(o : V3i) = x >= o.X || y >= o.Y || z >= o.Z
@@ -515,20 +513,16 @@ type V4i(x : int, y : int, z : int, w : int) =
     member __.Length = sqrt (float (x*x + y*y + z*z + w*w))
     override __.GetHashCode() = HashCode.Combine(x.GetHashCode(), y.GetHashCode(), z.GetHashCode(), w.GetHashCode())
     override __.Equals(o) = match o with | :? V4i as o -> x = o.X && y = o.Y && z = o.Z && w = o.W | _ -> false
+    override __.ToString() = sprintf "[%d, %d, %d, %d]" x y z w
     interface System.IComparable with
         member __.CompareTo(o) = 
             match o with 
             | :? V4i as o -> 
-                let a = compare x o.X
-                if a <> 0 then a
-                else
-                    let a = compare y o.Y
-                    if a <> 0 then a
-                    else
-                        let a = compare z o.Z
-                        if a <> 0 then a
-                        else
-                            compare w o.W
+                let mutable a = 0
+                if (a <- compare x o.X; a <> 0) then a
+                elif (a <- compare y o.Y; a <> 0) then a
+                elif (a <- compare z o.Z; a <> 0) then a
+                else compare w o.W
             | _ -> failwith "uncomparable"
     member __.AnyGreater(o : V4i) = x > o.X || y > o.Y || z > o.Z || w > o.W
     member __.AnyGreaterOrEqual(o : V4i) = x >= o.X || y >= o.Y || z >= o.Z || w >= o.W
@@ -572,14 +566,14 @@ type V2d(x : float, y : float) =
     member this.Normalized = let l = this.Length in V2d(x/l, y/l)
     override __.GetHashCode() = HashCode.Combine(x.GetHashCode(), y.GetHashCode())
     override __.Equals(o) = match o with | :? V2d as o -> x = o.X && y = o.Y | _ -> false
+    override __.ToString() = sprintf "[%f, %f]" x y
     interface System.IComparable with
         member __.CompareTo(o) = 
             match o with 
             | :? V2d as o -> 
-                let a = compare x o.X
-                if a <> 0 then a
-                else
-                    compare y o.Y
+                let mutable a = 0
+                if (a <- compare x o.X; a <> 0) then a
+                else compare y o.Y
             | _ -> failwith "uncomparable"
     member __.AnyGreater(o : V2d) = x > o.X || y > o.Y
     member __.AnyGreaterOrEqual(o : V2d) = x >= o.X || y >= o.Y
@@ -662,17 +656,15 @@ type V3d(x : float, y : float, z : float) =
     member this.Normalized = let l = this.Length in V3d(x/l, y/l, z/l)
     override __.GetHashCode() = HashCode.Combine(x.GetHashCode(), y.GetHashCode(), z.GetHashCode())
     override __.Equals(o) = match o with | :? V3d as o -> x = o.X && y = o.Y && z = o.Z | _ -> false
+    override __.ToString() = sprintf "[%f, %f, %f]" x y z
     interface System.IComparable with
         member __.CompareTo(o) = 
             match o with 
             | :? V3d as o -> 
-                let a = compare x o.X
-                if a <> 0 then a
-                else
-                    let a = compare y o.Y
-                    if a <> 0 then a
-                    else
-                        compare z o.Z
+                let mutable a = 0
+                if (a <- compare x o.X; a <> 0) then a
+                elif (a <- compare y o.Y; a <> 0) then a
+                else compare z o.Z
             | _ -> failwith "uncomparable"
     member __.AnyGreater(o : V3d) = x > o.X || y > o.Y || z > o.Z
     member __.AnyGreaterOrEqual(o : V3d) = x >= o.X || y >= o.Y || z >= o.Z
@@ -1063,20 +1055,16 @@ type V4d(x : float, y : float, z : float, w : float) =
     member this.Normalized = let l = this.Length in V4d(x/l, y/l, z/l, w/l)
     override __.GetHashCode() = HashCode.Combine(x.GetHashCode(), y.GetHashCode(), z.GetHashCode(), w.GetHashCode())
     override __.Equals(o) = match o with | :? V4d as o -> x = o.X && y = o.Y && z = o.Z && w = o.W | _ -> false
+    override __.ToString() = sprintf "[%f, %f, %f, %f]" x y z w
     interface System.IComparable with
         member __.CompareTo(o) = 
             match o with 
             | :? V4d as o -> 
-                let a = compare x o.X
-                if a <> 0 then a
-                else
-                    let a = compare y o.Y
-                    if a <> 0 then a
-                    else
-                        let a = compare z o.Z
-                        if a <> 0 then a
-                        else
-                            compare w o.W
+                let mutable a = 0
+                if (a <- compare x o.X; a <> 0) then a
+                elif (a <- compare y o.Y; a <> 0) then a
+                elif (a <- compare z o.Z; a <> 0) then a
+                else compare w o.W
             | _ -> failwith "uncomparable"
     member __.AnyGreater(o : V4d) = x > o.X || y > o.Y || z > o.Z || w > o.W
     member __.AnyGreaterOrEqual(o : V4d) = x >= o.X || y >= o.Y || z >= o.Z || w >= o.W

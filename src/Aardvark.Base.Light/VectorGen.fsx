@@ -100,20 +100,23 @@ let run () =
         // hashcode/equals
         printfn "    override __.GetHashCode() = HashCode.Combine(%s)" (names |> Seq.map (fun n -> sprintf "%s.GetHashCode()" (n.ToLower())) |> String.concat ", ")
         printfn "    override __.Equals(o) = match o with | :? %s as o -> %s | _ -> false" name (names |> Seq.map (fun n -> sprintf "%s = o.%s" (n.ToLower()) n) |> String.concat " && ")
+        printfn "    override __.ToString() = sprintf \"[%s]\" %s" (Seq.init d.dimension (fun _ -> if d.fract then "%f" else "%d") |> String.concat ", ") (names |> Seq.map (fun s -> s.ToLower()) |> String.concat " ")
         
         // IComparable
         printfn "    interface System.IComparable with"
         printfn "        member __.CompareTo(o) = "
         printfn "            match o with "
         printfn "            | :? %s as o -> " name
-        let mutable indent = "                "
+        printfn "                let mutable a = 0"
+        let indent = "                "
+        let mutable i = 0
         for n in Array.take (names.Length - 1) names do
-            printfn "%slet a = compare %s o.%s" indent (n.ToLower()) n
-            printfn "%sif a <> 0 then a" indent
-            printfn "%selse" indent
-            indent <- indent + "    "
-        let n = names.[names.Length - 1]
-        printfn "%scompare %s o.%s" indent (n.ToLower()) n
+            let iff = if i = 0 then "if" else "elif"
+            printfn "%s%s (a <- compare %s o.%s; a <> 0) then a" indent iff (n.ToLower()) n
+            i <- i + 1
+        let n = names.[i]
+        printfn "%selse compare %s o.%s" indent (n.ToLower()) n
+
         printfn "            | _ -> failwith \"uncomparable\""
 
 
