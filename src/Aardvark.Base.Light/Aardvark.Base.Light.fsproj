@@ -9,6 +9,7 @@
     <Compile Include="Utils.fs" />
     <Compile Include="Vectors_auto.fs" />
     <Compile Include="Matrices_auto.fs" />
+    <Compile Include="Trafo3d.fs" />
     <Compile Include="Prelude/Measures.fs" />
 	<Compile Include="Prelude/Lens.fs" />
 	<Compile Include="Prelude/Monoid.fs" />

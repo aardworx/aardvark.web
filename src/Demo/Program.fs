@@ -45,6 +45,8 @@ let main argv =
     let a = M44d.Rotation(V3d.III, 0.2) * M44d.Scale(V3d(0.1, 0.6, 10.0)) * M44d.Translation(V3d(1.0, 2.0, 3.0)) //(1.0, 2.0, 3.0, 0.0, 0.2, 0.0, 0.0, 0.0, 2.0)
     let b = a.Inverse
 
+    let tt = Trafo3d.Translation(1.0, 2.0, 3.0) * Trafo3d.Scale(0.1, 0.6, 10.0) * Trafo3d.Rotation(V3d.III, 0.2)
+
     let t1 = a * b
     let t2 = b * a
     
@@ -56,6 +58,7 @@ let main argv =
         console.log ("  " + m.R3.ToString())
         
     printMat "a" a
+    printMat "aa" tt.Forward
     printMat "b" b
     printMat "t1" t1
     printMat "t2" t2
