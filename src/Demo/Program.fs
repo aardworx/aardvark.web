@@ -38,9 +38,168 @@ let test (s : Sepp<int>) =
     s2.A <- 10
     s2
 
+type Context(gl : WebGLRenderingContext) =
+
+    static let versionRx = System.Text.RegularExpressions.Regex @"\#version.*(\r\n|\r|\n)"
+
+    member x.CompileShader (stage : float, code : string) =
+        
+        
+
+        let def =
+            if stage = gl.VERTEX_SHADER then "VERTEX"
+            elif stage = gl.FRAGMENT_SHADER then "FRAGMENT"
+            else "UNKNOWN"
+
+        let code = versionRx.Replace(code, fun m -> m.Value + "#define " + def + "\r\n")
+
+        let shader = gl.createShader(stage)
+        gl.shaderSource(shader, code)
+        gl.compileShader(shader)
+        
+        let s = gl.getShaderParameter(shader, gl.COMPILE_STATUS) |> unbox<int>
+        if s = 0 then
+            let log = gl.getShaderInfoLog(shader)
+            console.warn s
+            console.warn log
+            None
+        else
+            Some shader
+
+    member x.CreateProgram(code : string) =
+
+        match x.CompileShader(gl.VERTEX_SHADER, code), x.CompileShader(gl.FRAGMENT_SHADER, code) with
+        | Some vs, Some fs ->
+            let p = gl.createProgram()
+            gl.attachShader(p, vs)
+            gl.attachShader(p, fs)
+            gl.linkProgram(p)
+
+            let status = gl.getProgramParameter(p, gl.LINK_STATUS) |> unbox<int>
+            if status <> 0 then
+            
+                Some p
+            else
+                let log = gl.getProgramInfoLog(p)
+                console.warn log
+                None
+        | _ ->
+            None
+
+
+
+
+
+type WebGLRenderingContext with
+    member x.UNIFORM_BUFFER = 35345.0
+
+    [<Emit("$0.bindBufferRange($1, $2, $3, $4, $5)")>]
+    member x.bindBufferRange(target : float, index : float, buffer : WebGLBuffer, offset : float, size : float) = jsNative
+
+  
+
 
 [<EntryPoint>]
 let main argv =
+
+
+
+    document.addEventListener_readystatechange(fun e ->
+        if document.readyState = "complete" then
+            let canvas = document.createElement_canvas()
+            document.body.appendChild(canvas) |> ignore
+            canvas.width <- 200.0
+            canvas.height <- 200.0
+
+            
+            let gl = canvas.getContext("webgl2") |> unbox<WebGLRenderingContext>
+            let ctx = Context(gl)
+
+
+            let pos =   
+                Float32Array.``of`` [|
+                    -1.0; -1.0; 0.0
+                    1.0; -1.0; 0.0
+                    1.0; 1.0; 0.0
+                |]
+
+
+
+            let b = gl.createBuffer()
+            gl.bindBuffer(gl.ARRAY_BUFFER, b)
+            gl.bufferData(gl.ARRAY_BUFFER, U3.Case3 pos.buffer, gl.STATIC_DRAW)
+            gl.bindBuffer(gl.ARRAY_BUFFER, null)
+
+            let shader =
+                """#version 300 es
+
+                    #ifdef VERTEX
+
+                    uniform View {
+                        mat4 MVP;
+                    };
+
+                    layout(location = 0) in vec3 pos;
+                    void main() {
+                        gl_Position = MVP * vec4(pos, 1.0);
+                    }
+                    #endif
+
+                    #ifdef FRAGMENT
+                    precision highp float;
+                    layout(location = 0) out vec4 color;
+                    void main() {
+                        color = vec4(1,0,0,1);
+                    }
+                    #endif
+                """
+
+            let p = ctx.CreateProgram(shader)
+
+
+
+            let m = M44d.RotationZ(0.3)
+
+            let ub = gl.createBuffer()
+            gl.bindBuffer(gl.UNIFORM_BUFFER, ub)
+            gl.bufferData(gl.UNIFORM_BUFFER, U3.Case3 (m.ToFloat32Array().buffer), gl.DYNAMIC_DRAW)
+            gl.bindBuffer(gl.UNIFORM_BUFFER, null)
+
+            let mutable angle = 0.0
+            let rec render _ =
+                angle <- angle + 0.01
+
+                
+                let m = M44d.RotationZ(angle)
+                gl.bindBuffer(gl.UNIFORM_BUFFER, ub)
+                gl.bufferData(gl.UNIFORM_BUFFER, U3.Case3 (m.ToFloat32Array().buffer), gl.DYNAMIC_DRAW)
+                gl.bindBuffer(gl.UNIFORM_BUFFER, null)
+
+                let rect = canvas.getBoundingClientRect()
+                gl.clearColor(0.0, 1.0, 0.0, 1.0)
+                gl.clearDepth(1.0)
+                gl.clear(float (int gl.COLOR_BUFFER_BIT ||| int gl.DEPTH_BUFFER_BIT))
+
+                gl.viewport(0.0, 0.0, rect.width, rect.height)
+                gl.useProgram(p.Value)
+                gl.bindBufferRange(gl.UNIFORM_BUFFER, 0.0, ub, 0.0, 64.0)
+                gl.bindBuffer(gl.ARRAY_BUFFER, b)
+                gl.enableVertexAttribArray(0.0)
+                gl.vertexAttribPointer(0.0, 3.0, gl.FLOAT, false, 0.0, 0.0)
+                gl.bindBuffer(gl.ARRAY_BUFFER, null)
+                gl.drawArrays(gl.TRIANGLES, 0.0, 3.0)
+                gl.useProgram(null)
+                window.requestAnimationFrame(render) |> ignore
+
+            window.requestAnimationFrame(render) |> ignore
+
+    )
+
+
+
+
+
+
 
     let a = M44d.Rotation(V3d.III, 0.2) * M44d.Scale(V3d(0.1, 0.6, 10.0)) * M44d.Translation(V3d(1.0, 2.0, 3.0)) //(1.0, 2.0, 3.0, 0.0, 0.2, 0.0, 0.0, 0.0, 2.0)
     let b = a.Inverse
