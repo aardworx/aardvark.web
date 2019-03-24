@@ -90,29 +90,33 @@ type Context(gl : WebGLRenderingContext) =
 
 
 
-type WebGLRenderingContext with
-    member x.UNIFORM_BUFFER = 35345.0
+//type WebGLRenderingContext with
+//    member x.UNIFORM_BUFFER = 35345.0
 
-    [<Emit("$0.bindBufferRange($1, $2, $3, $4, $5)")>]
-    member x.bindBufferRange(target : float, index : float, buffer : WebGLBuffer, offset : float, size : float) = jsNative
+//    [<Emit("$0.bindBufferRange($1, $2, $3, $4, $5)")>]
+//    member x.bindBufferRange(target : float, index : float, buffer : WebGLBuffer, offset : float, size : float) = jsNative
 
   
+type WebGL2RenderingContext =
+    inherit WebGLRenderingContext
+    abstract member UNIFORM_BUFFER : float
+    abstract member bindBufferRange : target : float * index : float * buffer : WebGLBuffer * offset : float * size : float -> unit
 
 
 [<EntryPoint>]
 let main argv =
 
-
-
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
             let canvas = document.createElement_canvas()
             document.body.appendChild(canvas) |> ignore
-            canvas.width <- 200.0
-            canvas.height <- 200.0
+            document.body.style.margin <- "0"
+            document.body.style.padding <- "0"
 
+            canvas.style.width <- "100%"
+            canvas.style.height <- "100%"
             
-            let gl = canvas.getContext("webgl2") |> unbox<WebGLRenderingContext>
+            let gl = canvas.getContext("webgl2") |> unbox<WebGL2RenderingContext>
             let ctx = Context(gl)
 
 
@@ -141,12 +145,13 @@ let main argv =
 
                     layout(location = 0) in vec3 pos;
                     void main() {
-                        gl_Position = MVP * vec4(pos, 1.0);
+                        gl_Position = vec4(pos, 1.0) * MVP;
                     }
                     #endif
 
                     #ifdef FRAGMENT
                     precision highp float;
+                    precision highp int;
                     layout(location = 0) out vec4 color;
                     void main() {
                         color = vec4(1,0,0,1);
@@ -165,10 +170,18 @@ let main argv =
             gl.bufferData(gl.UNIFORM_BUFFER, U3.Case3 (m.ToFloat32Array().buffer), gl.DYNAMIC_DRAW)
             gl.bindBuffer(gl.UNIFORM_BUFFER, null)
 
+
+            let mutable t0 = None //performance.now()
             let mutable angle = 0.0
             let rec render _ =
-                angle <- angle + 0.01
-
+                let t = performance.now()
+                match t0 with
+                | Some tb ->
+                    let dt = t - tb
+                    t0 <- Some t
+                    angle <- angle + 0.001 * dt
+                | None ->
+                    t0 <- Some t
                 
                 let m = M44d.RotationZ(angle)
                 gl.bindBuffer(gl.UNIFORM_BUFFER, ub)
@@ -176,11 +189,15 @@ let main argv =
                 gl.bindBuffer(gl.UNIFORM_BUFFER, null)
 
                 let rect = canvas.getBoundingClientRect()
-                gl.clearColor(0.0, 1.0, 0.0, 1.0)
+
+                if canvas.width <> rect.width then canvas.width <- rect.width
+                if canvas.height <> rect.height then canvas.height <- rect.height
+                //console.log(sprintf "%.0fx%.0f" rect.width rect.height)
+                gl.viewport(0.0, 0.0, rect.width, rect.height)
+                gl.clearColor(0.0, 0.0, 0.0, 1.0)
                 gl.clearDepth(1.0)
                 gl.clear(float (int gl.COLOR_BUFFER_BIT ||| int gl.DEPTH_BUFFER_BIT))
 
-                gl.viewport(0.0, 0.0, rect.width, rect.height)
                 gl.useProgram(p.Value)
                 gl.bindBufferRange(gl.UNIFORM_BUFFER, 0.0, ub, 0.0, 64.0)
                 gl.bindBuffer(gl.ARRAY_BUFFER, b)
