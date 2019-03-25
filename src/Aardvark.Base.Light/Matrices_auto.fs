@@ -1154,6 +1154,12 @@ and M34d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
             n12*ci-n3*s, c+n2*n2*ci, n23*ci+n1*s,  0.0 , 
             n13*ci+n2*s, n23*ci-n1*s, c+n3*n3*ci,  0.0 
         )
+    static member ViewTrafo(location : V3d, right : V3d, up : V3d, normal : V3d) =
+        M34d(
+            right.X, right.Y, right.Z, -location.Dot(right), 
+            up.X, up.Y, up.Z, -location.Dot(up), 
+            normal.X, normal.Y, normal.Z, -location.Dot(normal)
+        )
     static member Scale(scale : V3d) : M34d = 
         M34d(
             scale.X,  0.0 ,  0.0 ,  0.0 , 
@@ -2007,6 +2013,13 @@ and M44d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
             c+n1*n1*ci, n12*ci+n3*s, n13*ci-n2*s,  0.0 , 
             n12*ci-n3*s, c+n2*n2*ci, n23*ci+n1*s,  0.0 , 
             n13*ci+n2*s, n23*ci-n1*s, c+n3*n3*ci,  0.0 , 
+             0.0 ,  0.0 ,  0.0 ,  1.0 
+        )
+    static member ViewTrafo(location : V3d, right : V3d, up : V3d, normal : V3d) =
+        M44d(
+            right.X, right.Y, right.Z, -location.Dot(right), 
+            up.X, up.Y, up.Z, -location.Dot(up), 
+            normal.X, normal.Y, normal.Z, -location.Dot(normal), 
              0.0 ,  0.0 ,  0.0 ,  1.0 
         )
     static member Scale(scale : V3d) : M44d = 

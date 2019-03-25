@@ -149,3 +149,41 @@ type ArrayExtensions private() =
             xk <- xk - xy
             lk <- lk - ly
             lkk <- lkk - ly - lx
+
+
+[<AbstractClass; Sealed; Extension>]
+type Fun private() =    
+    [<Extension>]
+    static member IsTiny (v : float) = v >= -1E-16 && v <= 1E-16
+    
+[<AbstractClass; Sealed>]
+type Constant private() =
+    
+    static member Pi = 3.1415926535897932384626433832795
+    static member PiInv = 0.318309886183790671537767526745028724068919291480912897495
+    static member PiTimesTwo = 6.283185307179586476925286766559
+    static member PiTimesThree = 9.424777960769379715387930149839
+    static member PiTimesFour = 12.56637061435917295385057353312
+    static member PiHalf = 1.570796326794896619231321691640
+    static member PiQuarter = 0.78539816339744830961566084581988
+    static member PiSquared = 9.869604401089358618834490999876
+    static member SqrtPiTimesTwo = 2.5066282746310005024157652848110
+    static member E = 2.71828182845905
+    static member Sqrt2 = 1.414213562373095048801688724209
+    static member Sqrt2Half = 0.70710678118654752440084436210485
+    static member Sqrt3 = 1.732050807568877293527446341505
+    static member Sqrt5 = 2.236067977499789696409173668731
+    static member Ln2 = 0.69314718055994530941723212145818
+    static member Ln2Inv = 1.4426950408889634073599246810023
+
+    static member RadiansPerDegree = 0.0174532925199433
+    static member DegreesPerRadian = 57.2957795130823
+    static member SpeedOfLight = 299792458.0
+
+    
+[<AbstractClass; Sealed; Extension>]
+type Conversion private() =
+    [<Extension>]
+    static member DegreesFromRadians (r : float) = Constant.DegreesPerRadian * r
+    [<Extension>]
+    static member RadiansFromDegrees (r : float) = Constant.RadiansPerDegree * r

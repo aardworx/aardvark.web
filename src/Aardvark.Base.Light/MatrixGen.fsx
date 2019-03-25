@@ -147,6 +147,18 @@ let run () =
             create true "        " d (fun r c -> if c < elements.Length && r < elements.[c].Length then elements.[c].[r] elif r = c then d.one else d.zero)
 
  
+            printfn "    static member ViewTrafo(location : V3d, right : V3d, up : V3d, normal : V3d) ="
+            let names = [|"right"; "up"; "normal"|]
+            create true "        " d (fun r c -> 
+                if r >= names.Length then
+                    if r = c then d.one
+                    else d.zero
+                else
+                    let n = names.[r]
+                    if c < 3 then sprintf "%s.%s" n vecNames.[c]
+                    else sprintf "-location.Dot(%s)" n
+            )
+
 
             //printfn "    static member Rotation(axis : V3d, angle : float) : %s = " name
             //printfn "        let c = cos angle"

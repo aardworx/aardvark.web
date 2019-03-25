@@ -21,6 +21,7 @@
 	<Compile Include="Datastructures\HDeltaSet.fs" />
 	<Compile Include="Datastructures\HSet.fs" />
     <Compile Include="Vectors.fs" />
+    <Compile Include="Camera.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />

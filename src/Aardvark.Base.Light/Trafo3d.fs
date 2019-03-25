@@ -29,6 +29,23 @@ type Trafo3d(forward : M44d, backward : M44d) =
             )
         Trafo3d(fw, fw.Inverse)
 
+
+    static member ViewTrafo(location : V3d, u : V3d, v : V3d, z : V3d) =
+        Trafo3d(
+            M44d(
+                u.X, u.Y, u.Z, -V3d.Dot(u, location),
+                v.X, v.Y, v.Z, -V3d.Dot(v, location),
+                z.X, z.Y, z.Z, -V3d.Dot(z, location),
+                0.0, 0.0, 0.0, 1.0
+            ),
+            M44d(
+                u.X, v.X, z.X, location.X,
+                u.Y, v.Y, z.Y, location.Y,
+                u.Z, v.Z, z.Z, location.Z,
+                0.0, 0.0, 0.0, 1.0
+            )
+        )
+
     new (forward : M44d) = Trafo3d(forward, forward.Inverse)
     override x.ToString() = sprintf "[%s, %s]" (string forward) (string backward)
     override x.GetHashCode() = forward.GetHashCode()
