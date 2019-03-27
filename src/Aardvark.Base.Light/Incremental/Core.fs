@@ -28,6 +28,8 @@ open System.Linq
 [<AllowNullLiteral>]
 type IAdaptiveObject =
 
+    abstract member Kind : string
+
     /// <summary>
     /// the globally unique id for the adaptive object
     /// </summary>
@@ -338,7 +340,7 @@ type Transaction() =
 /// defines a base class for all adaptive objects implementing
 /// IAdaptiveObject.
 /// </summary>
-[<AllowNullLiteral>]
+[<AllowNullLiteral; AbstractClass>]
 type AdaptiveObject() =
     let mutable id = newId()
     let mutable outOfDateValue = true
@@ -362,13 +364,13 @@ type AdaptiveObject() =
         and set v = AdaptiveObject.EvaluationDepthValue <- v
 
     member x.Level
-        with inline get() = if reevaluate then 0 else levelValue
-        and inline set v = if not reevaluate then levelValue <- v
+        with get() = if reevaluate then 0 else levelValue
+        and set v = if not reevaluate then levelValue <- v
 
     member x.OutOfDate 
-        with inline get() = 
+        with get() = 
             reevaluate || outOfDateValue
-        and inline set v = 
+        and set v = 
             if not reevaluate then 
                 outOfDateValue <- v
 
@@ -459,7 +461,11 @@ type AdaptiveObject() =
     abstract member AllInputsProcessedObj : obj -> unit
     default x.AllInputsProcessedObj(t) = ()
 
+    abstract member Kind : string
+    //default x.Kind = ""
 
+
+    member x.Outputs = outputs
 
     member x.Id = id
 
@@ -473,6 +479,8 @@ type AdaptiveObject() =
 
     interface IAdaptiveObject with
         member x.Id = x.Id
+
+        member x.Kind = x.Kind
 
         member x.Level
             with get() = if reevaluate then 0 else levelValue
@@ -500,54 +508,48 @@ type AdaptiveObject() =
             and set v = readerCountValue <- v
 
 
-///// <summary>
-///// defines a base class for all adaptive objects implementing
-///// IAdaptiveObject and providing dirty-inputs for evaluation.
-///// </summary>
-//[<AllowNullLiteral>]
-//type DirtyTrackingAdaptiveObject<'a when 'a :> IAdaptiveObject> =
-//    class 
-//        inherit AdaptiveObject
+/// <summary>
+/// defines a base class for all adaptive objects implementing
+/// IAdaptiveObject and providing dirty-inputs for evaluation.
+/// </summary>
+[<AllowNullLiteral; AbstractClass>]
+type DirtyTrackingAdaptiveObject<'a when 'a :> IAdaptiveObject>(kind : string) =
+    inherit AdaptiveObject()
 
-//        val mutable public Scratch : Dict<obj, HashSet<'a>>
-//        val mutable public Dirty : HashSet<'a>
+    let mutable scratch = HMap.empty
+    let mutable dirty = HSet.empty
 
-//        override x.InputChanged(t,o) =
-//            match o with
-//                | :? 'a as o ->
-//                    lock x.Scratch (fun () ->
-//                        let set = x.Scratch.GetOrCreate(t, fun t -> HashSet())
-//                        set.Add o |> ignore
-//                    )
-//                | _ -> ()
+    override x.InputChangedObj(t,o) =
+        if o.Kind = kind then 
+            scratch <- scratch |> HMap.alter t (Option.defaultValue HSet.empty >> HSet.add (unbox<'a> o) >> Some)
+        else
+            ()
 
-//        override x.AllInputsProcessed(t) =
-//            match lock x.Scratch (fun () -> x.Scratch.TryRemove t) with
-//                | (true, s) -> x.Dirty.UnionWith s
-//                | _ -> ()
+    override x.AllInputsProcessedObj(t) =
+        match HMap.tryRemove t scratch with
+        | Some (v, sc) ->
+            scratch <- sc
+            dirty <- HSet.union dirty v
+        | None ->
+            ()
 
 
-////
-////        member x.EvaluateIfNeeded' (token : AdaptiveToken) (otherwise : 'b) (compute : AdaptiveToken -> HashSet<'a> -> 'b) =
-////            x.EvaluateIfNeeded token otherwise (fun token ->
-////                let d = x.Dirty
-////                let res = compute token d
-////                d.Clear()
-////                res
-////            )
-
-//        member x.EvaluateAlways' (token : AdaptiveToken) (compute : AdaptiveToken -> HashSet<'a> -> 'b) =
-//            x.EvaluateAlways token (fun token ->
+//
+//        member x.EvaluateIfNeeded' (token : AdaptiveToken) (otherwise : 'b) (compute : AdaptiveToken -> HashSet<'a> -> 'b) =
+//            x.EvaluateIfNeeded token otherwise (fun token ->
 //                let d = x.Dirty
-//                x.Dirty <- HashSet()
 //                let res = compute token d
+//                d.Clear()
 //                res
 //            )
 
-//        new() = { Scratch = Dict(); Dirty = HashSet() }
-
-
-//    end
+    member x.EvaluateAlways' (token : AdaptiveToken) (compute : AdaptiveToken -> hset<'a> -> 'b) =
+        x.EvaluateAlways token (fun token ->
+            let d = dirty
+            dirty <- HSet.empty
+            let res = compute token d
+            res
+        )
 
 
 
@@ -564,8 +566,10 @@ type ConstantObject() =
 
     let mutable readerCount = 0
 
+    abstract member Kind : string
 
     interface IAdaptiveObject with
+        member x.Kind = x.Kind
         member x.Id = -1
         member x.Level
             with get() = 0

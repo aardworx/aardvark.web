@@ -125,7 +125,7 @@ module private HMapList =
 
         newL @ newR
 
-    let rec mergeWithOption' (f : 'k -> Option<'a> -> Option<'b> -> Option<'c>) (l : list<'k * 'a>) (r : list<'k * 'b>) =
+    let rec mergeWithOption1 (f : 'k -> Option<'a> -> Option<'b> -> Option<'c>) (l : list<'k * 'a>) (r : list<'k * 'b>) =
         let newL = 
             l |> List.choose (fun (lk,lv) ->
                 let other = r |> List.tryFind (fun (rk,_) -> Unchecked.equals rk lk) |> Option.map snd

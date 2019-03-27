@@ -71,7 +71,8 @@ type ModRef<'a>(value : 'a) =
 
     let mutable value = value
     let mutable cache = value
-
+    
+    override x.Kind = "Mod"
     member x.UnsafeCache
         with get() = value
         and set v = value <- v
@@ -130,6 +131,9 @@ type ModRef<'a>(value : 'a) =
 // force the evaluation of a constant cell.
 type ConstantMod<'a>(value : Lazy<'a>) =
     inherit ConstantObject()
+
+    override x.Kind = "Mod"
+
     member x.Value =
         value.Value
 
@@ -175,7 +179,8 @@ module Mod =
     type AbstractMod<'a>() =
         inherit AdaptiveObject()
         let mutable cache = Unchecked.defaultof<'a>
-
+        
+        override x.Kind = "Mod"
         abstract member Compute : AdaptiveToken -> 'a
 
         interface IMod with

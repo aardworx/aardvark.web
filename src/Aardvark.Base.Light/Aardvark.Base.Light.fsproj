@@ -20,9 +20,15 @@
 	<Compile Include="Datastructures/HMap.fs" />
 	<Compile Include="Datastructures\HDeltaSet.fs" />
 	<Compile Include="Datastructures\HSet.fs" />
+	<Compile Include="Datastructures\HRefSet.fs" />
 	<Compile Include="Incremental\PriorityQueue.fs" />
 	<Compile Include="Incremental\Core.fs" />
-	<Compile Include="Incremental\Mod.fs" />
+	<Compile Include="Incremental\Mod\Mod.fs" />
+	<Compile Include="Incremental\Mod\History.fs" />
+	<Compile Include="Incremental\ASet\asetcore.fs" />
+	<Compile Include="Incremental\ASet\cset.fs" />
+	<Compile Include="Incremental\ASet\mset.fs" />
+	<Compile Include="Incremental\ASet\aset.fs" />
     <Compile Include="Vectors.fs" />
     <Compile Include="Camera.fs" />
     <Compile Include="Library.fs" />

@@ -398,26 +398,23 @@ let seop() =
     ) |> unbox<Promise<ArrayBuffer>>
 
 let testy() =
-    let a = Mod.init 10
-    let b = Mod.init 10
-    let c = a |> Mod.bind (fun a -> if a < 11 then b |> Mod.map ((+) 2) else Mod.constant a)
+    let s = cset [1..10]
 
+    let test = s |> ASet.choose (fun v -> if v % 2 = 0 then Some (v / 2) else None)
 
-    console.warn(Mod.force c)
-    transact (fun () -> a.Value <- 100)
-    console.warn(Mod.force c)
-    transact (fun () -> b.Value <- 100)
-    console.warn(c.OutOfDate)
-    console.warn(Mod.force  c)
+    let r = test.GetReader()
+    console.warn (r.GetOperations(AdaptiveToken.Top) |> sprintf "%A")
+    console.warn (r.State |> Seq.toList |> sprintf "%A")
+
+    transact (fun () -> s.Add 99 |> ignore)
+    console.warn (r.GetOperations(AdaptiveToken.Top) |> sprintf "%A")
+    console.warn (r.State |> Seq.toList |> sprintf "%A")
+
     
-    transact (fun () -> a.Value <- 25)
-    console.warn(Mod.force  c)
+    transact (fun () -> s.Add 100 |> ignore)
+    console.warn (r.GetOperations(AdaptiveToken.Top) |> sprintf "%A")
+    console.warn (r.State  |> Seq.toList |> sprintf "%A")
 
-    let test = [1;2;3;4]
-    let x = Mod.constant test :> obj
-    let y = Mod.constant test :> obj
-    console.warn("a: " + (string (x.GetHash())))
-    console.warn("b: " + (string (y.GetHash())))
 
 
 [<EntryPoint>]

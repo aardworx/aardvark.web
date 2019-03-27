@@ -95,3 +95,78 @@ type DuplicatePriorityQueue<'a, 'k when 'k : comparison>(extract : 'a -> 'k) =
     member x.Count =
         count
 
+
+
+type Cache<'k, 'v>(creator : 'k -> 'v) =
+    let mutable store = HMap.empty
+
+    member x.Invoke(k : 'k) =
+        let res = ref Unchecked.defaultof<'v>
+        store <- 
+            store |> HMap.alter k (fun o ->
+                match o with
+                | Some (v,r) -> 
+                    res := v
+                    Some (v, r + 1)
+                | None ->
+                    let v = creator k
+                    res := v
+                    Some (v, 1)
+            )
+        !res
+
+    member x.Clear(dispose : 'v -> unit) =
+        store |> HMap.iter (fun _ (v,_) -> dispose v)
+        store <- HMap.empty
+        
+    member x.RevokeAndGetDeletedTotal(k : 'k) =
+        let res = ref None
+        store <- 
+            store |> HMap.alter k (fun o ->
+                match o with
+                | Some (v,1) ->
+                    res := Some(true, v)
+                    None
+                | Some (v,r) -> 
+                    res := Some(false, v)
+                    Some (v, r - 1)
+                | None ->
+                    failwith "cannot revoke unknown object"
+                    None
+            )
+        !res
+    member x.RevokeAndGetDeleted(k : 'k) =
+        let res = ref Unchecked.defaultof<'v>
+        let del = ref false
+        store <- 
+            store |> HMap.alter k (fun o ->
+                match o with
+                | Some (v,1) ->
+                    del := true
+                    res := v
+                    None
+                | Some (v,r) -> 
+                    res := v
+                    Some (v, r - 1)
+                | None ->
+                    failwith "cannot revoke unknown object"
+                    None
+            )
+        !del, !res
+
+    member x.Revoke(k : 'k) =
+        let res = ref Unchecked.defaultof<'v>
+        store <- 
+            store |> HMap.alter k (fun o ->
+                match o with
+                | Some (v,1) ->
+                    res := v
+                    None
+                | Some (v,r) -> 
+                    res := v
+                    Some (v, r - 1)
+                | None ->
+                    failwith "cannot revoke unknown object"
+                    None
+            )
+        !res
