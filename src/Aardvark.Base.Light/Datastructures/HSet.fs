@@ -4,72 +4,70 @@ open System.Collections
 open System.Collections.Generic
 
 module private HSetList =
-    let rec add (cnt : byref<int>) (value : 'a) (list : list<'a>) =
+    let rec add (cnt : ref<int>) (value : 'a) (list : list<'a>) =
         match list with
             | [] -> 
-                cnt <- cnt + 1
+                cnt := !cnt + 1
                 [value]
             | h :: tail ->
                 if Unchecked.equals h value then
                     list
                 else
-                    h :: add &cnt value tail
+                    h :: add cnt value tail
 
-    let rec remove (cnt : byref<int>) (value : 'a) (list : list<'a>) =
+    let rec remove (cnt : ref<int>) (value : 'a) (list : list<'a>) =
         match list with
             | [] ->
                 None
             | h :: tail ->
                 if Unchecked.equals h value then
-                    cnt <- cnt - 1
+                    cnt := !cnt - 1
                     match tail with
                         | [] -> None
                         | _ -> Some tail
                 else
-                    match remove &cnt value tail with
+                    match remove cnt value tail with
                         | Some t -> Some (h :: t)
                         | None -> Some [h]
 
-    let rec union (dupl : byref<int>) (l : list<'a>) (r : list<'a>) =
-        let mutable d = dupl
+    let rec union (dupl : ref<int>) (l : list<'a>) (r : list<'a>) =
         let newR = 
             r |> List.filter (fun r ->
                 if l |> List.exists (Unchecked.equals r) then
-                    d <- d + 1
+                    dupl := !dupl + 1
                     false
                 else
                     true
             )
 
-        dupl <- d
         l @ newR
 
-    let rec difference (cnt : byref<int>) (l : list<'a>) (r : list<'a>) =
+    let rec difference (cnt : ref<int>) (l : list<'a>) (r : list<'a>) =
         match l with
             | [] -> 
                 None
             | h :: tail ->
                 if List.exists (Unchecked.equals h) r then
-                    difference &cnt tail r
+                    difference cnt tail r
                 else
-                    cnt <- cnt + 1
-                    match difference &cnt tail r with
+                    cnt := !cnt + 1
+                    match difference cnt tail r with
                         | Some t -> Some (h :: t)
                         | None -> Some [h]
                     
 
-    let rec intersect (cnt : byref<int>) (l : list<'a>) (r : list<'a>) =
+    let rec intersect (cnt : ref<int>) (l : list<'a>) (r : list<'a>) =
         match l with
             | [] ->
                 None
             | h :: tail ->
                 if List.exists (Unchecked.equals h) r then
-                    cnt <- cnt + 1
-                    match intersect &cnt tail r with
+                    cnt := !cnt + 1
+                    match intersect cnt tail r with
                         | Some t -> Some (h :: t)
                         | None -> Some [h]
                 else
-                    intersect &cnt tail r
+                    intersect cnt tail r
 
 
     let rec mergeWithOption (f : 'a -> bool -> bool -> Option<'c>) (l : list<'a>) (r : list<'a>) =
@@ -103,15 +101,15 @@ module private HSetList =
           
     let rec equals (l : list<'a>) (r : list<'a>) =
         let mutable r = r
-        let mutable c = 0
+        let c = ref 0
         
         use e = (l :> seq<_>).GetEnumerator()
-        while c = 0 && e.MoveNext() do
+        while !c = 0 && e.MoveNext() do
             let l = e.Current
-            c <- 1
-            r <- remove &c l r |> Option.defaultValue []
+            c := 1
+            r <- remove c l r |> Option.defaultValue []
 
-        c = 0 && List.isEmpty r
+        !c = 0 && List.isEmpty r
 
 
 [<Struct; NoComparison; CustomEquality;>]
@@ -130,32 +128,32 @@ type hset<'a>(cnt : int, store : intmap<list<'a>>) =
 
     member x.Add (value : 'a) =
         let hash = Unchecked.hash value
-        let mutable cnt = cnt
+        let cnt = ref cnt
 
         let newStore = 
             store |> IntMap.alter (fun o ->
                 match o with
                     | None -> 
-                        cnt <- cnt + 1 
+                        cnt := !cnt + 1 
                         Some [value]
                     | Some old -> 
-                        HSetList.add &cnt value old |> Some
+                        HSetList.add cnt value old |> Some
             ) hash
 
-        hset(cnt, newStore)
+        hset(!cnt, newStore)
 
     member x.Remove (value : 'a) =
         let hash = Unchecked.hash value
-        let mutable cnt = cnt
+        let cnt = ref cnt
         
         let newStore = 
             store |> IntMap.alter (fun o ->
                 match o with
                     | None -> None
-                    | Some old -> HSetList.remove &cnt value old
+                    | Some old -> HSetList.remove cnt value old
             ) hash
 
-        hset(cnt, newStore)
+        hset(!cnt, newStore)
 
     member x.Contains (value : 'a) =
         let hash = Unchecked.hash value
@@ -165,14 +163,14 @@ type hset<'a>(cnt : int, store : intmap<list<'a>>) =
         
     member x.Alter(key : 'a, f : bool -> bool) =
         let hash = Unchecked.hash key
-        let mutable cnt = cnt
+        let cnt = ref cnt
 
         let newStore =  
             store |> IntMap.alter (fun ol ->
                 match ol with
                     | None ->
                         if f false then
-                            cnt <- cnt + 1
+                            cnt := !cnt + 1
                             Some [key]
                         else
                             None
@@ -180,10 +178,10 @@ type hset<'a>(cnt : int, store : intmap<list<'a>>) =
                         let mutable was = List.exists (Unchecked.equals key) ol
                         let should = f was
                         if should && not was then 
-                            cnt <- cnt + 1
+                            cnt := !cnt + 1
                             Some (key :: ol)
                         elif not should && was then
-                            cnt <- cnt - 1
+                            cnt := !cnt - 1
                             match List.filter (Unchecked.equals key >> not) ol with
                                 | [] -> None
                                 | l -> Some l
@@ -191,7 +189,7 @@ type hset<'a>(cnt : int, store : intmap<list<'a>>) =
                             Some ol
             ) hash
 
-        hset(cnt, newStore)
+        hset(!cnt, newStore)
 
     member x.Map (mapping : 'a -> 'b) =
         let mutable res = hset.Empty
@@ -269,33 +267,33 @@ type hset<'a>(cnt : int, store : intmap<list<'a>>) =
         ) seed
 
     member x.Union (other : hset<'a>) : hset<'a> =
-        let mutable dupl = 0
-        let newStore = IntMap.appendWith (fun l r -> HSetList.union &dupl l r) store other.Store
-        hset(cnt + other.Count - dupl, newStore)
+        let mutable dupl = ref 0
+        let newStore = IntMap.appendWith (fun l r -> HSetList.union dupl l r) store other.Store
+        hset(cnt + other.Count - !dupl, newStore)
 
     member x.Difference (other : hset<'a>) : hset<'a> =
-        let mutable cnt = 0
+        let cnt = ref 0
         let newStore =
             IntMap.mergeWithKey 
-                (fun k ll rl -> HSetList.difference &cnt ll rl) 
-                (fun l -> cnt <- l |> IntMap.fold (fun s l -> s + List.length l) cnt; l)
+                (fun k ll rl -> HSetList.difference cnt ll rl) 
+                (fun l -> cnt := l |> IntMap.fold (fun s l -> s + List.length l) !cnt; l)
                 (fun r -> IntMap.empty) 
                 store 
                 other.Store
 
-        hset(cnt, newStore)
+        hset(!cnt, newStore)
 
     member x.Intersect (other : hset<'a>) : hset<'a> =
-        let mutable cnt = 0
+        let cnt = ref 0
         let newStore =
             IntMap.mergeWithKey 
-                (fun k ll rl -> HSetList.intersect &cnt ll rl) 
+                (fun k ll rl -> HSetList.intersect cnt ll rl) 
                 (fun l -> IntMap.empty)
                 (fun r -> IntMap.empty) 
                 store 
                 other.Store
 
-        hset(cnt, newStore)
+        hset(!cnt, newStore)
         
     member x.ToSeq() =
         store |> IntMap.toSeq |> Seq.collect snd

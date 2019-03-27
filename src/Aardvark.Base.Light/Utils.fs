@@ -4,6 +4,99 @@ open System
 open System.Runtime.CompilerServices
 open Fable.Core
 open Fable.Import.JS
+open FSharp.Collections
+
+[<AllowNullLiteral>]
+type private LinkedNode<'a> =
+    class
+        val mutable public Value : 'a
+        val mutable public Next : LinkedNode<'a>
+        val mutable public Prev : LinkedNode<'a>
+
+        new(value, p, n) = { Value = value; Prev = p; Next = n }
+    end
+
+type Queue<'a>() =
+    let mutable first : LinkedNode<'a> = null
+    let mutable last : LinkedNode<'a> = null
+    let mutable count = 0
+
+    member x.Dequeue() =
+        if first = null then
+            failwith "bad"
+        else
+            count <- count - 1
+            let f = first
+            first <- f.Next
+            if isNull first then last <- null
+            else first.Prev <- null
+            f.Value
+
+    member x.Enqueue(value : 'a) =
+        let n = LinkedNode(value, last, null)
+        if last = null then first <- n
+        else last.Next <- n
+        last <- n
+        count <- count + 1
+
+    member x.Count = count
+
+[<AutoOpen>]
+module ListHeapExtensions = 
+    type System.Collections.Generic.List<'a> with
+        member x.HeapEnqueue(cmp : 'a -> 'a -> int, value : 'a) =
+            let mutable i = x.Count
+            let mutable run = true
+            x.Add(value)
+            while run && i > 0 do
+                let i2 = int ((i - 1) / 2)
+                if cmp value x.[i2] > 0 then 
+                    run <- false
+                else
+                    x.[i] <- x.[i2]
+                    i <- i2
+                    
+            x.[i] <- value
+
+        member x.HeapDequeue(cmp : 'a -> 'a -> int) : 'a =
+            let res = x.[0]
+            let mutable count = x.Count
+            if count = 1 then 
+                x.Clear()
+                res
+            else
+                let element = x.[count - 1]
+                x.RemoveAt(count - 1)
+                count <- count - 1
+                let mutable i = 0
+                let mutable i1 = 1
+                while i1 < count do
+                    let i2 = i1 + 1
+
+                    let ni = if i2 < count && cmp x.[i1] x.[i2] > 0 then i2 else i1
+                    if cmp x.[ni] element > 0 then
+                        i1 <- count
+                    else
+                        x.[i] <- x.[ni]
+                        i <- ni
+                        i1 <- 2 * i + 1
+                x.[i] <- element
+                res
+
+
+    type System.Collections.Generic.HashSet<'a> with
+        member x.Consume(count : ref<int>) =
+            let res = Seq.toArray x
+            count := res.Length
+            x.Clear()
+            res
+
+    let mutable private id = 0
+    let newId() =
+        let i = id + 1
+        id <- i
+        i
+
 
 type HashCode =
     static member Combine (a : uint32, b : uint32) =
@@ -25,6 +118,11 @@ module CoreExtensions =
     let private tt (o : obj) : string = failwith ""
     type System.Object with
         member x.GetTypeName() : string = tt x
+
+[<AbstractClass; Sealed; Extension>]
+type HashExtensions private() =
+    [<Extension>]
+    static member GetHash(value : 'a) = Unchecked.hash value
 
 
 [<AbstractClass; Sealed; Extension>]

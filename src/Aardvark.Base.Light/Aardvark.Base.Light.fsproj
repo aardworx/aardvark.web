@@ -20,6 +20,9 @@
 	<Compile Include="Datastructures/HMap.fs" />
 	<Compile Include="Datastructures\HDeltaSet.fs" />
 	<Compile Include="Datastructures\HSet.fs" />
+	<Compile Include="Incremental\PriorityQueue.fs" />
+	<Compile Include="Incremental\Core.fs" />
+	<Compile Include="Incremental\Mod.fs" />
     <Compile Include="Vectors.fs" />
     <Compile Include="Camera.fs" />
     <Compile Include="Library.fs" />

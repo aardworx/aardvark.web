@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Import.Browser
 open Fable.Import.JS
 open FSharp.Collections
+open Aardvark.Base.Incremental
 
 type Sepp<'a> =
     struct
@@ -396,8 +397,32 @@ let seop() =
         req.send("")
     ) |> unbox<Promise<ArrayBuffer>>
 
+let testy() =
+    let a = Mod.init 10
+    let b = Mod.init 10
+    let c = a |> Mod.bind (fun a -> if a < 11 then b |> Mod.map ((+) 2) else Mod.constant a)
+
+
+    console.warn(Mod.force c)
+    transact (fun () -> a.Value <- 100)
+    console.warn(Mod.force c)
+    transact (fun () -> b.Value <- 100)
+    console.warn(c.OutOfDate)
+    console.warn(Mod.force  c)
+    
+    transact (fun () -> a.Value <- 25)
+    console.warn(Mod.force  c)
+
+    let test = [1;2;3;4]
+    let x = Mod.constant test :> obj
+    let y = Mod.constant test :> obj
+    console.warn("a: " + (string (x.GetHash())))
+    console.warn("b: " + (string (y.GetHash())))
+
+
 [<EntryPoint>]
 let main argv =
+    testy()
 
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
@@ -478,6 +503,34 @@ let main argv =
             let p = ctx.CreateProgram(shader)
 
 
+            //let set = System.Collections.Generic.HashSet<obj>()
+
+            //do 
+            //    let a = obj()
+            //    let b = obj()
+
+            //    console.log (set.Add a)
+            //    console.log (set.Add b)
+            //    console.log (set.Remove a)
+            //    console.log (set.Remove b)
+            //    console.log (set.Remove a)
+            //    console.log (set.Remove b)
+
+
+            //let q = System.Collections.Generic.List<int>()
+            //let cmp = compare
+            //q.HeapEnqueue(cmp, 10)
+            //q.HeapEnqueue(cmp, 4)
+            //q.HeapEnqueue(cmp, 2)
+            //q.HeapEnqueue(cmp, 123)
+            //q.HeapEnqueue(cmp, 311)
+            //q.HeapEnqueue(cmp, 12)
+            //q.HeapEnqueue(cmp, 3)
+            //q.HeapEnqueue(cmp, 1999)
+
+
+            //while q.Count > 0 do
+            //    console.warn(q.HeapDequeue(cmp))
 
             let m = M44d.RotationZ(0.3)
 
@@ -486,8 +539,20 @@ let main argv =
             gl.bufferData(gl.UNIFORM_BUFFER, U3.Case3 (m.ToFloat32Array().buffer), gl.DYNAMIC_DRAW)
             gl.bindBuffer(gl.UNIFORM_BUFFER, null)
 
-            let vao = gl.createVertexArray()
-
+            //let vao = gl.createVertexArray()
+            //do
+            //    let i = Index.after Index.zero
+            //    let j = Index.after i
+            //    let b = Index.between i j
+            //    console.warn (i < b)
+            //    console.warn (b < j)
+            //    console.warn (i < j)
+            //    console.warn ((i = b))
+            //    console.warn ((b = j))
+            //    console.warn ((i = j))
+            //    console.warn ((i > b))
+            //    console.warn ((b > j))
+            //    console.warn ((i > j))
 
             let view = new RenderView(canvas)
             //view.Dispose()
@@ -533,7 +598,7 @@ let main argv =
                     m * v * p
 
                 gl.bindBuffer(gl.UNIFORM_BUFFER, ub)
-                gl.bufferData(gl.UNIFORM_BUFFER, U3.Case3 (mvp.Forward.ToFloat32Array().buffer), gl.DYNAMIC_DRAW)
+                gl.bufferSubData(gl.UNIFORM_BUFFER, 0.0, U2.Case2 (mvp.Forward.ToFloat32Array().buffer))
                 gl.bindBuffer(gl.UNIFORM_BUFFER, null)
 
 
@@ -572,35 +637,6 @@ let main argv =
             render()
 
     )
-
-
-
-
-
-
-
-    let a = M44d.Rotation(V3d.III, 0.2) * M44d.Scale(V3d(0.1, 0.6, 10.0)) * M44d.Translation(V3d(1.0, 2.0, 3.0)) //(1.0, 2.0, 3.0, 0.0, 0.2, 0.0, 0.0, 0.0, 2.0)
-    let b = a.Inverse
-
-    let tt = Trafo3d.Translation(1.0, 2.0, 3.0) * Trafo3d.Scale(0.1, 0.6, 10.0) * Trafo3d.Rotation(V3d.III, 0.2)
-
-    let t1 = a * b
-    let t2 = b * a
-    
-    let printMat (name : string) (m : M44d) =
-        console.log (sprintf "%s: " name)
-        console.log ("  " + m.R0.ToString())
-        console.log ("  " + m.R1.ToString())
-        console.log ("  " + m.R2.ToString())
-        console.log ("  " + m.R3.ToString())
-        
-    printMat "a" a
-    printMat "aa" tt.Forward
-    printMat "b" b
-    printMat "t1" t1
-    printMat "t2" t2
-
-    console.log (string t1)
 
 
 

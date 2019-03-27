@@ -121,24 +121,8 @@ module Index =
                 )
 
             member x.CompareTo(o : Value) =
-                match Monitor.TryEnter x, Monitor.TryEnter o with
-                    | true, true ->
-                        try 
-                            compare x.Key o.Key
-                        finally
-                            Monitor.Exit x
-                            Monitor.Exit o
+                compare x.Key o.Key
 
-                    | true, false ->
-                        Monitor.Exit x
-                        x.CompareTo o
-
-                    | false, true ->
-                        Monitor.Exit o
-                        x.CompareTo o
-
-                    | false, false ->
-                        x.CompareTo o
 
             interface IComparable with
                 member x.CompareTo (o : obj) =
@@ -159,16 +143,16 @@ module Index =
         inherit Index()
         do real.AddRef()
 
-        static let queue = new System.Collections.Concurrent.BlockingCollection<Value>()
-        static let runner =
+        //static let queue = new System.Collections.Concurrent.BlockingCollection<Value>()
+        //static let runner =
             
-            1
-            ()
-            //startThread (fun () -> 
-            //    while true do
-            //        let e = queue.Take()
-            //        e.Delete()
-            //)
+        //    1
+        //    ()
+        //    //startThread (fun () -> 
+        //    //    while true do
+        //    //        let e = queue.Take()
+        //    //        e.Delete()
+        //    //)
 
         member private x.Value = real
 
@@ -204,7 +188,8 @@ module Index =
                 Monitor.Exit l
 
         override x.Finalize() =
-            queue.Add real
+            Fable.Import.JS.console.warn "finalize"
+            //queue.Add real
 
         override x.CompareTo (o : obj) =
             match o with
