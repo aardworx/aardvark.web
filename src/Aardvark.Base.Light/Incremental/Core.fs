@@ -351,12 +351,6 @@ type AdaptiveObject() =
     [<DefaultValue; ThreadStatic>]
     static val mutable private EvaluationDepthValue : int
 
-    //val mutable public Id : int
-    //val mutable public OutOfDateValue : bool
-    //val mutable public LevelValue : int 
-    //val mutable public Outputs : HashSet<IAdaptiveObject>
-    //val mutable public ReaderCountValue : int
-    //val mutable public Reevaluate : bool
 
     /// used for reseting EvaluationDepth in eager evaluation
     static member internal UnsaveEvaluationDepth
@@ -462,7 +456,6 @@ type AdaptiveObject() =
     default x.AllInputsProcessedObj(t) = ()
 
     abstract member Kind : string
-    //default x.Kind = ""
 
 
     member x.Outputs = outputs

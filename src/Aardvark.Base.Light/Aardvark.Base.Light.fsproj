@@ -9,7 +9,9 @@
     <Compile Include="Utils.fs" />
     <Compile Include="Vectors_auto.fs" />
     <Compile Include="Matrices_auto.fs" />
+    <Compile Include="Vectors.fs" />
     <Compile Include="Trafo3d.fs" />
+    <Compile Include="Camera.fs" />
     <Compile Include="Prelude/Measures.fs" />
 	<Compile Include="Prelude/Lens.fs" />
 	<Compile Include="Prelude/Monoid.fs" />
@@ -25,13 +27,11 @@
 	<Compile Include="Incremental\Core.fs" />
 	<Compile Include="Incremental\Mod\Mod.fs" />
 	<Compile Include="Incremental\Mod\History.fs" />
+	<Compile Include="Incremental\AFun\afun.fs" />
 	<Compile Include="Incremental\ASet\asetcore.fs" />
 	<Compile Include="Incremental\ASet\cset.fs" />
 	<Compile Include="Incremental\ASet\mset.fs" />
 	<Compile Include="Incremental\ASet\aset.fs" />
-    <Compile Include="Vectors.fs" />
-    <Compile Include="Camera.fs" />
-    <Compile Include="Library.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

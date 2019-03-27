@@ -170,3 +170,12 @@ type Cache<'k, 'v>(creator : 'k -> 'v) =
                     None
             )
         !res
+
+
+module ChangeTracker =
+    let track<'a>() : 'a -> bool =
+        let old = ref None
+        fun v -> 
+            match !old with
+            | Some o when Unchecked.equals v o  -> false
+            | _ -> old := Some v;  true

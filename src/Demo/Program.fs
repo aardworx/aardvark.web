@@ -409,7 +409,7 @@ let testy() =
     let a = Mod.init 10
     let b = Mod.init 11
     let s = cset [a :> IMod<_>; b :> IMod<_>]
-    let test = s |> ASet.chooseM (Mod.map ((+) 2 >> Some))
+    let test = s |> ASet.chooseM (Mod.map ((+) 5 >> Some))
     
     let r = test.GetReader()
     console.warn (r.GetOperations(AdaptiveToken.Top) |> sprintf "op: %A")
@@ -454,6 +454,7 @@ let main argv =
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
             let canvas = document.createElement_canvas()
+            canvas.tabIndex <- 1.0
             document.body.appendChild(canvas) |> ignore
             document.body.style.margin <- "0"
             document.body.style.padding <- "0"
@@ -581,36 +582,30 @@ let main argv =
             //    console.warn ((b > j))
             //    console.warn ((i > j))
 
-            let view = new RenderView(canvas)
+            //let view = new RenderView(canvas)
             //view.Dispose()
+            let mouse = new Aardvark.Rendering.Mouse(canvas) :> Aardvark.Rendering.IMouse
+            let keyboard = new Aardvark.Rendering.Keyboard(canvas)  :> Aardvark.Rendering.IKeyboard
 
-            let mutable down = Set.empty
+            let time = Mod.custom (fun _ -> performance.now() / 1000.0)
+            let initial = CameraView.lookAt (V3d.III * 6.0) V3d.Zero V3d.OOI
+            let cam = Aardvark.Application.DefaultCameraController.control mouse keyboard time initial
 
-            view.Mouse.Down.Add (fun (b, p) ->
-                down <- Set.add b down
-                console.log (sprintf "down %A %A" b p)
-            )
-            view.Mouse.Up.Add (fun (b, p) ->
-                down <- Set.remove b down
-                console.log (sprintf "up %A %A" b p)
-            )
-            view.Mouse.Move.Add (fun (p) ->
-                if not (Set.isEmpty down) then
-                    console.log (sprintf "drag %A" p)
-            )
-            view.Mouse.Wheel.Add (fun (p) ->
-                console.log (sprintf "wheel %A" p)
-            )
+            
+            let v = cam.GetValue(AdaptiveToken.Top) |> CameraView.viewTrafo
+
             let mutable t0 = None
             let mutable angle = 0.0
-            let rec render() =
-                let t = performance.now()
+            let mutable baseTime = performance.now()
+            let mutable frameCount = 0
+            let rec render _ =
+                let t = performance.now() / 1000.0
                 match t0 with
                 | Some tb ->
                     let dt = t - tb
                     //console.log(dt)
                     t0 <- Some t
-                    angle <- angle + 0.001 * dt
+                    angle <- angle + 0.1 * dt
                 | None ->
                     t0 <- Some t
                 
@@ -620,7 +615,7 @@ let main argv =
 
                 let mvp =
                     let m = Trafo3d.RotationZ(angle)
-                    let v = CameraView.lookAt (V3d.III * 6.0) V3d.Zero V3d.OOI |> CameraView.viewTrafo
+                    let v = cam |> Mod.force |> CameraView.viewTrafo
                     let p = Frustum.perspective 60.0 0.1 100.0 (rect.width / rect.height) |> Frustum.projTrafo
                     m * v * p
 
@@ -658,10 +653,20 @@ let main argv =
                 gl.disableVertexAttribArray(0.0)
                 gl.useProgram(null)
 
-                setTimeout render 16 |> ignore
-                //window.requestAnimationFrame(render) |> ignore
 
-            render()
+                frameCount <- frameCount + 1
+                if frameCount > 100 then
+                    let n = performance.now()
+                    let fps = 1000.0 * float frameCount / (n - baseTime)
+                    console.log fps
+                    baseTime <- n
+                    frameCount <- 0
+
+                transact (fun () -> time.MarkOutdated())
+                //setTimeout render 16 |> ignore
+                window.requestAnimationFrame(render) |> ignore
+
+            render 0.0
 
     )
 

@@ -173,11 +173,14 @@ type ConstantMod<'a>(value : Lazy<'a>) =
 /// </summary>
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Mod =
-
+    let mutable private depth = 0
 
     [<AbstractClass>]
     type AbstractMod<'a>() =
         inherit AdaptiveObject()
+
+
+
         let mutable cache = Unchecked.defaultof<'a>
         
         override x.Kind = "Mod"
@@ -263,17 +266,9 @@ module Mod =
     // LazyMod<'a> (as the name suggests) implements IMod<'a>
     // and will be evaluated lazily (if not forced to be eager
     // by a callback or subsequent eager computations)
-    type LazyMod<'a> =
-        class
-            inherit AbstractMod<'a>
-            val mutable public inputs : seq<IAdaptiveObject>
-            val mutable public compute : AdaptiveToken -> 'a
-
-            override x.Compute(token) = x.compute(token)
-
-            new(inputs : seq<IAdaptiveObject>, compute) =
-                { inputs = inputs; compute = compute }
-        end
+    type LazyMod<'a>(compute : AdaptiveToken -> 'a) =
+        inherit AbstractMod<'a>()
+        override x.Compute(token) = compute(token)
 
 
 
@@ -411,7 +406,7 @@ module Mod =
     /// cell to be constant in any case.
     /// </summary>
     let custom (compute : AdaptiveToken -> 'a) : IMod<'a> =
-        LazyMod(Seq.empty, compute) :> IMod<_>
+        LazyMod(compute) :> IMod<_>
 
 
 
@@ -466,15 +461,6 @@ module Mod =
                 map (fun a -> f a (m2.GetValue(AdaptiveToken.Empty))) m1
             | (false, false) ->
                 Map2Mod(m1, m2, f) :> IMod<_>
-
-    /// <summary>
-    /// creates a custom modifiable cell using the given
-    /// compute function and adds all given inputs to the
-    /// resulting cell.
-    /// </summary>
-    [<Obsolete("Use Mod.custom insteand: explicit input tracking is no longer neccesary")>]
-    let mapCustom (f : AdaptiveToken -> 'a) (inputs : list<#IAdaptiveObject>) =
-        LazyMod(List.map (fun a -> a :> IAdaptiveObject) inputs, f) :> IMod<_>
 
 
 
