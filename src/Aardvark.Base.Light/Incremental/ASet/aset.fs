@@ -451,161 +451,249 @@ module ASet =
 
                 deltas
             
-        //type MapMReader<'a, 'b>(input : aset<'a>, f : 'a -> IMod<'b>) =
-        //    inherit AbstractDirtyReader<IMod<'b>, hdeltaset<'b>>(HDeltaSet.monoid, "Mod")
+        type MapMReader<'a, 'b>(input : aset<'a>, f : 'a -> IMod<'b>) =
+            inherit AbstractDirtyReader<IMod<'b>, hdeltaset<'b>>(HDeltaSet.monoid, "Mod")
             
-        //    let r = input.GetReader()
+            let r = input.GetReader()
 
-        //    let f = Cache f
-        //    let mutable initial = true
-        //    let cache = Dict<IMod<'b>, ref<int * 'b>>()
+            let f = Cache f
+            let mutable initial = true
+            let mutable cache : hmap<IMod<'b>, int * 'b> = HMap.empty
 
-        //    member x.Invoke(token : AdaptiveToken, v : 'a) =
-        //        let m = f.Invoke v
-        //        let v = m.GetValue token
-        //        let r = cache.GetOrCreate(m, fun _ -> ref (0, v))
-        //        r := (fst !r + 1, v)
+            let addOrUpdate (m : IMod<'b>) (value : 'b) =
+                cache <- HMap.alter m (fun o ->
+                    match o with
+                    | Some (r,v) ->
+                        Some (r+1,value)
+                    | None ->
+                        Some (1, value)
+                ) cache
 
-        //        v
-
-        //    member x.Invoke2(token : AdaptiveToken, m : IMod<'b>) =
-        //        let r = cache.[m]
-        //        let v = m.GetValue token
-        //        let (rc, o) = !r
-        //        r := (rc, v)
-        //        o, v
-
-        //    member x.Revoke(v : 'a, dirty : HashSet<_>) =
-        //        let m = f.Revoke v
+            let update (m : IMod<'b>) (value : 'b) =
+                let old = ref value
+                cache <- HMap.alter m (fun o ->
+                    match o with
+                    | Some (r,v) ->
+                        old := v
+                        Some (r,value)
+                    | None ->
+                        None
+                ) cache
+                !old
                 
-        //        match cache.TryGetValue m with
-        //            | (true, r) -> 
-        //                let (cnt, v) = !r
-        //                if cnt = 1 then
-        //                    cache.Remove m |> ignore
-        //                    dirty.Remove m |> ignore
-        //                    lock m (fun () -> m.Outputs.Remove x |> ignore )
-        //                    v
-        //                else
-        //                    r := (cnt - 1, v)
-        //                    v
-        //            | _ -> 
-        //                failwith "[ASet] cannot remove unknown object"
+
+            member x.Invoke(token : AdaptiveToken, v : 'a) =
+                let m = f.Invoke v
+                let v = m.GetValue token
+                addOrUpdate m v
+                v
+
+            member x.Invoke2(token : AdaptiveToken, m : IMod<'b>) =
+                let v = m.GetValue token
+                let o = update m v
+                //let r = cache.[m]
+                //let (rc, o) = !r
+                //r := (rc, v)
+                o, v
+
+            member x.Revoke(v : 'a, dirty : ref<hset<_>>) =
+                let m = f.Revoke v
+                
+                let old = ref None
+                cache <- HMap.alter m (fun o ->
+                    match o with
+                    | Some (1, o) ->
+                        dirty := HSet.remove m !dirty
+                        m.Outputs.Remove x |> ignore
+                        old := Some o
+                        None
+                    | Some (r,o) ->
+                        old := Some o
+                        Some (r-1,o)
+                    | None ->
+                        None
+                ) cache
 
 
-        //    override x.Release() =
-        //        f.Clear ignore
+                match !old with
+                | Some v -> v
+                | _ -> failwith "[ASet] cannot remove unknown object"
 
-        //        for (KeyValue(m,_)) in cache do 
-        //            lock m (fun () -> m.Outputs.Remove x |> ignore)
-        //        cache.Clear()
+                //match cache.TryGetValue m with
+                //    | (true, r) -> 
+                //        let (cnt, v) = !r
+                //        if cnt = 1 then
+                //            cache.Remove m |> ignore
+                //            dirty.Remove m |> ignore
+                //            lock m (fun () -> m.Outputs.Remove x |> ignore )
+                //            v
+                //        else
+                //            r := (cnt - 1, v)
+                //            v
+                //    | _ -> 
+                //        failwith "[ASet] cannot remove unknown object"
 
-        //        r.Dispose()
+                
+            override x.Kind = "SetReader"
+            override x.Release() =
+                f.Clear ignore
+                for (m,_) in cache do 
+                    lock m (fun () -> m.Outputs.Remove x |> ignore)
+                cache <- HMap.empty
 
-        //    override x.Compute(token, dirty) =
-        //        let mutable deltas = 
-        //            r.GetOperations token |> HDeltaSet.map (fun d ->
-        //                match d with
-        //                    | Add(1,m) -> Add(x.Invoke(token,m))
-        //                    | Rem(1,m) -> Rem(x.Revoke(m, dirty))
-        //                    | _ -> unexpected()
-        //            )
+                r.Dispose()
 
-        //        for d in dirty do
-        //            let o, n = x.Invoke2(token, d)
-        //            if not <| Object.Equals(o,n) then
-        //                deltas <- HDeltaSet.combine deltas (HDeltaSet.ofList [Add n; Rem o])
+            override x.Compute(token, dirty) =
+                let dirty = ref dirty
+                let mutable deltas = 
+                    r.GetOperations token |> HDeltaSet.map (fun d ->
+                        match d with
+                            | Add(1,m) -> Add(x.Invoke(token,m))
+                            | Rem(1,m) -> Rem(x.Revoke(m, dirty))
+                            | _ -> unexpected()
+                    )
 
-        //        deltas
+                for d in !dirty do
+                    let o, n = x.Invoke2(token, d)
+                    if not <| Object.Equals(o,n) then
+                        deltas <- HDeltaSet.combine deltas (HDeltaSet.ofList [Add n; Rem o])
 
-        //type ChooseMReader<'a, 'b>(scope : Ag.Scope, input : aset<'a>, f : 'a -> IMod<Option<'b>>) =
-        //    inherit AbstractDirtyReader<IMod<Option<'b>>, hdeltaset<'b>>(scope, HDeltaSet.monoid)
+                deltas
+
+        type ChooseMReader<'a, 'b>(input : aset<'a>, f : 'a -> IMod<Option<'b>>) =
+            inherit AbstractDirtyReader<IMod<Option<'b>>, hdeltaset<'b>>(HDeltaSet.monoid, "Mod")
             
-        //    let r = input.GetReader()
+            let r = input.GetReader()
 
-        //    let f = Cache f
-        //    let mutable initial = true
-        //    let cache = Dict<IMod<Option<'b>>, ref<int * Option<'b>>>()
+            let f = Cache f
+            let mutable initial = true
+            let mutable cache : hmap<IMod<Option<'b>>, int * Option<'b>> = HMap.empty
+            
+            let addOrUpdate (m : IMod<Option<'b>>) (value : Option<'b>) =
+                cache <- HMap.alter m (fun o ->
+                    match o with
+                    | Some (r,v) ->
+                        Some (r+1,value)
+                    | None ->
+                        Some (1, value)
+                ) cache
+            
+            let update (m : IMod<Option<'b>>) (value : Option<'b>) =
+                let old = ref None
+                cache <- HMap.alter m (fun o ->
+                    match o with
+                    | Some (r,v) ->
+                        old := v
+                        Some (r,value)
+                    | None ->
+                        None
+                ) cache
+                !old
 
-        //    member x.Invoke(token : AdaptiveToken, v : 'a) =
-        //        let m = f.Invoke v
-        //        let v = m.GetValue token
-        //        let r = cache.GetOrCreate(m, fun _ -> ref (0, None))
-        //        r := (fst !r + 1, v)
-        //        v
+            member x.Invoke(token : AdaptiveToken, v : 'a) =
+                let m = f.Invoke v
+                let v = m.GetValue token
+                addOrUpdate m v
+                //let r = cache.GetOrCreate(m, fun _ -> ref (0, None))
+                //r := (fst !r + 1, v)
+                v
 
-        //    member x.Invoke2(token : AdaptiveToken, m : IMod<Option<'b>>) =
-        //        match cache.TryGetValue m with
-        //            | (true, r) ->
-        //                let (rc, o) = !r
-        //                let v = m.GetValue token
-        //                r := (rc, v)
-        //                o, v
-        //            | _ ->
-        //              None, None  
+            member x.Invoke2(token : AdaptiveToken, m : IMod<Option<'b>>) =
+                let v = m.GetValue token
+                let o = update m v
+                o, v
+                //match cache.TryGetValue m with
+                //    | (true, r) ->
+                //        let (rc, o) = !r
+                //        let v = m.GetValue token
+                //        r := (rc, v)
+                //        o, v
+                //    | _ ->
+                //      None, None  
 
-        //    member x.Revoke(v : 'a) =
-        //        let m = f.Revoke v
-        //        match cache.TryGetValue m with
-        //            | (true, r) -> 
-        //                let (rc, v) = !r
-        //                if rc = 1 then
-        //                    cache.Remove m |> ignore
-        //                    lock m (fun () -> m.Outputs.Remove x |> ignore )
-        //                else
-        //                    r := (rc - 1, v)
-        //                v
-        //            | _ -> 
-        //                failwith "[ASet] cannot remove unknown object"
+            member x.Revoke(v : 'a, dirty : ref<hset<IMod<Option<'b>>>>) =
+                let m = f.Revoke v
 
-        //    override x.Release() =
-        //        f.Clear ignore
+                
+                let old = ref None
+                cache <- HMap.alter m (fun o ->
+                    match o with
+                    | Some (1, o) ->
+                        dirty := HSet.remove m !dirty
+                        m.Outputs.Remove x |> ignore
+                        old := o
+                        None
+                    | Some (r,o) ->
+                        old := o
+                        Some (r-1,o)
+                    | None ->
+                        None
+                ) cache
+                !old
 
-        //        for (KeyValue(m,_)) in cache do 
-        //            lock m (fun () -> m.Outputs.Remove x |> ignore)
-        //        cache.Clear()
+                //match cache.TryGetValue m with
+                //    | (true, r) -> 
+                //        let (rc, v) = !r
+                //        if rc = 1 then
+                //            cache.Remove m |> ignore
+                //            lock m (fun () -> m.Outputs.Remove x |> ignore )
+                //        else
+                //            r := (rc - 1, v)
+                //        v
+                //    | _ -> 
+                //        failwith "[ASet] cannot remove unknown object"
 
-        //        r.Dispose()
+            override x.Kind = "SetReader"
 
-        //    override x.Compute(token, dirty) =
-        //        let mutable deltas = 
-        //            r.GetOperations token |> HDeltaSet.choose (fun d ->
-        //                match d with
-        //                    | Add(1,m) -> 
-        //                        match x.Invoke(token,m) with
-        //                            | Some v -> Some (Add v)
-        //                            | None -> None
+            override x.Release() =
+                f.Clear ignore
 
-        //                    | Rem(1,m) ->
-        //                        match x.Revoke m with
-        //                            | Some v -> Some (Rem v)
-        //                            | None -> None
+                for (m,_) in cache do 
+                    lock m (fun () -> m.Outputs.Remove x |> ignore)
+                cache <- HMap.empty
 
-        //                    | _ -> 
-        //                        unexpected()
-        //            )
+                r.Dispose()
 
-        //        for d in dirty do
-        //            let change = 
-        //                match x.Invoke2(token, d) with
-        //                    | None, None -> 
-        //                        HDeltaSet.empty
+            override x.Compute(token, dirty) =
+                let dirty = ref dirty
+                let mutable deltas = 
+                    r.GetOperations token |> HDeltaSet.choose (fun d ->
+                        match d with
+                            | Add(1,m) -> 
+                                match x.Invoke(token,m) with
+                                    | Some v -> Some (Add v)
+                                    | None -> None
 
-        //                    | None, Some v ->
-        //                        HDeltaSet.single (Add v)
+                            | Rem(1,m) ->
+                                match x.Revoke(m, dirty) with
+                                    | Some v -> Some (Rem v)
+                                    | None -> None
 
-        //                    | Some o, None ->
-        //                        HDeltaSet.single (Rem o)
+                            | _ -> 
+                                unexpected()
+                    )
 
-        //                    | Some o, Some n ->
-        //                        if Object.Equals(o, n) then
-        //                            HDeltaSet.empty
-        //                        else
-        //                            HDeltaSet.ofList [Rem o; Add n]
+                for d in !dirty do
+                    let change = 
+                        match x.Invoke2(token, d) with
+                            | None, None -> 
+                                HDeltaSet.empty
 
-        //            deltas <- HDeltaSet.combine deltas change
+                            | None, Some v ->
+                                HDeltaSet.single (Add v)
 
-        //        deltas
+                            | Some o, None ->
+                                HDeltaSet.single (Rem o)
+
+                            | Some o, Some n ->
+                                if Object.Equals(o, n) then
+                                    HDeltaSet.empty
+                                else
+                                    HDeltaSet.ofList [Rem o; Add n]
+
+                    deltas <- HDeltaSet.combine deltas change
+
+                deltas
 
     // =====================================================================================
     // CREATORS (of*)
@@ -760,19 +848,19 @@ module ASet =
         else
             aset <| fun () -> new FlattenReader<'a>(set)
 
-    //let mapM (mapping : 'a -> IMod<'b>) (set : aset<'a>) =
-    //    if set.IsConstant then
-    //        set.Content |> Mod.force |> HRefSet.map mapping |> ofSet |> flattenM
-    //    else
-    //        aset <| fun scope -> new MapMReader<'a, 'b>(scope, set, mapping)
+    let mapM (mapping : 'a -> IMod<'b>) (set : aset<'a>) =
+        if set.IsConstant then
+            set.Content |> Mod.force |> HRefSet.map mapping |> ofSet |> flattenM
+        else
+            aset <| fun () -> new MapMReader<'a, 'b>(set, mapping)
 
-    //let chooseM (mapping : 'a -> IMod<Option<'b>>) (set : aset<'a>) =
-    //    aset <| fun scope -> new ChooseMReader<'a, 'b>(scope, set, mapping)
+    let chooseM (mapping : 'a -> IMod<Option<'b>>) (set : aset<'a>) =
+        aset <| fun () -> new ChooseMReader<'a, 'b>(set, mapping)
 
-    //let filterM (predicate : 'a -> IMod<bool>) (set : aset<'a>) =
-    //    set |> chooseM (fun a ->
-    //        a |> predicate |> Mod.map (fun v -> if v then Some a else None)
-    //    )
+    let filterM (predicate : 'a -> IMod<bool>) (set : aset<'a>) =
+        set |> chooseM (fun a ->
+            a |> predicate |> Mod.map (fun v -> if v then Some a else None)
+        )
 
     let bind (mapping : 'a -> aset<'b>) (m : IMod<'a>) =
         if m.IsConstant then

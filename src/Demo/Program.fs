@@ -397,24 +397,54 @@ let seop() =
         req.send("")
     ) |> unbox<Promise<ArrayBuffer>>
 
+module Mod =
+    let ofPromise (p : Promise<'a>) =
+        let res = Mod.init None
+        p.``then`` (fun r -> transact (fun () -> res.Value <- Some r)) |> ignore
+        res :> IMod<_>
+
+
 let testy() =
-    let s = cset [1..10]
 
-    let test = s |> ASet.choose (fun v -> if v % 2 = 0 then Some (v / 2) else None)
-
+    let a = Mod.init 10
+    let b = Mod.init 11
+    let s = cset [a :> IMod<_>; b :> IMod<_>]
+    let test = s |> ASet.chooseM (Mod.map ((+) 2 >> Some))
+    
     let r = test.GetReader()
-    console.warn (r.GetOperations(AdaptiveToken.Top) |> sprintf "%A")
-    console.warn (r.State |> Seq.toList |> sprintf "%A")
+    console.warn (r.GetOperations(AdaptiveToken.Top) |> sprintf "op: %A")
+    console.warn (r.State |> Seq.toList |> sprintf "st: %A")
 
-    transact (fun () -> s.Add 99 |> ignore)
-    console.warn (r.GetOperations(AdaptiveToken.Top) |> sprintf "%A")
-    console.warn (r.State |> Seq.toList |> sprintf "%A")
+    transact (fun () -> a.Value <- 100)
+    console.warn (r.GetOperations(AdaptiveToken.Top) |> sprintf "op: %A")
+    console.warn (r.State |> Seq.toList |> sprintf "st: %A")
+    
+    transact (fun () -> s.Remove a |> ignore)
+    console.warn (r.GetOperations(AdaptiveToken.Top) |> sprintf "op: %A")
+    console.warn (r.State |> Seq.toList |> sprintf "st: %A")
+
+    //let s = cset [1..10]
+
+    //let test = s |> ASet.choose (fun v -> if v % 2 = 0 then Some (v / 2) else None)
+
+    //let r = test.GetReader()
+    //console.warn (r.GetOperations(AdaptiveToken.Top) |> sprintf "%A")
+    //console.warn (r.State |> Seq.toList |> sprintf "%A")
+
+    //transact (fun () -> s.Add 99 |> ignore)
+    //console.warn (r.GetOperations(AdaptiveToken.Top) |> sprintf "%A")
+    //console.warn (r.State |> Seq.toList |> sprintf "%A")
 
     
-    transact (fun () -> s.Add 100 |> ignore)
-    console.warn (r.GetOperations(AdaptiveToken.Top) |> sprintf "%A")
-    console.warn (r.State  |> Seq.toList |> sprintf "%A")
+    //transact (fun () -> s.Add 100 |> ignore)
+    //console.warn (r.GetOperations(AdaptiveToken.Top) |> sprintf "%A")
+    //console.warn (r.State  |> Seq.toList |> sprintf "%A")
 
+    //let m = Mod.ofPromise (seop())
+    //console.warn(Mod.force m)
+    
+    //console.warn(Mod.force m)
+    //setTimeout (fun () -> console.warn(Mod.force m)) 1000 |> ignore
 
 
 [<EntryPoint>]
