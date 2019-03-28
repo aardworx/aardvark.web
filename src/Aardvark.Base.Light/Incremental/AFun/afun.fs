@@ -378,26 +378,10 @@ module ModExtensions =
             Mod.custom (fun t ->
                 c.GetValue(t).Evaluate(t,(m.GetValue t))
             )
+
         let rec private int (initial : IMod<'a>) (controllers : list<IMod<afun<'a, 'a>>>): IMod<'a> =
-            
-            let mutable a = initial
-            for e in controllers do
-                a <- wrap a e
+            controllers |> List.fold wrap initial
 
-            a
-
-
-            //match controllers with
-            //    | c::cs ->
-            //        let result = 
-            //            Mod.custom (fun t ->
-            //                c.GetValue(t).Evaluate(t,(initial.GetValue t))
-            //            )
-
-            //        int result cs
-
-            //    | [] -> 
-            //        initial
 
         let integrate (initial : 'a) (time : IMod<float>) (controllers : list<IMod<afun<'a, 'a>>>) =
             let currentValue = ref initial

@@ -14,8 +14,11 @@ type PixelPosition(pos : V2d, size : V2d) =
     member x.Ndc =
         V2d(
             2.0 * pos.X / size.X - 1.0,
-            1.0 - 2.0 * pos.Y / size.Y
+            2.0 * pos.Y / size.Y - 1.0
         )
+
+    member x.NormalizedPosition =
+        pos / size
 
     override x.GetHashCode() =
         HashCode.Combine(Unchecked.hash pos, Unchecked.hash size)
@@ -134,7 +137,7 @@ type Mouse(c : HTMLElement) =
 
     let pixelPos (e : MouseEvent) =
         let r = c.getBoundingClientRect()
-        let pp = PixelPosition(V2d(r.width - e.clientX, r.height - e.clientY), V2d(r.width, r.height))
+        let pp = PixelPosition(V2d(e.clientX, r.height - e.clientY), V2d(r.width, r.height))
         pp
 
     let setPos (i : bool) (e : MouseEvent) =

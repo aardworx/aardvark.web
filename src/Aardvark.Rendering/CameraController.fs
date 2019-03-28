@@ -52,7 +52,7 @@ module DefaultCameraController =
                 location |> Mod.step (fun op delta (cam : CameraView) ->
                     let trafo =
                         M44d.Rotation(cam.Right, float delta.Y * -0.01) *
-                        M44d.Rotation(cam.Sky, float delta.X * -0.01)
+                        M44d.Rotation(cam.Sky, float delta.X * 0.01)
 
                     let newForward = trafo.TransformDir cam.Forward |> Vec.normalize
                     cam.WithForward(newForward)
@@ -94,7 +94,7 @@ module DefaultCameraController =
             if d then
                 location |> Mod.step (fun p delta (cam : CameraView) ->
 
-                    let step = 0.05 * (cam.Down * float delta.Y + cam.Right * float delta.X)
+                    let step = 0.05 * (cam.Up * float delta.Y + cam.Right * float delta.X)
 
                     cam.WithLocation(cam.Location + step)
 
@@ -110,7 +110,7 @@ module DefaultCameraController =
         down |> Mod.map (fun d ->
             if d then
                 location |> Mod.step (fun p delta (cam : CameraView) ->
-                    let step = -0.05 * (cam.Forward * float delta.Y)
+                    let step = 0.05 * (cam.Forward * float delta.Y)
                     cam.WithLocation(cam.Location + step)
 
                 )
