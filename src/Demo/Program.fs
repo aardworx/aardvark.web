@@ -893,11 +893,10 @@ let main argv =
 
 
             render := fun _ ->
+                let rect = canvas.getBoundingClientRect()
+                transact (fun () -> size.Value <- V2i(int rect.width, int rect.height))
                 caller.EvaluateAlways AdaptiveToken.Top (fun token ->
                     let t = performance.now() / 1000.0
- 
-                
-                    let rect = canvas.getBoundingClientRect()
 
                 
                     writer.GetValue token
