@@ -5,7 +5,8 @@
   "author": "",
   "license": "ISC",
   "scripts": {
-    "start": "webpack-dev-server"
+    "start": "webpack-dev-server",
+    "build": "webpack -p"
   },
   "dependencies": {
     "@babel/core": "^7.3.4",

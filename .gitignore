@@ -4,3 +4,4 @@
 /.paket/Paket.Restore.targets
 obj/
 bin/
+/public/bundle.js
