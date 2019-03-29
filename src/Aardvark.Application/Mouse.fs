@@ -1,4 +1,4 @@
-﻿namespace Aardvark.Rendering
+﻿namespace Aardvark.Application
 
 open Fable.Core
 open Fable.Import.JS
