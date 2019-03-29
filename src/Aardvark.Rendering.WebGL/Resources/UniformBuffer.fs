@@ -153,6 +153,7 @@ type UniformBuffer(ctx : Context, handle : WebGLBuffer, layout : UniformBlockInf
         ctx.GL.bindBuffer(ctx.GL.UNIFORM_BUFFER, null)
 
     override x.Destroy() =
+        Log.debug "destroy uniformbuffer"
         store <- null
         ctx.GL.deleteBuffer handle
 
@@ -162,6 +163,7 @@ module UniformBufferImpl =
     
     type Context with
         member x.CreateUniformBuffer(layout : UniformBlockInfo)  =
+            Log.debug "create uniformbuffer"
             let handle = x.GL.createBuffer()
             x.GL.bindBuffer(x.GL.UNIFORM_BUFFER, handle)
             x.GL.bufferData(x.GL.UNIFORM_BUFFER, U3.Case1 (float layout.size), x.GL.DYNAMIC_DRAW)

@@ -6,6 +6,7 @@ open Aardvark.Base.Rendering
 open Fable.Import.Browser
 open Aardvark.Rendering.WebGL
 open Fable.Import.JS
+open Fable.Core
 
 
 type RenderControl(canvas : HTMLCanvasElement) =
@@ -24,11 +25,45 @@ type RenderControl(canvas : HTMLCanvasElement) =
     let time = Mod.custom (fun _ -> performance.now() / 1000.0)
 
     let mutable task = RenderTask.empty
+    let mutable showFps = true
+    let mutable fps = 0.0
 
+    let overlay =
+        let div = document.createElement_div()
+        canvas.parentElement.appendChild(div) |> ignore
+        div.style.position <- "absolute"
+        div.style.right <- "5px"
+        div.style.bottom <- "5px"
+        div.style.color <- "white"
+        div.style.fontSize <- "2em"
+        div.style.fontFamily <- "Consolas"
+        div
+        
+    let mutable frameCount = 0
+    let mutable overlayVisible = false
+    let mutable baseTime = performance.now()
+    let hideOverlay() = 
+        if overlayVisible then
+            overlayVisible <- false
+            overlay.style.display <- "none"
+            frameCount <- 0
+            
+    let mutable hide = setTimeout hideOverlay 300
+
+
+    let mutable inRender = false
     let render = ref (fun (v : float) -> ())
     let caller =
         { new AdaptiveObject() with
             override x.MarkObj() = 
+                if not inRender then
+                    clearTimeout hide
+                    if not overlayVisible then
+                        overlayVisible <- true
+                        overlay.style.display <- "block"
+                        overlay.innerText <- ""
+                        baseTime <- performance.now()
+
                 window.requestAnimationFrame(!render) |> ignore
                 true
             override x.Kind = 
@@ -48,9 +83,8 @@ type RenderControl(canvas : HTMLCanvasElement) =
 
     do 
         checkSize()
-        let mutable frameCount = 0
-        let mutable baseTime = performance.now()
         render := fun _ ->
+            inRender <- true
             let rect = canvas.getBoundingClientRect()
             let s = V2i(int rect.width, int rect.height)
             if s <> size.Value then transact (fun () -> size.Value <- s)
@@ -69,13 +103,22 @@ type RenderControl(canvas : HTMLCanvasElement) =
                 frameCount <- frameCount + 1
                 if frameCount > 100 then
                     let n = performance.now()
-                    let fps = 1000.0 * float frameCount / (n - baseTime)
+                    fps <- 1000.0 * float frameCount / (n - baseTime)
                     console.log fps
                     baseTime <- n
                     frameCount <- 0
+                    if showFps then overlay.innerText <- sprintf "%.1ffps" fps
+                //if showFps then
+                //    ctx2d.textAlign <- "right"
+                //    ctx2d.font <- "Consolas"
+                //    ctx2d.strokeStyle <- (U3.Case1 "color: white")
+                //    ctx2d.strokeText(sprintf "%.1ffps" fps, rect.width, rect.height, 100.0)
 
             )
             transact (fun () -> time.MarkOutdated())
+            inRender <- false
+            clearTimeout hide
+            hide <- setTimeout hideOverlay 300
 
         !render 0.0
 
@@ -87,6 +130,10 @@ type RenderControl(canvas : HTMLCanvasElement) =
     member x.Mouse = mouse :> IMouse
     member x.Size = size :> IMod<_>
     member x.Time = time 
+
+    member x.ShowFps
+        with get() = showFps
+        and set v = showFps <- v
 
     member x.RenderTask
         with get() = task

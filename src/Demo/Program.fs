@@ -130,7 +130,7 @@ let main argv =
             
 
 
-            let task = 
+            let task() = 
                 let prep = control.Manager.Prepare(control.FramebufferSignature, object)
                 let objects = [prep]
                 for o in objects do PreparedRenderObject.acquire o
@@ -145,7 +145,24 @@ let main argv =
                         for o in objects do PreparedRenderObject.release o
                 }
 
-            control.RenderTask <- task
+
+            let mutable active = true
+
+            control.Keyboard.DownWithRepeats.Add(fun k ->
+                match k with
+                | Aardvark.Application.Keys.Return ->
+                    if active then
+                        active <- false
+                        control.RenderTask <- RenderTask.empty
+                    else
+                        active <- true
+                        control.RenderTask <- task()
+                | _ ->
+                    ()
+            )
+
+
+            control.RenderTask <- task()
     )
 
 

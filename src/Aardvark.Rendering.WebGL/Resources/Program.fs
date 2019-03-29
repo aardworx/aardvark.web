@@ -4,6 +4,7 @@ open Fable.Import.Browser
 open Fable.Import.JS
 open FSharp.Collections
 open Aardvark.Base.Rendering
+open Aardvark.Base
 
 type ProgramParameter =
     {
@@ -42,7 +43,9 @@ type Program(ctx : Context, handle : WebGLProgram, iface : ProgramInterface) =
     member x.Handle = handle
     member x.Interface = iface
 
-    override x.Destroy() = ctx.GL.deleteProgram handle
+    override x.Destroy() = 
+        Log.debug "destroy program"
+        ctx.GL.deleteProgram handle
 
 [<AutoOpen>]
 module ProgramImpl = 
@@ -167,6 +170,7 @@ module ProgramImpl =
                 Some shader
 
         member x.CreateProgram(signature : FramebufferSignature, code : string) =
+            Log.debug "create program"
             match x.CompileShader(x.GL.VERTEX_SHADER, code), x.CompileShader(x.GL.FRAGMENT_SHADER, code) with
             | Some vs, Some fs ->
                 let p = x.GL.createProgram()

@@ -1,6 +1,7 @@
 ﻿namespace Aardvark.Rendering.WebGL
 
 open System
+open Aardvark.Base
 open Fable.Import.JS
 open Fable.Import.Browser
 
@@ -63,7 +64,8 @@ type Resource(ctx : Context) =
 
     member x.Release() = 
         refCount <- refCount - 1
-        if refCount = 0 then x.Destroy()
+        if refCount = 0 then 
+            x.Destroy()
 
 
     abstract member Destroy : unit -> unit
