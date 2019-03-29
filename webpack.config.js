@@ -4,8 +4,10 @@
 
 var path = require("path");
 
+var production = process.argv.indexOf("-p") >= 0;
+
 module.exports = {
-    mode: "development",
+    mode: production ? "production" : "development",
     entry: "./src/Demo/Demo.fsproj",
     output: {
         path: path.join(__dirname, "./public"),
@@ -15,7 +17,7 @@ module.exports = {
         contentBase: "./public",
         port: 8080,
     },
-	devtool: "eval-source-map",
+	devtool: production ? false : "eval-source-map",
     module: {
         rules: [{
             test: /\.fs(x|proj)?$/,
