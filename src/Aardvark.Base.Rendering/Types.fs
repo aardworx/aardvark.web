@@ -99,6 +99,25 @@ type IRenderTask =
     inherit System.IDisposable
     abstract member Run : AdaptiveToken -> unit
     
+[<AbstractClass>]
+type AbstractRenderTask() =
+    inherit AdaptiveObject()
+    override x.Kind = "RenderTask"
+
+    abstract member Render : AdaptiveToken -> unit
+    abstract member Release : unit -> unit
+
+    interface IRenderTask with
+        member x.Run t =
+            x.EvaluateAlways t (fun t ->
+                x.Render t
+            )
+        member x.Dispose() = 
+            x.Release()
+
+    
+
+
 module RenderTask =
     type private EmptyTask() =
         inherit ConstantObject()

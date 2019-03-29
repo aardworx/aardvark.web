@@ -128,19 +128,22 @@ let main argv =
                     call = Mod.constant { faceVertexCount = 6; first = 0; instanceCount = 1 }
                 }
             
-            let prep = control.Manager.Prepare(control.FramebufferSignature, object)
-            PreparedRenderObject.acquire prep
-            let objects = [prep]
 
 
             let task = 
-                RenderTask.custom (fun token ->
-                    for prep in objects do
-                        PreparedRenderObject.update token prep
+                let prep = control.Manager.Prepare(control.FramebufferSignature, object)
+                let objects = [prep]
+                for o in objects do PreparedRenderObject.acquire o
+                { new AbstractRenderTask() with
+                    member x.Render(token) =
+                        for prep in objects do
+                            PreparedRenderObject.update token prep
 
-                    for prep in objects do
-                        PreparedRenderObject.render prep
-                )
+                        for prep in objects do
+                            PreparedRenderObject.render prep
+                    member x.Release() =
+                        for o in objects do PreparedRenderObject.release o
+                }
 
             control.RenderTask <- task
     )
