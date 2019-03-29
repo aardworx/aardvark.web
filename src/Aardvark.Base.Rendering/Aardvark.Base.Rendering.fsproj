@@ -8,7 +8,6 @@
     <None Include="ArrayBufferGen.fsx" />
     <Compile Include="ArrayBuffer_auto.fs" />
   </ItemGroup>
-  <ItemGroup />
   <ItemGroup>
     <ProjectReference Include="..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />
   </ItemGroup>

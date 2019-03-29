@@ -30,6 +30,7 @@ type IArrayBuffer<'a> =
 module DefaultSemantic =
     let Positions = "Positions"
     let Colors = "Colors"
+    let DiffuseColorCoordinates = "DiffuseColorCoordinates"
     let Depth = "Depth"
 
 
@@ -63,7 +64,7 @@ type DrawCall =
 type PipelineState =
     {
         shader          : string
-        uniforms        : Map<string, IMod>
+        uniforms        : string -> Option<IMod>
     }
 
 type BufferView =

@@ -9,6 +9,7 @@ open FSharp.Collections
 open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
 open Aardvark.Rendering.WebGL
+open Aardvark.SceneGraph
 
 [<EntryPoint>]
 let main argv =
@@ -20,15 +21,15 @@ let main argv =
 
             uniform View {
                 float scale;
-                mat4 MVP;
+                mat4 ModelViewProjTrafo;
             };
 
-            layout(location = 0) in vec3 pos;
-            layout(location = 1) in vec2 tc;
+            layout(location = 0) in vec3 Positions;
+            layout(location = 1) in vec2 DiffuseColorCoordinates;
             out vec2 cc;
             void main() {
-                gl_Position = vec4(scale * pos, 1.0) * MVP;
-                cc = tc;
+                gl_Position = vec4(scale * Positions, 1.0) * ModelViewProjTrafo;
+                cc = DiffuseColorCoordinates;
             }
             #endif
 
@@ -74,14 +75,14 @@ let main argv =
             let model = angle |> Mod.map Trafo3d.RotationZ
             let view = cam |> Mod.map CameraView.viewTrafo
             let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 60.0 0.1 100.0 (float s.X / float s.Y) |> Frustum.projTrafo)
-            let modelViewProj =
-                Mod.custom (fun t ->
-                    let m = model.GetValue(t)
-                    let v = view.GetValue(t)
-                    let p = proj.GetValue(t)
-                    m * v * p
+            //let modelViewProj =
+            //    Mod.custom (fun t ->
+            //        let m = model.GetValue(t)
+            //        let v = view.GetValue(t)
+            //        let p = proj.GetValue(t)
+            //        m * v * p
                 
-                )
+            //    )
 
             
             let pos =   
@@ -107,42 +108,51 @@ let main argv =
                     0; 2; 3
                 |]
 
-            let object =
-                {
-                    pipeline = 
-                        { 
-                            shader = shader 
-                            uniforms =
-                                Map.ofList [
-                                    "scale", Mod.constant 1.0 :> IMod
-                                    "MVP", modelViewProj :> IMod
-                                ]
-                        }
-                    vertexBuffers =
-                        Map.ofList [
-                            "pos", BufferView.ofArray (Mod.constant pos)
-                            "tc", BufferView.ofArray (Mod.constant tc)
-                        ]
-                    indexBuffer = Some <|  BufferView.ofArray (Mod.constant index)
-                    mode = PrimitiveTopology.TriangleList
-                    call = Mod.constant { faceVertexCount = 6; first = 0; instanceCount = 1 }
-                }
-            
+            let sg =
+                Sg.draw PrimitiveTopology.TriangleList
+                |> Sg.index index
+                |> Sg.vertexAttribute DefaultSemantic.Positions pos
+                |> Sg.vertexAttribute DefaultSemantic.DiffuseColorCoordinates tc
+                |> Sg.uniform "scale" (Mod.constant 1.0)
+                |> Sg.trafo model
+                |> Sg.viewTrafo view
+                |> Sg.projTrafo proj
+                |> Sg.shader shader
+
+            let sg =
+                let rand = System.Random()
+                Sg.ofList [
+                    for i in 0 .. 200 do
+                        let phi = rand.NextDouble() * Constant.PiTimesTwo
+                        let r = rand.NextDouble() * 10.0
+
+                        let t = V3d(cos phi, sin phi, 0.0) * r
+                        yield sg |> Sg.trafo (Mod.constant <| Trafo3d.Translation t)
+                ]
+
+
+            let objects = sg.RenderObjects()
 
 
             let task() = 
-                let prep = control.Manager.Prepare(control.FramebufferSignature, object)
-                let objects = [prep]
-                for o in objects do PreparedRenderObject.acquire o
+                let prep = objects |> ASet.map (fun o -> control.Manager.Prepare(control.FramebufferSignature, o))
+
+                let reader = prep.GetReader()
                 { new AbstractRenderTask() with
                     member x.Render(token) =
-                        for prep in objects do
+                        for op in reader.GetOperations token do
+                            match op with
+                            | Add(_,o) -> PreparedRenderObject.acquire o
+                            | Rem(_,o) -> PreparedRenderObject.release o
+
+                        for prep in reader.State do
                             PreparedRenderObject.update token prep
 
-                        for prep in objects do
+                        for prep in reader.State do
                             PreparedRenderObject.render prep
                     member x.Release() =
-                        for o in objects do PreparedRenderObject.release o
+                        for o in reader.State do PreparedRenderObject.release o
+                        reader.Dispose()
                 }
 
 

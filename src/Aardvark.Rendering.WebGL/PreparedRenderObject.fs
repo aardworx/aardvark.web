@@ -123,7 +123,7 @@ module Resources =
 
             let uniformBuffers = 
                 program.Interface.uniformBlocks |> Map.map (fun index block ->
-                    x.CreateUniformBuffer(block, fun n -> Map.tryFind n o.pipeline.uniforms)
+                    x.CreateUniformBuffer(block, o.pipeline.uniforms)
                 )
 
             let vertexBuffers =
