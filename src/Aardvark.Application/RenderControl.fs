@@ -5,6 +5,7 @@ open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
 open Fable.Import.Browser
 open Aardvark.Rendering.WebGL
+open Fable.Import.JS
 
 
 type RenderControl(canvas : HTMLCanvasElement) =
@@ -34,12 +35,25 @@ type RenderControl(canvas : HTMLCanvasElement) =
                 "RenderControl"
         }
 
+    let rec checkSize() =
+        let rect = canvas.getBoundingClientRect()
+        let s = V2i(int rect.width, int rect.height)
+        if s <> size.Value then
+            transact (fun () -> 
+                size.Value <- s
+                caller.MarkOutdated()
+            )
+        setTimeout checkSize 100 |> ignore
+            
+
     do 
+        checkSize()
         let mutable frameCount = 0
         let mutable baseTime = performance.now()
         render := fun _ ->
             let rect = canvas.getBoundingClientRect()
-            transact (fun () -> size.Value <- V2i(int rect.width, int rect.height))
+            let s = V2i(int rect.width, int rect.height)
+            if s <> size.Value then transact (fun () -> size.Value <- s)
             caller.EvaluateAlways AdaptiveToken.Top (fun token ->
 
                 if canvas.width <> rect.width then canvas.width <- rect.width
