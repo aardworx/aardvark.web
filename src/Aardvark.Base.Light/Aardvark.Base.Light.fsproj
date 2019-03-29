@@ -15,6 +15,7 @@
     <Compile Include="Prelude/Measures.fs" />
 	<Compile Include="Prelude/Lens.fs" />
 	<Compile Include="Prelude/Monoid.fs" />
+	<Compile Include="Datastructures\Dict.fs" />
 	<Compile Include="Datastructures/SetOperation.fs" />
 	<Compile Include="Datastructures/ElementOperation.fs" />
 	<Compile Include="Datastructures/Index.fs" />
