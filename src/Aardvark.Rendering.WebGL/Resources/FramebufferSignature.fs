@@ -9,6 +9,11 @@ type FramebufferSignature(ctx : Context, colors : Map<int, string>, depth : bool
     member x.Depth = depth
     override x.Destroy() = ()
 
+    interface IFramebufferSignature with
+        member x.Colors = colors
+        member x.Depth = depth
+
+
 [<AutoOpen>]
 module FramebufferSignatureImpl =
     type Context with

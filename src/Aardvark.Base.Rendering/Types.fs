@@ -14,6 +14,7 @@ type PrimitiveType =
     | Mat of PrimitiveType * int * int
     | Trafo
     
+
 type IArrayBuffer =
     abstract member ElementType : PrimitiveType
     abstract member Length : int
@@ -31,6 +32,10 @@ module DefaultSemantic =
     let Colors = "Colors"
     let Depth = "Depth"
 
+
+type IFramebufferSignature =
+    abstract member Colors : Map<int, string>
+    abstract member Depth : bool
 
 type IBuffer = interface end
 
@@ -87,4 +92,35 @@ type RenderObject =
         mode            : PrimitiveTopology
         call            : IMod<DrawCall>
     }
+    
+
+type IRenderTask =
+    inherit IAdaptiveObject
+    inherit System.IDisposable
+    abstract member Run : AdaptiveToken -> unit
+    
+module RenderTask =
+    type private EmptyTask() =
+        inherit ConstantObject()
+        override x.Kind = "RenderTask"
+        interface IRenderTask with
+            member x.Run _ = ()
+            member x.Dispose() = ()
+
+    type private NoDisposeTask(render : AdaptiveToken -> unit) =
+        inherit AdaptiveObject()
+        override x.Kind = "RenderTask"
+        interface IRenderTask with
+            member x.Run t =
+                x.EvaluateAlways t (fun t ->
+                    render t
+                )
+            member x.Dispose() = 
+                ()
+
+    let empty =  new EmptyTask() :> IRenderTask
+    
+    
+    let custom (f : AdaptiveToken -> unit) =  new NoDisposeTask(f) :> IRenderTask
+    
     

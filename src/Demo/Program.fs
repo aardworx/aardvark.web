@@ -10,19 +10,6 @@ open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
 open Aardvark.Rendering.WebGL
 
-type IRenderTask =  
-    inherit System.IDisposable
-    abstract member Run : V2i -> unit
-
-module RenderTask =
-    let empty = 
-        { new IRenderTask with
-            member x.Run _ = ()
-            member x.Dispose() = ()
-        }
-
-
-
 [<EntryPoint>]
 let main argv =
 
@@ -66,32 +53,27 @@ let main argv =
             canvas.style.width <- "100%"
             canvas.style.height <- "100%"
             
-            let mouse = new Aardvark.Application.Mouse(canvas) :> Aardvark.Application.IMouse
-            let keyboard = new Aardvark.Application.Keyboard(canvas)  :> Aardvark.Application.IKeyboard
-            let time = Mod.custom (fun _ -> performance.now() / 1000.0)
-            let size = Mod.init (V2i.II)
+            let control = new Aardvark.Application.RenderControl(canvas)
 
 
 
 
             let initial = CameraView.lookAt (V3d.III * 6.0) V3d.Zero V3d.OOI
-            let cam = Aardvark.Application.DefaultCameraController.control mouse keyboard time initial
-            let anim = keyboard.IsDown(Aardvark.Application.Keys.Space)
+            let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
+            let anim = control.Keyboard.IsDown(Aardvark.Application.Keys.Space)
             let angle =
-                Mod.integrate 0.0 time [
+                Mod.integrate 0.0 control.Time [
                     anim |> Mod.map (fun a ->
                         if a then 
-                            time |> Mod.stepTime (fun _ dt o -> o + 0.1 * dt)
+                            control.Time |> Mod.stepTime (fun _ dt o -> o + 0.1 * dt)
                         else
                             AFun.create id
                     )
                 ]
 
-
-
             let model = angle |> Mod.map Trafo3d.RotationZ
             let view = cam |> Mod.map CameraView.viewTrafo
-            let proj = size |> Mod.map (fun s ->  Frustum.perspective 60.0 0.1 100.0 (float s.X / float s.Y) |> Frustum.projTrafo)
+            let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 60.0 0.1 100.0 (float s.X / float s.Y) |> Frustum.projTrafo)
             let modelViewProj =
                 Mod.custom (fun t ->
                     let m = model.GetValue(t)
@@ -146,64 +128,21 @@ let main argv =
                     call = Mod.constant { faceVertexCount = 6; first = 0; instanceCount = 1 }
                 }
             
-
-
-
-            let gl = canvas.getContext("webgl2") |> unbox<Aardvark.Rendering.WebGL.WebGL2RenderingContext>
-            let ctx = Context(gl)
-            let manager = new ResourceManager(ctx)
-            let prep = manager.Prepare(ctx.DefaultFramebufferSignature, object)
+            let prep = control.Manager.Prepare(control.FramebufferSignature, object)
             PreparedRenderObject.acquire prep
-
             let objects = [prep]
 
 
-
-            let mutable baseTime = performance.now()
-            let mutable frameCount = 0
-
-            let render = ref (fun (v : float) -> ())
-            let caller =
-                { new AdaptiveObject() with
-                    override x.MarkObj() = 
-                        window.requestAnimationFrame(!render) |> ignore
-                        true
-                    override x.Kind = "RenderView"
-                }
-
-            render := fun _ ->
-                let rect = canvas.getBoundingClientRect()
-                transact (fun () -> size.Value <- V2i(int rect.width, int rect.height))
-                caller.EvaluateAlways AdaptiveToken.Top (fun token ->
-
-                    if canvas.width <> rect.width then canvas.width <- rect.width
-                    if canvas.height <> rect.height then canvas.height <- rect.height
-                    //console.log(sprintf "%.0fx%.0f" rect.width rect.height)
-                    gl.viewport(0.0, 0.0, rect.width, rect.height)
-                    gl.clearColor(0.0, 0.0, 0.0, 1.0)
-                    gl.clearDepth(1.0)
-                    gl.clear(float (int gl.COLOR_BUFFER_BIT ||| int gl.DEPTH_BUFFER_BIT))
+            let task = 
+                RenderTask.custom (fun token ->
                     for prep in objects do
                         PreparedRenderObject.update token prep
 
                     for prep in objects do
                         PreparedRenderObject.render prep
-
-
-                    frameCount <- frameCount + 1
-                    if frameCount > 100 then
-                        let n = performance.now()
-                        let fps = 1000.0 * float frameCount / (n - baseTime)
-                        console.log fps
-                        baseTime <- n
-                        frameCount <- 0
-
-                    //setTimeout render 16 |> ignore
                 )
-                transact (fun () -> time.MarkOutdated())
 
-            !render 0.0
-
+            control.RenderTask <- task
     )
 
 
