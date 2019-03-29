@@ -6,6 +6,7 @@
   <ItemGroup>
     <None Include="VectorGen.fsx" />
     <None Include="MatrixGen.fsx" />
+    <Compile Include="Log.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="Vectors_auto.fs" />
     <Compile Include="Matrices_auto.fs" />
