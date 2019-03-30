@@ -126,7 +126,7 @@ let main argv =
                         let phi = rand.NextDouble() * Constant.PiTimesTwo
                         let r = rand.NextDouble() * 10.0
 
-                        let t = V3d(cos phi, sin phi, 0.0) * r
+                        let t = V3d(cos phi, sin phi, 0.1 * (rand.NextDouble() - 0.5)) * r
                         yield sg |> Sg.trafo (Mod.constant <| Trafo3d.Translation t)
                 ]
 

@@ -31,6 +31,7 @@ type PreparedRenderObject =
         vertexBuffers       : Map<int, IResource<Buffer> * list<VertexAttrib>>
         indexBuffer         : Option<IResource<Buffer> * IndexInfo>
         mode                : float
+        depthMode           : IMod<Option<float>>
         call                : IMod<DrawCall>
     }
 
@@ -41,6 +42,7 @@ module PreparedRenderObject =
         o.vertexBuffers |> Map.iter (fun _ (b,_) -> b.GetHandle(t) |> ignore)
         o.indexBuffer |> FSharp.Core.Option.iter (fun (b,_) -> b.GetHandle t |> ignore)
         o.call.GetValue(t) |> ignore
+        o.depthMode.GetValue t |> ignore
 
     let acquire (o : PreparedRenderObject) =
         o.program.Acquire()
@@ -61,6 +63,14 @@ module PreparedRenderObject =
 
         gl.useProgram(o.program.Handle)
         
+        match o.depthMode.GetValue AdaptiveToken.Top with
+        | Some m ->
+            gl.enable(gl.DEPTH_TEST)
+            gl.depthFunc(m)
+        | None ->
+            gl.disable(gl.DEPTH_TEST)
+
+
         // bind uniforms
         for (id, b) in Map.toSeq o.uniformBuffers do
             let b = b.GetHandle(AdaptiveToken.Top)
@@ -76,6 +86,8 @@ module PreparedRenderObject =
                 gl.vertexAttribPointer(float id, float att.size, att.typ, att.norm, float att.stride, float att.offset)
                 id <- id + 1
             gl.bindBuffer(gl.ARRAY_BUFFER, null)
+
+
 
         
         let call = o.call.GetValue AdaptiveToken.Top
@@ -172,12 +184,28 @@ module Resources =
                 | PrimitiveTopology.TriangleStrip -> gl.TRIANGLE_STRIP
 
 
+            let depthMode =
+                o.pipeline.depthMode |> Mod.map (fun m ->
+                    match m with
+                    | DepthTestMode.None -> None
+                    | DepthTestMode.Less -> Some gl.LESS
+                    | DepthTestMode.LessOrEqual -> Some gl.LEQUAL
+                    | DepthTestMode.Greater -> Some gl.GREATER
+                    | DepthTestMode.GreaterOrEqual -> Some gl.GEQUAL
+                    | DepthTestMode.Equal -> Some gl.EQUAL
+                    | DepthTestMode.NotEqual -> Some gl.NOTEQUAL
+                    | DepthTestMode.Always -> Some gl.ALWAYS
+                    | DepthTestMode.Never -> Some gl.NEVER
+                    | _ -> None
+                )
+
             {
                 program             = program
                 uniformBuffers      = uniformBuffers
                 indexBuffer         = indexBuffer
                 vertexBuffers       = vertexBuffers
                 mode                = mode
+                depthMode           = depthMode
                 call                = o.call
             }
 

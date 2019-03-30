@@ -61,9 +61,24 @@ type DrawCall =
         instanceCount   : int
     }
 
+
+
+type DepthTestMode =
+    | None = 0
+    | Less = 1
+    | LessOrEqual = 2
+    | Greater = 3
+    | GreaterOrEqual = 4
+    | Equal = 5
+    | NotEqual = 6
+    | Never = 7
+    | Always = 8
+
+
 type PipelineState =
     {
         shader          : string
+        depthMode       : IMod<DepthTestMode>
         uniforms        : string -> Option<IMod>
     }
 
@@ -83,7 +98,6 @@ module BufferView =
             offset  = 0
             typ     = t
         }
-
 
 type RenderObject =
     {

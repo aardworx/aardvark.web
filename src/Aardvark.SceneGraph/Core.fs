@@ -14,6 +14,7 @@ type TraversalState =
         uniforms            : Map<string, IMod>
         vertexAttriubtes    : Map<string, BufferView>
         indexBuffer         : Option<BufferView>
+        depthMode           : IMod<DepthTestMode>
     }
 
 type ISg =
@@ -125,7 +126,7 @@ module Sg =
                 |> Map.add "ProjTrafo" (state.projTrafo :> IMod)
 
             ASet.single {
-                pipeline = { shader = state.shader; uniforms = getUniform uniforms }
+                pipeline = { shader = state.shader; uniforms = getUniform uniforms; depthMode = state.depthMode }
                 vertexBuffers = state.vertexAttriubtes
                 indexBuffer = state.indexBuffer
                 mode = mode
@@ -172,6 +173,11 @@ module Sg =
         override x.RenderObjects (state : TraversalState) =
             nodes |> ASet.collect (fun s -> s.RenderObjects(state))
         
+    type DepthTestModeApplicator(mode : IMod<DepthTestMode>, sg : ISg) =
+        inherit ASg()
+        override x.RenderObjects (state : TraversalState) =
+            sg.RenderObjects { state with depthMode = mode }
+
 
     let empty = EmptyNode() :> ISg
     let draw (mode : PrimitiveTopology) = RenderNode(mode, null) :> ISg
@@ -187,6 +193,7 @@ module Sg =
     let ofSeq (sg : seq<ISg>) = sg |> ASet.ofSeq |> set
     let ofList (sg : list<ISg>) = sg |> ASet.ofList |> set
     let uniform (name : string) (value : IMod<'a>) (sg : ISg) = UniformApplicator(name, value :> IMod, sg) :> ISg
+    let depthTest (mode : IMod<DepthTestMode>) (sg : ISg) = DepthTestModeApplicator(mode, sg) :> ISg
 
 [<AutoOpen>]
 module SgExtensions =
@@ -196,6 +203,7 @@ module SgExtensions =
             {
                 shader = ""
                 trafos = []
+                depthMode = Mod.constant DepthTestMode.LessOrEqual
                 viewTrafo = Mod.constant Trafo3d.Identity
                 projTrafo = Mod.constant Trafo3d.Identity
                 uniforms = Map.empty
