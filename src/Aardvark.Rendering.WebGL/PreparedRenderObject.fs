@@ -182,7 +182,7 @@ module Resources =
                 | PrimitiveTopology.LineStrip -> gl.LINE_STRIP
                 | PrimitiveTopology.TriangleList -> gl.TRIANGLES
                 | PrimitiveTopology.TriangleStrip -> gl.TRIANGLE_STRIP
-
+                | _ -> gl.POINTS
 
             let depthMode =
                 o.pipeline.depthMode |> Mod.map (fun m ->

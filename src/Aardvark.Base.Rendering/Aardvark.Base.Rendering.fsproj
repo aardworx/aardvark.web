@@ -4,9 +4,15 @@
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="DefaultSemantic.fs" />
+    <Compile Include="PrimitiveType.fs" />
+    <Compile Include="Buffers.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="RenderObject.fs" />
+    <Compile Include="RenderTask.fs" />
     <None Include="ArrayBufferGen.fsx" />
     <Compile Include="ArrayBuffer_auto.fs" />
+    <Compile Include="ArrayList_auto.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />

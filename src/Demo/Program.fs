@@ -44,6 +44,14 @@ let main argv =
             #endif
         """
 
+    let list = V2fList()
+
+    for i in 0 .. 100 do
+        list.Add(V2d(float i, 1.0))
+
+    Log.warn "%A" list.Count
+
+
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
             let canvas = document.createElement_canvas()

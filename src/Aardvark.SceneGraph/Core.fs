@@ -51,7 +51,7 @@ module Sg =
                 | None -> None
             | None ->
                 None
-        let map3 (f : 'a -> 'b -> 'c -> 'd) (a : Option<'a>) (b : Option<'c>) (c : Option<'c>) =
+        let map3 (f : 'a -> 'b -> 'c -> 'd) (a : Option<'a>) (b : Option<'b>) (c : Option<'c>) =
             match a with
             | Some a ->
                 match b with
