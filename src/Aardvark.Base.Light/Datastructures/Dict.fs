@@ -142,7 +142,6 @@ type Dict<'k, 'v>(hash : 'k -> int, equals : 'k -> 'k -> bool) =
         let newCapIndex = if newCapIndex < 0 then 0 elif newCapIndex >= 29 then 28 else newCapIndex
         if newCapIndex <> capacityIndex then
             let newCap = DictConstants.primeSizes.[newCapIndex]
-            console.warn(sprintf "resize %d -> %d" capacity newCap)
             let newStore : DictEntry<'k, 'v>[] = FSharp.Collections.Array.zeroCreate newCap
 
             for i in 0 .. store.Length - 1 do

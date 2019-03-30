@@ -12,7 +12,6 @@
     <Compile Include="RenderTask.fs" />
     <None Include="ArrayBufferGen.fsx" />
     <Compile Include="ArrayBuffer_auto.fs" />
-    <Compile Include="ArrayList_auto.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />

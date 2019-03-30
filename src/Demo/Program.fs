@@ -44,13 +44,6 @@ let main argv =
             #endif
         """
 
-    let list = V2fList()
-
-    for i in 0 .. 100 do
-        list.Add(V2d(float i, 1.0))
-
-    Log.warn "%A" list.Count
-
 
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
@@ -93,13 +86,19 @@ let main argv =
             //    )
 
             
-            let pos =   
-                V3fBuffer.ofArray [|
-                    V3d(-1.0, -1.0, 0.0)
-                    V3d(1.0, -1.0, 0.0)
-                    V3d(1.0, 1.0, 0.0)
-                    V3d(-1.0, 1.0, 0.0)
-                |]
+            let pos = V3fList()
+            pos.Add(V3d(-1.0, -1.0, 0.0))
+            pos.Add(V3d(1.0, -1.0, 0.0))
+            pos.Add(V3d(1.0, 1.0, 0.0))
+            pos.Add(V3d(-1.0, 1.0, 0.0))
+
+            //let pos =   
+            //    V3fBuffer.ofArray [|
+            //        V3d(-1.0, -1.0, 0.0)
+            //        V3d(1.0, -1.0, 0.0)
+            //        V3d(1.0, 1.0, 0.0)
+            //        V3d(-1.0, 1.0, 0.0)
+            //    |]
                 
                 
             let tc =   

@@ -56,6 +56,8 @@ type Int8List(initialCapacity : int) =
             n.set(Int8Array.Create(store.buffer, 0.0, float (1 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 1
+    static member PrimitiveType = Int(true, 8)
     member x.Count = count
     
     member x.Add(value : int8) =
@@ -141,6 +143,8 @@ type Int16List(initialCapacity : int) =
             n.set(Int16Array.Create(store.buffer, 0.0, float (1 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 2
+    static member PrimitiveType = Int(true, 16)
     member x.Count = count
     
     member x.Add(value : int16) =
@@ -226,6 +230,8 @@ type Int32List(initialCapacity : int) =
             n.set(Int32Array.Create(store.buffer, 0.0, float (1 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 4
+    static member PrimitiveType = Int(true, 32)
     member x.Count = count
     
     member x.Add(value : int32) =
@@ -311,6 +317,8 @@ type Uint8List(initialCapacity : int) =
             n.set(Uint8Array.Create(store.buffer, 0.0, float (1 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 1
+    static member PrimitiveType = Int(false, 8)
     member x.Count = count
     
     member x.Add(value : uint8) =
@@ -396,6 +404,8 @@ type Uint16List(initialCapacity : int) =
             n.set(Uint16Array.Create(store.buffer, 0.0, float (1 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 2
+    static member PrimitiveType = Int(false, 16)
     member x.Count = count
     
     member x.Add(value : uint16) =
@@ -481,6 +491,8 @@ type Uint32List(initialCapacity : int) =
             n.set(Uint32Array.Create(store.buffer, 0.0, float (1 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 4
+    static member PrimitiveType = Int(false, 32)
     member x.Count = count
     
     member x.Add(value : uint32) =
@@ -566,6 +578,8 @@ type Float32List(initialCapacity : int) =
             n.set(Float32Array.Create(store.buffer, 0.0, float (1 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 4
+    static member PrimitiveType = Float 32
     member x.Count = count
     
     member x.Add(value : float) =
@@ -651,6 +665,8 @@ type Float64List(initialCapacity : int) =
             n.set(Float64Array.Create(store.buffer, 0.0, float (1 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 8
+    static member PrimitiveType = Float 64
     member x.Count = count
     
     member x.Add(value : float) =
@@ -739,6 +755,8 @@ type V2iList(initialCapacity : int) =
             n.set(Int32Array.Create(store.buffer, 0.0, float (2 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 8
+    static member PrimitiveType = Vec(Int(true, 32), 2)
     member x.Count = count
     
     member x.Add(value : V2i) =
@@ -833,6 +851,8 @@ type V3iList(initialCapacity : int) =
             n.set(Int32Array.Create(store.buffer, 0.0, float (3 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 12
+    static member PrimitiveType = Vec(Int(true, 32), 3)
     member x.Count = count
     
     member x.Add(value : V3i) =
@@ -930,6 +950,8 @@ type V4iList(initialCapacity : int) =
             n.set(Int32Array.Create(store.buffer, 0.0, float (4 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 16
+    static member PrimitiveType = Vec(Int(true, 32), 4)
     member x.Count = count
     
     member x.Add(value : V4i) =
@@ -1027,6 +1049,8 @@ type V2fList(initialCapacity : int) =
             n.set(Float32Array.Create(store.buffer, 0.0, float (2 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 8
+    static member PrimitiveType = Vec(Float 32, 2)
     member x.Count = count
     
     member x.Add(value : V2d) =
@@ -1121,6 +1145,8 @@ type V3fList(initialCapacity : int) =
             n.set(Float32Array.Create(store.buffer, 0.0, float (3 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 12
+    static member PrimitiveType = Vec(Float 32, 3)
     member x.Count = count
     
     member x.Add(value : V3d) =
@@ -1218,6 +1244,8 @@ type V4fList(initialCapacity : int) =
             n.set(Float32Array.Create(store.buffer, 0.0, float (4 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 16
+    static member PrimitiveType = Vec(Float 32, 4)
     member x.Count = count
     
     member x.Add(value : V4d) =
@@ -1317,6 +1345,8 @@ type M22fList(initialCapacity : int) =
             n.set(Float32Array.Create(store.buffer, 0.0, float (4 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 16
+    static member PrimitiveType = Mat(Float 32, 2, 2)
     member x.Count = count
     
     member x.Add(value : M22d) =
@@ -1418,6 +1448,8 @@ type M23fList(initialCapacity : int) =
             n.set(Float32Array.Create(store.buffer, 0.0, float (6 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 24
+    static member PrimitiveType = Mat(Float 32, 2, 3)
     member x.Count = count
     
     member x.Add(value : M23d) =
@@ -1526,6 +1558,8 @@ type M33fList(initialCapacity : int) =
             n.set(Float32Array.Create(store.buffer, 0.0, float (9 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 36
+    static member PrimitiveType = Mat(Float 32, 3, 3)
     member x.Count = count
     
     member x.Add(value : M33d) =
@@ -1643,6 +1677,8 @@ type M34fList(initialCapacity : int) =
             n.set(Float32Array.Create(store.buffer, 0.0, float (12 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 48
+    static member PrimitiveType = Mat(Float 32, 3, 4)
     member x.Count = count
     
     member x.Add(value : M34d) =
@@ -1770,6 +1806,8 @@ type M44fList(initialCapacity : int) =
             n.set(Float32Array.Create(store.buffer, 0.0, float (16 * newCap)) |> unbox)
             store <- n
             capacity <- newCap
+    static member ElementSize = 64
+    static member PrimitiveType = Mat(Float 32, 4, 4)
     member x.Count = count
     
     member x.Add(value : M44d) =

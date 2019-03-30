@@ -189,6 +189,8 @@ let run() =
         printfn "            store <- n"
         printfn "            capacity <- newCap"
         
+        printfn "    static member ElementSize = %d" byteSize
+        printfn "    static member PrimitiveType = %s" (PrimitiveType.toCtor t)
         printfn "    member x.Count = count"
         printfn "    "
         printfn "    member x.Add(value : %s) =" tt
