@@ -10,25 +10,103 @@ open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
 open Aardvark.Rendering.WebGL
 open Aardvark.SceneGraph
+open Fable.Core.JsInterop
+
+type RenderTask(signature : FramebufferSignature, manager : ResourceManager, objects : aset<RenderObject>) =
+    inherit DirtyTrackingAdaptiveObject<IResource>("Resource")
+
+    let preparedObjects = objects |> ASet.map (fun o -> manager.Prepare(signature, o))
+    let reader = preparedObjects.GetReader()
+    let allResources = Dict<IResource, int>(Unchecked.hash, Unchecked.equals)
+
+    let addResource (r : IResource) =
+        let isNew = ref false
+        allResources.Alter(r, fun o ->
+            match o with
+            | Some o -> Some (o+1)
+            | None -> 
+                isNew := true
+                Some 1
+        )
+        !isNew
+
+    let removeResource (r : IResource) =
+        let isDead = ref false
+        allResources.Alter(r, fun o ->
+            match o with
+            | None
+            | Some 1 -> 
+                isDead := true
+                None
+            | Some o ->
+                Some (o - 1)
+        )
+        !isDead
+
+    override x.Kind = "RenderTask"
+
+    member x.Run(token : AdaptiveToken) =
+        x.EvaluateAlways' token (fun token dirty ->
+            let mutable dirty = HRefSet.ofSeq dirty
+
+            let ops = reader.GetOperations token
+            for o in ops do
+                match o with
+                | Add(_,o) ->
+                    PreparedRenderObject.acquire o
+                    for r in PreparedRenderObject.resources o do
+                        if addResource r then
+                            dirty <- HRefSet.add r dirty
+                | Rem(_,o) ->
+                    for r in PreparedRenderObject.resources o do
+                        if removeResource r then
+                            dirty <- HRefSet.remove r dirty
+                    PreparedRenderObject.release o
+
+            if dirty.Count > 0 then
+                Log.startTime "update %d" dirty.Count
+                for d in dirty do
+                    d.Update token |> ignore
+                Log.stopTime()
+
+            for o in reader.State do
+                PreparedRenderObject.render o
+        )
+
+    member x.Dispose() =
+        for o in reader.State do
+            PreparedRenderObject.release o
+
+        reader.Dispose()
+        allResources.Clear()
+
+    interface IRenderTask with
+        member x.Dispose() = x.Dispose()
+        member x.Run t = x.Run t
+
+
+
 
 [<EntryPoint>]
 let main argv =
-
     let shader =
         """#version 300 es
 
             #ifdef VERTEX
 
-            uniform View {
+            uniform PerModel {
+                mat4 ModelTrafo;
+            };
+            uniform PerView {
                 float scale;
-                mat4 ModelViewProjTrafo;
+                mat4 ViewProjTrafo;
             };
 
             layout(location = 0) in vec3 Positions;
             layout(location = 1) in vec2 DiffuseColorCoordinates;
             out vec2 cc;
             void main() {
-                gl_Position = vec4(scale * Positions, 1.0) * ModelViewProjTrafo;
+                gl_Position = (vec4(scale * Positions, 1.0) * ModelTrafo) * ViewProjTrafo;
                 cc = DiffuseColorCoordinates;
             }
             #endif
@@ -56,9 +134,6 @@ let main argv =
             canvas.style.height <- "100%"
             
             let control = new Aardvark.Application.RenderControl(canvas)
-
-
-
 
             let initial = CameraView.lookAt (V3d.III * 6.0) V3d.Zero V3d.OOI
             let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
@@ -142,25 +217,26 @@ let main argv =
 
 
             let task() = 
-                let prep = objects |> ASet.map (fun o -> control.Manager.Prepare(control.FramebufferSignature, o))
+                new RenderTask(control.FramebufferSignature, control.Manager, objects) :> IRenderTask
+                //let prep = objects |> ASet.map (fun o -> control.Manager.Prepare(control.FramebufferSignature, o))
 
-                let reader = prep.GetReader()
-                { new AbstractRenderTask() with
-                    member x.Render(token) =
-                        for op in reader.GetOperations token do
-                            match op with
-                            | Add(_,o) -> PreparedRenderObject.acquire o
-                            | Rem(_,o) -> PreparedRenderObject.release o
+                //let reader = prep.GetReader()
+                //{ new AbstractRenderTask() with
+                //    member x.Render(token) =
+                //        for op in reader.GetOperations token do
+                //            match op with
+                //            | Add(_,o) -> PreparedRenderObject.acquire o
+                //            | Rem(_,o) -> PreparedRenderObject.release o
 
-                        for prep in reader.State do
-                            PreparedRenderObject.update token prep
+                //        for prep in reader.State do
+                //            PreparedRenderObject.update token prep
 
-                        for prep in reader.State do
-                            PreparedRenderObject.render prep
-                    member x.Release() =
-                        for o in reader.State do PreparedRenderObject.release o
-                        reader.Dispose()
-                }
+                //        for prep in reader.State do
+                //            PreparedRenderObject.render token prep
+                //    member x.Release() =
+                //        for o in reader.State do PreparedRenderObject.release o
+                //        reader.Dispose()
+                //}
 
 
             let mutable active = true

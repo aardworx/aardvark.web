@@ -4,6 +4,17 @@
 module Log =
     open Fable.Import.JS
 
+    
+    let mutable private currentTimers = []
+
+    let startTime fmt = Printf.kprintf (fun str -> currentTimers <- str :: currentTimers; console.time str) fmt
+    let stopTime() =
+        match currentTimers with
+        | h :: t ->
+            console.timeEnd(h)
+            currentTimers <- t
+        | [] ->
+            console.timeEnd()
 
     let start fmt = Printf.kprintf (fun str -> console.group str) fmt
     let stop () = console.groupEnd()

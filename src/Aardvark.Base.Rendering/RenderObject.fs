@@ -11,8 +11,6 @@ type PipelineState =
         uniforms        : string -> Option<IMod>
     }
 
-
-
 type RenderObject =
     {
         pipeline        : PipelineState

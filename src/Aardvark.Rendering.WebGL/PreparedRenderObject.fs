@@ -31,39 +31,55 @@ type PreparedRenderObject =
         vertexBuffers       : Map<int, IResource<Buffer> * list<VertexAttrib>>
         indexBuffer         : Option<IResource<Buffer> * IndexInfo>
         mode                : float
-        depthMode           : IMod<Option<float>>
-        call                : IMod<DrawCall>
+        depthMode           : IResource<Option<float>>
+        call                : IResource<DrawCall>
     }
 
 module PreparedRenderObject =
 
-    let update (t : AdaptiveToken) (o : PreparedRenderObject) =
-        o.uniformBuffers |> Map.iter (fun _ b -> b.GetHandle(t) |> ignore)
-        o.vertexBuffers |> Map.iter (fun _ (b,_) -> b.GetHandle(t) |> ignore)
-        o.indexBuffer |> FSharp.Core.Option.iter (fun (b,_) -> b.GetHandle t |> ignore)
-        o.call.GetValue(t) |> ignore
-        o.depthMode.GetValue t |> ignore
+    let resources (o : PreparedRenderObject) =
+        seq {
+            yield! o.uniformBuffers |> Map.toSeq |> Seq.map (fun (_,b) -> b :> IResource)
+            yield! o.vertexBuffers |> Map.toSeq |> Seq.map (fun (_,(b,_)) -> b :> IResource)
+            match o.indexBuffer with
+            | Some(ib,_) -> yield ib :> IResource
+            | None -> ()
+
+            yield o.depthMode :> IResource
+            yield o.call :> IResource
+
+        }
+
+    //let update (t : AdaptiveToken) (o : PreparedRenderObject) =
+    //    o.uniformBuffers |> Map.iter (fun _ b -> b.Update(t))
+    //    o.vertexBuffers |> Map.iter (fun _ (b,_) -> b.Update(t))
+    //    o.indexBuffer |> FSharp.Core.Option.iter (fun (b,_) -> b.Update t)
+    //    o.call.Update(t) |> ignore
+    //    o.depthMode.Update t |> ignore
 
     let acquire (o : PreparedRenderObject) =
         o.program.Acquire()
         o.uniformBuffers |> Map.iter (fun _ b -> b.Acquire())
         o.vertexBuffers |> Map.iter (fun _ (b,_) -> b.Acquire())
         o.indexBuffer |> FSharp.Core.Option.iter (fun (b,_) -> b.Acquire())
-        
+        o.call.Acquire()
+        o.depthMode.Acquire()
+
     let release (o : PreparedRenderObject) =
         o.program.Release()
         o.uniformBuffers |> Map.iter (fun _ b -> b.Release())
         o.vertexBuffers |> Map.iter (fun _ (b,_) -> b.Release())
         o.indexBuffer |> FSharp.Core.Option.iter (fun (b,_) -> b.Release())
+        o.call.Release()
+        o.depthMode.Release()
 
 
     let render (o : PreparedRenderObject) =
         let gl = o.program.Context.GL
 
-
         gl.useProgram(o.program.Handle)
         
-        match o.depthMode.GetValue AdaptiveToken.Top with
+        match !o.depthMode.Handle with
         | Some m ->
             gl.enable(gl.DEPTH_TEST)
             gl.depthFunc(m)
@@ -73,12 +89,12 @@ module PreparedRenderObject =
 
         // bind uniforms
         for (id, b) in Map.toSeq o.uniformBuffers do
-            let b = b.GetHandle(AdaptiveToken.Top)
+            let b = !b.Handle
             gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
 
         // bind buffers
         for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
-            let b = b.GetHandle(AdaptiveToken.Top)
+            let b = !b.Handle
             gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
             let mutable id = id
             for att in atts do
@@ -90,10 +106,10 @@ module PreparedRenderObject =
 
 
         
-        let call = o.call.GetValue AdaptiveToken.Top
+        let call = !o.call.Handle
         match o.indexBuffer with
         | Some (ib, info) ->
-            let ib = ib.GetHandle(AdaptiveToken.Top)
+            let ib = !ib.Handle
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib.Handle)
             gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
         | None ->
@@ -184,20 +200,7 @@ module Resources =
                 | PrimitiveTopology.TriangleStrip -> gl.TRIANGLE_STRIP
                 | _ -> gl.POINTS
 
-            let depthMode =
-                o.pipeline.depthMode |> Mod.map (fun m ->
-                    match m with
-                    | DepthTestMode.None -> None
-                    | DepthTestMode.Less -> Some gl.LESS
-                    | DepthTestMode.LessOrEqual -> Some gl.LEQUAL
-                    | DepthTestMode.Greater -> Some gl.GREATER
-                    | DepthTestMode.GreaterOrEqual -> Some gl.GEQUAL
-                    | DepthTestMode.Equal -> Some gl.EQUAL
-                    | DepthTestMode.NotEqual -> Some gl.NOTEQUAL
-                    | DepthTestMode.Always -> Some gl.ALWAYS
-                    | DepthTestMode.Never -> Some gl.NEVER
-                    | _ -> None
-                )
+            let depthMode = x.CreateDepthMode(o.pipeline.depthMode)
 
             {
                 program             = program
@@ -206,6 +209,6 @@ module Resources =
                 vertexBuffers       = vertexBuffers
                 mode                = mode
                 depthMode           = depthMode
-                call                = o.call
+                call                = x.CreateDrawCall(o.call)
             }
 

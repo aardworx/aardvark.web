@@ -1,15 +1,5 @@
 ﻿namespace Aardvark.Base.Rendering
 
-open Fable.Import.JS
-open Aardvark.Base
-open Aardvark.Base.Incremental
-open FSharp.Collections
-
-
-type IFramebufferSignature =
-    abstract member Colors : Map<int, string>
-    abstract member Depth : bool
-    
 type DepthTestMode =
     | None = 0
     | Less = 1
