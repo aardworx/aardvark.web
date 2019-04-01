@@ -50,7 +50,8 @@ type RenderControl(canvas : HTMLCanvasElement) =
             
     let mutable hide = setTimeout hideOverlay 300
 
-
+    
+    let mutable rafap = false
     let mutable inRender = false
     let render = ref (fun (v : float) -> ())
     let caller =
@@ -64,11 +65,20 @@ type RenderControl(canvas : HTMLCanvasElement) =
                         overlay.innerText <- ""
                         baseTime <- performance.now()
 
-                window.requestAnimationFrame(!render) |> ignore
+                if not rafap then
+                    window.requestAnimationFrame(!render) |> ignore
                 true
             override x.Kind = 
                 "RenderControl"
         }
+
+    do 
+        let ctrl = keyboard.IsDown(Keys.LeftCtrl)
+        keyboard.KeyDown(Keys.End).Add (fun () ->
+            if ctrl.GetValue(AdaptiveToken.Top) then
+                if not rafap then transact caller.MarkOutdated
+                rafap <- not rafap
+        )
 
     let rec checkSize() =
         let rect = canvas.getBoundingClientRect()
@@ -119,6 +129,8 @@ type RenderControl(canvas : HTMLCanvasElement) =
             inRender <- false
             clearTimeout hide
             hide <- setTimeout hideOverlay 300
+            if rafap then 
+                setTimeout (fun () -> !render 0.0) 0 |> ignore //window.requestAnimationFrame(!render) |> ignore
 
         !render 0.0
 

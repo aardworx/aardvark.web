@@ -15,7 +15,8 @@ module Log =
             currentTimers <- t
         | [] ->
             console.timeEnd()
-
+            
+    let startCollapsed fmt = Printf.kprintf (fun str -> console.groupCollapsed str) fmt
     let start fmt = Printf.kprintf (fun str -> console.group str) fmt
     let stop () = console.groupEnd()
     let debug fmt = Printf.kprintf (fun str -> console.debug(str)) fmt

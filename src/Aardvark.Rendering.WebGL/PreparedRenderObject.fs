@@ -24,8 +24,10 @@ type IndexInfo =
         size : int
     }
 
+[<CustomEquality; CustomComparison>]
 type PreparedRenderObject =
     {
+        id                  : int
         program             : Program
         uniformBuffers      : Map<int, IResource<UniformBuffer>>
         vertexBuffers       : Map<int, IResource<Buffer> * list<VertexAttrib>>
@@ -34,6 +36,18 @@ type PreparedRenderObject =
         depthMode           : IResource<Option<float>>
         call                : IResource<DrawCall>
     }
+
+    override x.GetHashCode() = x.id
+    override x.Equals o =
+        match o with
+        | :? PreparedRenderObject as o -> x.id = o.id
+        | _ -> false
+    interface IComparable with
+        member x.CompareTo o =
+            match o with
+            | :? PreparedRenderObject as o -> compare x.id o.id
+            | _ -> failwith "uncomparable"
+
 
 module PreparedRenderObject =
 
@@ -203,6 +217,7 @@ module Resources =
             let depthMode = x.CreateDepthMode(o.pipeline.depthMode)
 
             {
+                id                  = newId()
                 program             = program
                 uniformBuffers      = uniformBuffers
                 indexBuffer         = indexBuffer
