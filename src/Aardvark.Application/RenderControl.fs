@@ -7,12 +7,44 @@ open Fable.Import.Browser
 open Aardvark.Rendering.WebGL
 open Fable.Import.JS
 open Fable.Core
+open Fable.Core.JsInterop
+
+
+type ContextAttribs =
+     {
+        alpha : bool
+        antialias : bool
+        depth : bool
+        powerPreference : string
+        preserveDrawingBuffer : bool
+        stencil : bool
+     }
 
 
 type RenderControl(canvas : HTMLCanvasElement) =
-    let gl = canvas.getContext("webgl2") |> unbox<WebGL2RenderingContext>
+
+    let config =
+        {
+            alpha = false
+            antialias = true
+            depth = true
+            powerPreference = "high-performance"
+            preserveDrawingBuffer = true
+            stencil = true
+        }
+
+    let gl = canvas.getContext("webgl2", config) |> unbox<WebGL2RenderingContext>
     let ctx = Context(gl)
     let manager = new ResourceManager(ctx)
+
+    do
+        canvas.addEventListener("webglcontextlost", EventListenerOrEventListenerObject.Case1 (fun _ -> Log.warn "context lost"))
+        canvas.addEventListener("webglcontextrestored", EventListenerOrEventListenerObject.Case1 (fun _ -> Log.warn "context restored"))
+        let dbgRenderInfo = gl.getExtension("WEBGL_debug_renderer_info") |> unbox<WEBGL_debug_renderer_info>
+        if unbox dbgRenderInfo then
+          let name = gl.getParameter(dbgRenderInfo.UNMASKED_RENDERER_WEBGL) |> unbox<string>
+          let vendor = gl.getParameter(dbgRenderInfo.UNMASKED_VENDOR_WEBGL) |> unbox<string>
+          Log.warn "%s %s" vendor name
 
     let signature = ctx.DefaultFramebufferSignature
 
@@ -73,6 +105,15 @@ type RenderControl(canvas : HTMLCanvasElement) =
         }
 
     do 
+        
+        canvas.addEventListener_pointerdown(fun e ->
+            if unbox e.pointerType = "touch" then
+                overlay.innerHTML <- "RAFAP"
+                overlay.style.display <- "block"
+
+                if not rafap then transact caller.MarkOutdated
+                rafap <- not rafap
+        )
         let ctrl = keyboard.IsDown(Keys.LeftCtrl)
         keyboard.KeyDown(Keys.End).Add (fun () ->
             if ctrl.GetValue(AdaptiveToken.Top) then

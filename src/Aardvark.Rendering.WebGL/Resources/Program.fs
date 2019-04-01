@@ -103,7 +103,7 @@ module ProgramImpl =
                     let strides     = x.getActiveUniforms(p, indices, x.UNIFORM_ARRAY_STRIDE) |> unbox<Uint32Array>
                     let rowMajors   = x.getActiveUniforms(p, indices, x.UNIFORM_IS_ROW_MAJOR) |> unbox<bool[]>
                     let types       = x.getActiveUniforms(p, indices, x.UNIFORM_TYPE) |> unbox<Uint32Array>
-                    
+        
                     x.uniformBlockBinding(p, float bi, float bi)
                     let fields =
                         List.init (int indices.length) (fun i ->
@@ -112,9 +112,16 @@ module ProgramImpl =
                             let stride = strides.[i] |> unbox<int>
                             let rowMajor = rowMajors.[i] |> unbox<bool>
                             let t = types.[i] |> PrimitiveType.ofGLType x
+
                             let r = x.getActiveUniform(p, indices.[i])
-                            { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }
+                            if unbox r.name then
+                                Some { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }
+                            else
+                                document.write(sprintf "bad: %A" (JSON.stringify { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }))
+                                None
+                                
                         )
+                        |> List.choose id
                         |> List.sortBy (fun f -> f.offset)
 
                     yield bi, { index = bi; size = size; name = name; fields = fields; fieldsByName = fields |> Seq.map (fun f -> f.name, f) |> Map.ofSeq }

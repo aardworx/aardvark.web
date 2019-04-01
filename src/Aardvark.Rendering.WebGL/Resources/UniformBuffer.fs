@@ -51,10 +51,12 @@ module private Blit =
     let toFloatArray (t : PrimitiveType) =
         match t with
         | Scalar -> fun (value : obj) -> Float32Array.``of`` [| number value|]
-        | Vec(_,2) -> fun (value : obj) -> Float32Array.``of`` [| number value?X; number value?Y |]
-        | Vec(_,3) -> fun (value : obj) -> Float32Array.``of`` [| number value?X; number value?Y; number value?Z |]
-        | Vec(_,3) -> fun (value : obj) -> Float32Array.``of`` [| number value?X; number value?Y; number value?Z; number value?W |]
-
+        | Vec(Float _ ,2) -> fun (value : obj) -> let value = unbox<V2d> value in Float32Array.``of`` [| value.X; value.Y |]
+        | Vec(Float _ ,3) -> fun (value : obj) -> let value = unbox<V3d> value in Float32Array.``of`` [| value.X; value.Y; value.Z |]
+        | Vec(Float _ ,4) -> fun (value : obj) -> let value = unbox<V4d> value in Float32Array.``of`` [| value.X; value.Y; value.Z; value.W |]
+        | Vec(Int _ ,2) -> fun (value : obj) -> let value = unbox<V2i> value in Float32Array.``of`` [| float value.X; float value.Y |]
+        | Vec(Int _ ,3) -> fun (value : obj) -> let value = unbox<V3i> value in Float32Array.``of`` [| float value.X; float value.Y; float value.Z |]
+        | Vec(Int _ ,4) -> fun (value : obj) -> let value = unbox<V4i> value in Float32Array.``of`` [| float value.X; float value.Y; float value.Z; float value.W |]
         | Mat(_,2,2) -> fun (value : obj) -> (unbox<M22d> value).ToFloat32Array()
         | Mat(_,2,3) -> fun (value : obj) -> (unbox<M23d> value).ToFloat32Array()
         | Mat(_,2,4) -> fun (value : obj) -> (unbox<M24d> value).ToFloat32Array()
@@ -84,6 +86,7 @@ module private Blit =
                 let toArray = toFloatArray src
                 let dstSize, writer = getBlit tSrc tDst
                 dDst * dstSize, fun (view : DataView) (offset : int) (value : obj) ->
+                    
                     let mutable off = offset
                     let arr = toArray value
                     for i in 0 .. int arr.length - 1 do

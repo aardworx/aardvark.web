@@ -31,11 +31,24 @@ type BufferView =
     }
 
 module BufferView =
+
+    let private cache = WeakMap.Create() |> unbox<WeakMap<IMod, IMod<IBuffer>>>
+
+    let toBuffer<'a when 'a :> IArrayBuffer> (m : IMod<'a>) =
+        let v = cache.get(m)
+        if unbox v then 
+            v
+        else
+            let v = m |> Mod.map (fun a -> HostBuffer a :> IBuffer)
+            cache.set(m, v) |> ignore
+            v
+
+
     let inline ofArray<'a when 'a :> IArrayBuffer and 'a : (static member PrimitiveType : PrimitiveType) > (arr : IMod<'a>) =
         let t = (^a : (static member PrimitiveType : PrimitiveType) ())
         
         {
-            buffer  = arr |> Mod.map (fun a -> HostBuffer a :> IBuffer)
+            buffer  = toBuffer arr //|> Mod.map (fun a -> HostBuffer a :> IBuffer)
             offset  = 0
             typ     = t
         }

@@ -22,6 +22,8 @@ type ISg =
 
 module Sg =
     let private mulCache : Fable.Import.JS.WeakMap<IMod<Trafo3d>, Fable.Import.JS.WeakMap<IMod<Trafo3d>, IMod<Trafo3d>>> = Fable.Import.JS.WeakMap.Create() |> unbox
+    let private cameraLocationCache : Fable.Import.JS.WeakMap<IMod, IMod<V3d>> = Fable.Import.JS.WeakMap.Create() |> unbox
+
 
     let inline private (<*>) (l : IMod<Trafo3d>) (r : IMod<Trafo3d>) =
         if l.IsConstant && r.IsConstant then
@@ -64,6 +66,17 @@ module Sg =
                 None
 
     let private mul (l : IMod) (r : IMod) = unbox l <*> unbox r :> IMod
+
+
+    let private camLocation (m : IMod) =
+        let r = cameraLocationCache.get m
+        if unbox r then
+            r
+        else
+            let m = unbox<IMod<Trafo3d>> m
+            let r = m |> Mod.map (fun (t : Trafo3d) -> t.Backward.C3.XYZ)
+            cameraLocationCache.set(m, r) |> ignore
+            r
     let rec private getUniform (m : Map<string, IMod>) (name : string) =
         match Map.tryFind name m with
         | Some v -> Some v
@@ -77,6 +90,11 @@ module Sg =
                 | "ModelViewTrafo" -> Option.map2 mul (getUniform m "ModelTrafo") (getUniform m "ViewTrafo")
                 | "ViewProjTrafo" -> Option.map2 mul (getUniform m "ViewTrafo") (getUniform m "ProjTrafo")
                 | "ModelViewProjTrafo" -> Option.map3 (fun a b c -> mul a (mul b c)) (getUniform m "ModelTrafo") (getUniform m "ViewTrafo") (getUniform m "ProjTrafo")
+                
+                | "NormalMatrix" -> Option.map (fun v -> v |> unbox<IMod<Trafo3d>> |> Mod.map (fun (t : Trafo3d) -> M33d t.Backward.Transposed) :> IMod) (getUniform m "ModelTrafo")
+
+                | "CameraLocation" -> Option.map (fun v -> v |> camLocation :> IMod) (getUniform m "ViewTrafo")
+
                 | _ -> None
 
     [<AbstractClass>]

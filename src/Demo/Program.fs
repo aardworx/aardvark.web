@@ -71,10 +71,7 @@ type TrieNode<'k, 'a>(dirty : DictSet<ILinked>, nodeKey : Option<'k>, parent : T
 
     member x.Last =
         if unbox lastChild then
-            if unbox lastChild then lastChild.Last
-            elif unbox lastValue then lastValue
-            elif unbox prev then prev.Last
-            else null
+            lastChild.Last
         else
             if unbox lastValue then lastValue
             elif unbox prev then prev.Last
@@ -228,11 +225,11 @@ module Compiler =
         let gl = o.program.Context.GL
 
         [
-            //Log.startCollapsed "init(%d)" o.id
-            //Log.line "set program"
+            Log.startCollapsed "init(%d)" o.id
+            Log.line "set program"
             yield fun () -> gl.useProgram(o.program.Handle)
             
-            //Log.line "set depthMode"
+            Log.line "set depthMode"
             match !o.depthMode.Handle with
             | Some m ->
                 yield fun () -> 
@@ -245,14 +242,14 @@ module Compiler =
 
             // bind uniforms
             for (id, b) in Map.toSeq o.uniformBuffers do
-                //Log.line "set UB %d" id
+                Log.line "set UB %d" id
                 yield fun () -> 
                     let b = !b.Handle
                     gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
 
             // bind buffers
             for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
-                //Log.line "set VB %d" id
+                Log.line "set VB %d" id
                 yield fun () -> 
                     let b = !b.Handle
                     gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
@@ -276,20 +273,22 @@ module Compiler =
                     let call = !o.call.Handle
                     gl.drawArrays(o.mode, float call.first, float call.faceVertexCount)
 
-            //Log.stop()
+            Log.stop()
         ]
 
     let compileDiff (prev : PreparedRenderObject) (o : PreparedRenderObject) =
         let gl = o.program.Context.GL
 
+        //compile o
+
         [
-            //Log.startCollapsed "compile(%d, %d)" prev.id o.id
+            Log.startCollapsed "compile(%d, %d)" prev.id o.id
             if prev.program.Handle <> o.program.Handle then
-                //Log.line "set program"
+                Log.line "set program"
                 yield fun () -> gl.useProgram(o.program.Handle)
 
             if prev.depthMode.Handle <> o.depthMode.Handle then
-                //Log.line "set depthMode"
+                Log.line "set depthMode"
                 match !o.depthMode.Handle with
                 | Some m ->
                     yield fun () -> 
@@ -305,7 +304,7 @@ module Compiler =
                 | Some ob when ob.Handle = b.Handle -> 
                     ()
                 | _ -> 
-                    //Log.line "set UB %d" id
+                    Log.line "set UB %d" id
                     yield fun () -> 
                         let b = !b.Handle
                         gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
@@ -316,7 +315,7 @@ module Compiler =
                 | Some (ob,oa) when ob.Handle = b.Handle && oa = atts ->
                     ()
                 | _ -> 
-                    //Log.line "set VB %d" id
+                    Log.line "set VB %d" id
                     yield fun () -> 
                         let b = !b.Handle
                         gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
@@ -327,22 +326,28 @@ module Compiler =
                             id <- id + 1
                         gl.bindBuffer(gl.ARRAY_BUFFER, null)
 
+            match prev.indexBuffer, o.indexBuffer with
+            | Some (ob,oi), Some (ib, info) when ib.Handle = ob.Handle && oi = info ->
+                
+                yield fun () ->
+                    let call = !o.call.Handle
+                    gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
 
+            | _, None ->
+                yield fun () ->
+                    let call = !o.call.Handle
+                    gl.drawArrays(o.mode, float call.first, float call.faceVertexCount)
+                    
 
-            
-            match o.indexBuffer with
-            | Some (ib, info) ->
+            | _,  Some (ib, info) ->
+                Log.line "set IB"
                 yield fun () ->
                     let call = !o.call.Handle
                     let ib = !ib.Handle
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib.Handle)
                     gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
-            | None ->
-                yield fun () ->
-                    let call = !o.call.Handle
-                    gl.drawArrays(o.mode, float call.first, float call.faceVertexCount)
 
-            //Log.stop()
+            Log.stop()
         ]
 
 [<AllowNullLiteral>]
@@ -501,9 +506,9 @@ let main argv =
     node.Add([1;2;3], 5) |> ignore
     node.Update(AdaptiveToken.Top)
 
-    let w = node.Remove [0;1]
+    let w = node.Remove [0]
     node.Update(AdaptiveToken.Top)
-    //Log.warn "remove %A" w
+    Log.warn "remove %A" w
     let mutable c = unbox<Fragment> node.First
     while unbox c do
         Log.warn "%A" c.Code
@@ -513,33 +518,39 @@ let main argv =
 
     let shader =
         """#version 300 es
-
-            #ifdef VERTEX
-
+        
+            precision highp float;
+            precision highp int;
             uniform PerModel {
                 mat4 ModelTrafo;
+                mat3 NormalMatrix;
             };
             uniform PerView {
-                float scale;
                 mat4 ViewProjTrafo;
+                vec3 CameraLocation;
             };
 
+            #ifdef VERTEX
             layout(location = 0) in vec3 Positions;
-            layout(location = 1) in vec2 DiffuseColorCoordinates;
-            out vec2 cc;
+            layout(location = 1) in vec3 Normals;
+            out vec3 fs_Normals; 
+            out vec4 fs_WorldPosition; 
             void main() {
-                gl_Position = (vec4(scale * Positions, 1.0) * ModelTrafo) * ViewProjTrafo;
-                cc = DiffuseColorCoordinates;
+                vec4 wp = vec4(Positions, 1.0) * ModelTrafo;
+                gl_Position = wp * ViewProjTrafo;
+                fs_Normals = normalize(Normals * NormalMatrix);
+                fs_WorldPosition = wp;
             }
             #endif
 
             #ifdef FRAGMENT
-            precision highp float;
-            precision highp int;
-            in vec2 cc;
+            in vec3 fs_Normals; 
+            in vec4 fs_WorldPosition; 
             layout(location = 0) out vec4 Colors;
             void main() {
-                Colors = vec4(cc.x,cc.y,1,1);
+                vec3 v = normalize(CameraLocation);
+                float diff = abs(dot(normalize(fs_Normals), normalize(CameraLocation - fs_WorldPosition.xyz)));
+                Colors = vec4(diff, diff, diff, 1);
             }
             #endif
         """
@@ -613,10 +624,13 @@ let main argv =
                 |]
 
             let sg =
-                Sg.draw PrimitiveTopology.TriangleList
-                |> Sg.index index
-                |> Sg.vertexAttribute DefaultSemantic.Positions pos
-                |> Sg.vertexAttribute DefaultSemantic.DiffuseColorCoordinates tc
+                //Sg.draw PrimitiveTopology.TriangleList
+                //|> Sg.index index
+                //|> Sg.vertexAttribute DefaultSemantic.Positions pos
+                //|> Sg.vertexAttribute DefaultSemantic.DiffuseColorCoordinates tc
+
+                Sg.sphere 3
+                //Sg.box Box3d.Unit
                 |> Sg.uniform "scale" (Mod.constant 1.0)
                 |> Sg.trafo model
                 |> Sg.viewTrafo view
@@ -624,7 +638,7 @@ let main argv =
                 |> Sg.shader shader
 
             let sg =
-                let s = 11
+                let s = 5
                 let rand = System.Random()
                 Sg.ofList [
                     for x in -s/2 .. s/2 do
@@ -633,7 +647,7 @@ let main argv =
                                 let phi = rand.NextDouble() * Constant.PiTimesTwo
                                 let r = rand.NextDouble() * 10.0
 
-                                let t = V3d(float x, float y, float z) * 3.0
+                                let t = V3d(float x, float y, float z) * 2.0
                                 yield sg |> Sg.trafo (Mod.constant <| Trafo3d.Translation t)
                 ]
 
