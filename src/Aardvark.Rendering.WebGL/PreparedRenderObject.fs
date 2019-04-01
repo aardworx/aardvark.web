@@ -24,7 +24,7 @@ type IndexInfo =
         size : int
     }
 
-[<CustomEquality; CustomComparison>]
+[<CustomEquality;NoComparison>]
 type PreparedRenderObject =
     {
         id                  : int
@@ -42,11 +42,11 @@ type PreparedRenderObject =
         match o with
         | :? PreparedRenderObject as o -> x.id = o.id
         | _ -> false
-    interface IComparable with
-        member x.CompareTo o =
-            match o with
-            | :? PreparedRenderObject as o -> compare x.id o.id
-            | _ -> failwith "uncomparable"
+    //interface IComparable with
+    //    member x.CompareTo o =
+    //        match o with
+    //        | :? PreparedRenderObject as o -> compare x.id o.id
+    //        | _ -> failwith "uncomparable"
 
 
 module PreparedRenderObject =
@@ -93,7 +93,7 @@ module PreparedRenderObject =
 
         gl.useProgram(o.program.Handle)
         
-        match !o.depthMode.Handle with
+        match o.depthMode.Handle.Value with
         | Some m ->
             gl.enable(gl.DEPTH_TEST)
             gl.depthFunc(m)
@@ -103,12 +103,12 @@ module PreparedRenderObject =
 
         // bind uniforms
         for (id, b) in Map.toSeq o.uniformBuffers do
-            let b = !b.Handle
+            let b = b.Handle.Value
             gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
 
         // bind buffers
         for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
-            let b = !b.Handle
+            let b = b.Handle.Value
             gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
             let mutable id = id
             for att in atts do
@@ -120,10 +120,10 @@ module PreparedRenderObject =
 
 
         
-        let call = !o.call.Handle
+        let call = o.call.Handle.Value
         match o.indexBuffer with
         | Some (ib, info) ->
-            let ib = !ib.Handle
+            let ib = ib.Handle.Value
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib.Handle)
             gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
         | None ->

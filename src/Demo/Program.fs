@@ -162,6 +162,163 @@ type TrieNode<'k, 'a>(dirty : DictSet<ILinked>, nodeKey : Option<'k>, parent : T
                 false
 
 
+
+[<AllowNullLiteral>]
+type TrieNodeNew<'k, 'a>(dirty : DictSet<ILinked>, parent : TrieNodeNew<'k, 'a>, create : 'a -> ILinked) =
+    let mutable value : Option<ILinked> = None
+
+    let mutable prev : TrieNodeNew<'k, 'a> = null
+    let mutable next : TrieNodeNew<'k, 'a> = null
+
+    let mutable lastChild : TrieNodeNew<'k, 'a> = null
+    let mutable firstChild : TrieNodeNew<'k, 'a> = null
+
+    let children = Dict<'k, TrieNodeNew<'k, 'a>>(Unchecked.hash, Unchecked.equals)
+
+    member x.First : ILinked =
+        match value with
+        | Some v -> v
+        | None ->
+            if unbox firstChild then firstChild.First
+            else null
+
+    member x.Last : ILinked =
+        if unbox lastChild then lastChild.Last
+        elif FSharp.Core.Option.isSome value then value.Value
+        else null
+
+    member x.Prev
+        with get() = prev
+        and set p = prev <- p
+        
+    member x.Next
+        with get() = next
+        and set p = next <- p
+
+    member x.Add(keys : list<'k>, v : 'a, left : TrieRef<'k, 'a>, right : TrieRef<'k, 'a>) =
+        match keys with
+        | [] ->
+            match value with
+            | Some v ->
+                let prev = v.Prev
+                let next = v.Next
+                if unbox prev then prev.Next <- next
+                if unbox next then next.Prev <- prev
+                value <- None
+            | _ ->
+                ()
+
+            let next =
+                if unbox firstChild then firstChild.First
+                else right.First
+
+            let prev = 
+                left.Last
+
+            let l = create v
+            l.Prev <- prev
+            l.Next <- next
+
+            dirty.Add l |> ignore
+            if unbox prev then 
+                prev.Next <- l
+            if unbox next then 
+                next.Prev <- l
+                dirty.Add next |> ignore
+
+            value <- Some l
+
+        | k :: ks ->
+
+            match children.TryGetValue k with
+            | Some c ->
+                let l = 
+                    if unbox c.Prev then Trie c.Prev
+                    elif FSharp.Core.Option.isSome value then Value value.Value
+                    else left
+
+                let r =
+                    if unbox c.Next then Trie c.Next
+                    else right
+
+                c.Add(ks, v, l, r)
+            | None ->
+                let c = TrieNodeNew(dirty, x, create)
+                let l = 
+                    if unbox lastChild then Trie lastChild
+                    elif FSharp.Core.Option.isSome value then Value value.Value
+                    else left
+                    
+                let r =
+                    right
+                c.Add(ks, v, l, r)
+
+
+
+                if unbox lastChild then lastChild.Next <- c
+                else firstChild <- c
+                c.Prev <- lastChild
+                lastChild <- c
+                assert(unbox lastChild && unbox firstChild)
+                children.[k] <- c
+
+    member x.Remove(keys : list<'k>) =
+        match keys with
+        | [] -> 
+            let l = x.First
+            let r = x.Last
+
+            let mutable c = l
+            while c <> r.Next do
+                dirty.Remove c |> ignore
+                c <- c.Next
+
+            if unbox l.Prev then l.Prev.Next <- r.Next
+            if unbox r.Next then 
+                dirty.Add r.Next |> ignore
+                r.Next.Prev <- l.Prev
+
+
+            true
+        | k :: ks ->
+            match children.TryGetValue k with
+            | Some c ->
+                if c.Remove ks then
+                    children.Remove k |> ignore
+                    if unbox c.Prev then c.Prev.Next <- c.Next
+                    else firstChild <- c.Next
+
+                    if unbox c.Next then c.Next.Prev <- c.Prev
+                    else lastChild <- c.Prev
+
+                    if children.Count > 0 || FSharp.Core.Option.isSome value then false
+                    else true
+                else
+                    false
+            | None ->
+                false
+
+
+and TrieRef<'k, 'a> =
+    | Nothing
+    | Trie of TrieNodeNew<'k, 'a>
+    | Value of ILinked
+
+    member x.First = 
+        match x with
+        | Nothing -> null
+        | Trie t -> t.First
+        | Value v -> v
+
+    member x.Last = 
+        match x with
+        | Nothing -> null
+        | Trie t -> t.Last
+        | Value v -> v
+
+
+
+
 [<AllowNullLiteral>]
 type Fragment(value : int) =
     let mutable code = "none"
@@ -200,18 +357,18 @@ type Fragment(value : int) =
 
 type Trie<'k, 'a>(create : 'a -> ILinked) =
     let dirty = DictSet<ILinked>(Unchecked.hash, Unchecked.equals)
-    let mutable root = TrieNode<'k, 'a>(dirty, None, null, create)
+    let mutable root = TrieNodeNew<'k, 'a>(dirty, null, create)
 
     member x.First = root.First
     member x.Last = root.Last
 
 
     member x.Add(keys : list<'k>, value : 'a) =
-        root.Add(keys, value)
+        root.Add(keys, value, Nothing, Nothing)
 
     member x.Remove(keys : list<'k>) =
         if root.Remove keys then
-            root <- TrieNode<'k, 'a>(dirty, None, null, create)
+            root <- TrieNodeNew<'k, 'a>(dirty, null, create)
 
     member x.Update(token : AdaptiveToken) =
         for d in dirty do 
@@ -225,12 +382,12 @@ module Compiler =
         let gl = o.program.Context.GL
 
         [
-            Log.startCollapsed "init(%d)" o.id
+            Log.start "init(%d)" o.id
             Log.line "set program"
             yield fun () -> gl.useProgram(o.program.Handle)
             
             Log.line "set depthMode"
-            match !o.depthMode.Handle with
+            match o.depthMode.Handle.Value with
             | Some m ->
                 yield fun () -> 
                     gl.enable(gl.DEPTH_TEST)
@@ -244,14 +401,14 @@ module Compiler =
             for (id, b) in Map.toSeq o.uniformBuffers do
                 Log.line "set UB %d" id
                 yield fun () -> 
-                    let b = !b.Handle
+                    let b = b.Handle.Value
                     gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
 
             // bind buffers
             for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
                 Log.line "set VB %d" id
                 yield fun () -> 
-                    let b = !b.Handle
+                    let b = b.Handle.Value
                     gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
                     let mutable mid = id
                     for att in atts do
@@ -264,13 +421,13 @@ module Compiler =
             match o.indexBuffer with
             | Some (ib, info) ->
                 yield fun () ->
-                    let call = !o.call.Handle
-                    let ib = !ib.Handle
+                    let call = o.call.Handle.Value
+                    let ib = ib.Handle.Value
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib.Handle)
                     gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
             | None ->
                 yield fun () ->
-                    let call = !o.call.Handle
+                    let call = o.call.Handle.Value
                     gl.drawArrays(o.mode, float call.first, float call.faceVertexCount)
 
             Log.stop()
@@ -282,20 +439,19 @@ module Compiler =
         //compile o
 
         [
-            Log.startCollapsed "compile(%d, %d)" prev.id o.id
+            Log.start "compile(%d, %d)" prev.id o.id
             if prev.program.Handle <> o.program.Handle then
                 Log.line "set program"
                 yield fun () -> gl.useProgram(o.program.Handle)
 
             if prev.depthMode.Handle <> o.depthMode.Handle then
                 Log.line "set depthMode"
-                match !o.depthMode.Handle with
-                | Some m ->
-                    yield fun () -> 
+                yield fun () -> 
+                    match o.depthMode.Handle.Value with
+                    | Some m ->
                         gl.enable(gl.DEPTH_TEST)
                         gl.depthFunc(m)
-                | None ->
-                    yield fun () -> 
+                    | None ->
                         gl.disable(gl.DEPTH_TEST)
             
             // bind uniforms
@@ -306,7 +462,7 @@ module Compiler =
                 | _ -> 
                     Log.line "set UB %d" id
                     yield fun () -> 
-                        let b = !b.Handle
+                        let b = b.Handle.Value
                         gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
 
             // bind buffers
@@ -317,7 +473,7 @@ module Compiler =
                 | _ -> 
                     Log.line "set VB %d" id
                     yield fun () -> 
-                        let b = !b.Handle
+                        let b = b.Handle.Value
                         gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
                         let mutable id = id
                         for att in atts do
@@ -330,25 +486,120 @@ module Compiler =
             | Some (ob,oi), Some (ib, info) when ib.Handle = ob.Handle && oi = info ->
                 
                 yield fun () ->
-                    let call = !o.call.Handle
+                    let call = o.call.Handle.Value
                     gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
 
             | _, None ->
                 yield fun () ->
-                    let call = !o.call.Handle
+                    let call = o.call.Handle.Value
                     gl.drawArrays(o.mode, float call.first, float call.faceVertexCount)
                     
 
             | _,  Some (ib, info) ->
                 Log.line "set IB"
                 yield fun () ->
-                    let call = !o.call.Handle
-                    let ib = !ib.Handle
+                    let call = o.call.Handle.Value
+                    let ib = ib.Handle.Value
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib.Handle)
                     gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
 
             Log.stop()
         ]
+
+    let compileDiff2 (prev : PreparedRenderObject) (o : PreparedRenderObject) =
+        let gl = o.program.Context.GL
+
+        //compile o
+
+        let args = System.Collections.Generic.List<obj>()
+
+        let code = 
+            [
+                yield "var gl = tup[0];"
+                yield "var args = tup[1];"
+                yield "debugger;"
+                if prev.program.Handle <> o.program.Handle then
+                    Log.line "set program"
+                    yield sprintf "gl.useProgram(args[%d])" args.Count //fun () -> gl.useProgram(o.program.Handle)
+                    args.Add(o.program.Handle)
+
+                if prev.depthMode.Handle <> o.depthMode.Handle then
+                    Log.line "set depthMode"
+                    yield sprintf "if(args[%d].value) { gl.enable(gl.DEPTH_TEST); gl.depthFunc(args[%d].value); } else { gl.disable(gl.DEPTH_TEST); }" args.Count args.Count
+                    args.Add(o.depthMode.Handle)
+
+                // bind uniforms
+                for (id, b) in Map.toSeq o.uniformBuffers do
+                    match Map.tryFind id prev.uniformBuffers with
+                    | Some ob when ob.Handle = b.Handle -> 
+                        ()
+                    | _ -> 
+                        yield sprintf "gl.bindBufferBase(gl.UNIFORM_BUFFER, %d, args[%d].value.handle)" id args.Count
+                        args.Add(b.Handle)
+                        Log.line "set UB %d" id
+                        //yield fun () -> 
+                        //    let b = b.Handle.Value
+                        //    gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
+
+                // bind buffers
+                for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
+                    match Map.tryFind id prev.vertexBuffers with
+                    | Some (ob,oa) when ob.Handle = b.Handle && oa = atts ->
+                        ()
+                    | _ -> 
+                        yield sprintf "gl.bindBuffer(gl.ARRAY_BUFFER, args[%d].value.handle)" args.Count
+                        args.Add b.Handle
+                        let mutable id = id
+                        for att in atts do
+                            yield sprintf "gl.enableVertexAttribArray(%d)" id
+                            yield sprintf "gl.vertexAttribPointer(%d, %d, %f, %A, %d, %d)" id att.size att.typ att.norm att.stride att.offset
+                            id <- id + 1
+                        yield "gl.bindBuffer(gl.ARRAY_BUFFER, null)"
+
+
+                        Log.line "set VB %d" id
+                        //yield fun () -> 
+                        //    let b = b.Handle.Value
+                        //    gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
+                        //    let mutable id = id
+                        //    for att in atts do
+                        //        gl.enableVertexAttribArray(float id)
+                        //        gl.vertexAttribPointer(float id, float att.size, att.typ, att.norm, float att.stride, float att.offset)
+                        //        id <- id + 1
+                        //    gl.bindBuffer(gl.ARRAY_BUFFER, null)
+
+                match prev.indexBuffer, o.indexBuffer with
+                | Some (ob,oi), Some (ib, info) when ib.Handle = ob.Handle && oi = info ->
+                    
+                    yield sprintf "gl.drawElements(%f, args[%d].value.faceVertexCount, %f, (%d + args[%d].value.first * %d))" o.mode args.Count info.typ info.offset args.Count info.size
+                    args.Add(o.call.Handle)
+                    //yield fun () ->
+                    //    let call = o.call.Handle.Value
+                    //    gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
+
+                | _, None ->
+                    yield sprintf "gl.drawArrays(%f, args[%d].value.first, args[%d].value.faceVertexCount)" o.mode args.Count args.Count
+                    args.Add o.call.Handle
+                
+
+                | _,  Some (ib, info) ->
+                    failwith "" "set IB"
+                    //yield fun () ->
+                    //    let call = o.call.Handle.Value
+                    //    let ib = ib.Handle.Value
+                    //    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib.Handle)
+                    //    gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
+
+                Log.stop()
+            ]
+
+        let code = FSharp.Core.String.concat ";\n" code
+        let f = Function.Create("tup", code) |> unbox<WebGLRenderingContext * System.Collections.Generic.List<obj> -> unit>
+        [ 
+            fun () -> f (gl, args)
+        ]
+
+
 
 [<AllowNullLiteral>]
 type RenderObjectFragment(o : PreparedRenderObject) =
@@ -411,8 +662,9 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
 
     let getKey (o : PreparedRenderObject) =
         [
-            o.program.Handle :> obj
-            o.id :> obj
+            o.vertexBuffers |> Map.toList |> List.map (fun (i,(b,d)) -> i, b.Handle, d) :> obj
+            o.program :> obj
+            o :> obj
         ]
 
 
@@ -452,7 +704,11 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
         x.EvaluateAlways' token (fun token dirty ->
             let mutable dirty = HRefSet.ofSeq dirty
 
+            let rand = System.Random()
             let ops = reader.GetOperations token
+            //let ops = ops |> Seq.map (fun o -> rand.Next(), o) |> Seq.toList |> List.sortBy fst |> Seq.map snd
+
+
             for o in ops do
                 match o with
                 | Add(_,o) ->
@@ -502,7 +758,7 @@ let main argv =
     node.Add([0;1], 1) |> ignore
     node.Add([0;2], 2) |> ignore
     node.Add([1;2], 3) |> ignore
-    node.Add([1;2], 4) |> ignore
+    node.Add([1;3], 4) |> ignore
     node.Add([1;2;3], 5) |> ignore
     node.Update(AdaptiveToken.Top)
 
@@ -583,7 +839,7 @@ let main argv =
 
             let model = angle |> Mod.map Trafo3d.RotationZ
             let view = cam |> Mod.map CameraView.viewTrafo
-            let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 60.0 0.1 1000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
+            let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 110.0 0.1 1000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
             //let modelViewProj =
             //    Mod.custom (fun t ->
             //        let m = model.GetValue(t)
@@ -623,34 +879,50 @@ let main argv =
                     0; 2; 3
                 |]
 
-            let sg =
-                //Sg.draw PrimitiveTopology.TriangleList
-                //|> Sg.index index
-                //|> Sg.vertexAttribute DefaultSemantic.Positions pos
-                //|> Sg.vertexAttribute DefaultSemantic.DiffuseColorCoordinates tc
-
-                Sg.sphere 3
-                //Sg.box Box3d.Unit
-                |> Sg.uniform "scale" (Mod.constant 1.0)
+            let sphere() =
+                Sg.sphere 5
+                |> Sg.trafo (Mod.constant (Trafo3d.Scale(0.5) * Trafo3d.Translation(V3d(0.5, 0.5, 0.5))))
                 |> Sg.trafo model
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
-                |> Sg.shader shader
-
-            let sg =
-                let s = 5
-                let rand = System.Random()
-                Sg.ofList [
+                
+            let sphere2() =
+                Sg.sphere 1
+                |> Sg.trafo (Mod.constant (Trafo3d.Scale(0.5) * Trafo3d.Translation(V3d(0.5, 0.5, 0.5))))
+                |> Sg.trafo model
+                |> Sg.viewTrafo view
+                |> Sg.projTrafo proj
+                    
+            let box() =
+                Sg.box Box3d.Unit
+                |> Sg.trafo model
+                |> Sg.viewTrafo view
+                |> Sg.projTrafo proj
+                
+            let rand = System.Random()
+            let sett =
+                let s = 7
+                cset [
                     for x in -s/2 .. s/2 do
                         for y in -s/2 .. s/2 do
                             for z in -s/2 .. s/2 do
-                                let phi = rand.NextDouble() * Constant.PiTimesTwo
-                                let r = rand.NextDouble() * 10.0
+                                let r = rand.NextDouble()
+                                
+                                let sg =
+                                    if r > 0.6 then sphere2()
+                                    elif r > 0.3 then sphere()
+                                    else box()
 
                                 let t = V3d(float x, float y, float z) * 2.0
-                                yield sg |> Sg.trafo (Mod.constant <| Trafo3d.Translation t)
+                                let s = sg |> Sg.trafo (Mod.init <| Trafo3d.Translation t)
+                                yield s
                 ]
 
+            let sg =
+                let s = 7
+                let rand = System.Random()
+                Sg.set sett
+                |> Sg.shader shader
 
             let objects = sg.RenderObjects()
 
@@ -689,6 +961,11 @@ let main argv =
                     else
                         active <- true
                         control.RenderTask <- task()
+                | Aardvark.Application.Keys.X ->
+                    
+                    if sett.Count > 0 then
+                        let e = sett |> Seq.item (rand.Next sett.Count)
+                        transact (fun () -> sett.Remove e |> ignore)
                 | _ ->
                     ()
             )

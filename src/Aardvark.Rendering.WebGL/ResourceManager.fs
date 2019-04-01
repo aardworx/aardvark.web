@@ -7,6 +7,29 @@ open FSharp.Collections
 open Aardvark.Base.Rendering
 open Aardvark.Rendering.WebGL
 
+type nref<'a>(v : 'a) =
+    let id = newId()
+    let mutable value = v
+
+    member x.Id = id
+
+    member x.GetValue() = value
+
+    member x.Value
+        with get() = value
+        and set v = value <- v
+
+    override x.GetHashCode() = id
+    override x.Equals o =
+        match o with
+        | :? nref<obj> as o -> o.Id = id
+        | _ -> false
+
+//[<AutoOpen>]
+//module Assign =
+//    let inline (:=) (a : ^a) (b : ^b) = ((^a) : (member set_Value : ^b -> unit) (a, b))
+//    let inline (!) (l : ^a) = ((^a) : (member get_Value : unit -> ^b) (l))
+
 type IResourceToken =
     inherit IDisposable
     abstract member Context : Context
@@ -21,7 +44,7 @@ type IResource =
 
 type IResource<'a> =
     inherit IResource
-    abstract member Handle : ref<'a>
+    abstract member Handle : nref<'a>
     //abstract member GetHandle : AdaptiveToken -> 'a
 
 type ResourceCache(ctx : Context) =
@@ -64,7 +87,7 @@ type AbstractResource<'a>(entry : IDisposable) =
     inherit AdaptiveObject()
 
     let mutable hasHandle = false
-    let handle = ref Unchecked.defaultof<'a>
+    let handle = nref Unchecked.defaultof<'a>
     let mutable refCount = 0
 
     abstract member ResourceKind : string
@@ -82,8 +105,8 @@ type AbstractResource<'a>(entry : IDisposable) =
         refCount <- 0
         if hasHandle then
             hasHandle <- false
-            x.DestroyRes !handle
-            handle := Unchecked.defaultof<_>
+            x.DestroyRes handle.Value
+            handle.Value <- Unchecked.defaultof<_>
         
 
 
@@ -92,8 +115,8 @@ type AbstractResource<'a>(entry : IDisposable) =
         if refCount = 0 then
             if hasHandle then
                 hasHandle <- false
-                x.DestroyRes !handle
-                handle := Unchecked.defaultof<_>
+                x.DestroyRes handle.Value
+                handle.Value <- Unchecked.defaultof<_>
                 entry.Dispose()
 
     member x.Update(t) =
@@ -102,11 +125,11 @@ type AbstractResource<'a>(entry : IDisposable) =
 
             if hasHandle then
                 if x.OutOfDate then 
-                    let hh = x.UpdateRes(t, !handle)
-                    handle := hh
+                    let hh = x.UpdateRes(t, handle.Value)
+                    handle.Value <- hh
             else
                 let h = x.CreateRes t
-                handle := h
+                handle.Value <- h
                 hasHandle <- true
         )
 

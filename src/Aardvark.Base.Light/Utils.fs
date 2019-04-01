@@ -91,10 +91,13 @@ module ListHeapExtensions =
             x.Clear()
             res
 
-    let mutable private id = 0
+    let mutable private id = 1
     let newId() =
-        let i = id + 1
-        id <- i
+        let nid = 
+            if id > 0 then -id - 1
+            else -id + 1
+        let i = id
+        id <- nid
         i
 
 

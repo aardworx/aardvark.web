@@ -144,6 +144,7 @@ module Sg =
                 |> Map.add "ProjTrafo" (state.projTrafo :> IMod)
 
             ASet.single {
+                id = newId()
                 pipeline = { shader = state.shader; uniforms = getUniform uniforms; depthMode = state.depthMode }
                 vertexBuffers = state.vertexAttriubtes
                 indexBuffer = state.indexBuffer
