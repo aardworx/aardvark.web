@@ -34,6 +34,9 @@ type RenderControl(canvas : HTMLCanvasElement) =
         }
 
     let gl = canvas.getContext("webgl2", config) |> unbox<WebGL2RenderingContext>
+    let gl =
+        if unbox gl then gl
+        else canvas.getContext("webgl", config) |> unbox<WebGL2RenderingContext>
     let ctx = Context(gl)
     let manager = new ResourceManager(ctx)
 

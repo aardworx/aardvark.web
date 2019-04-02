@@ -283,6 +283,27 @@ type UniformBufferResource(token : IResourceToken, layout : UniformBlockInfo, tr
         b.Destroy()
 
 
+type UniformLocationResource(token : IResourceToken, typ : PrimitiveType, value : IMod) =
+    inherit AbstractResource<UniformLocation>(token)
+    
+    let mutable write = Mod.constant ()
+    
+    override x.ResourceKind = "UniformLocation"
+    override x.CreateRes(t) =
+        let b = token.Context.CreateUniformLocation(typ)
+        write <- b.GetWriter(value)
+        write.GetValue t
+        
+        Prom.value b
+        
+    override x.UpdateRes(t, b) =
+        write.GetValue t
+        Prom.value b
+                   
+    override x.DestroyRes b =
+        write <- Mod.constant ()
+        b.Destroy()
+
 type ResourceManager(ctx : Context) =
        
     let noToken =
@@ -295,6 +316,7 @@ type ResourceManager(ctx : Context) =
     let textureCache = ResourceCache(ctx)
     let indexBufferCache = ResourceCache(ctx)
     let uniformBufferCache = ResourceCache(ctx)
+    let uniformLocationCache = ResourceCache(ctx)
     let depthModeCache = ResourceCache(ctx)
     let programCache = Dict<FramebufferSignature * string, Option<Program>>(Unchecked.hash, Unchecked.equals)
 
@@ -326,7 +348,11 @@ type ResourceManager(ctx : Context) =
         indexBufferCache.GetOrCreate([data], fun token ->
             BufferResource(token, ctx.GL.ELEMENT_ARRAY_BUFFER, data)
         )
-
+    member x.CreateUniformLocation(typ : PrimitiveType, data : IMod) =
+        uniformLocationCache.GetOrCreate([typ; data], fun token ->
+            UniformLocationResource(token, typ, data)
+        )
+        
     member x.CreateDepthMode(mode : IMod<DepthTestMode>) =
         let create (m : DepthTestMode) =
             let gl = x.Context.GL

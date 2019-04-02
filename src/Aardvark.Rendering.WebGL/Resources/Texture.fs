@@ -56,6 +56,34 @@ module TextureImpl =
             //r.send ""
         )
 
+    let resize(img : ImageData, size : V2i) =
+        if int img.width = size.X && int img.height = size.Y then
+            img
+        else
+            Log.warn  "implicit texture resize: %A -> %A" (V2i(int img.width, int img.height)) size
+            let src = document.createElement_canvas()
+            let dst = document.createElement_canvas()
+            let sctx = src.getContext_2d()
+            let dctx = dst.getContext_2d()
+
+            src.width <- img.width
+            src.height <- img.height
+            sctx.putImageData(img, 0.0, 0.0)
+
+            dst.width <- float size.X
+            dst.height <- float size.Y
+            dctx.drawImage(U3.Case2 src, 0.0, 0.0, img.width, img.height, 0.0, 0.0, float size.X, float size.Y)
+            dctx.getImageData(0.0, 0.0, float size.X, float size.Y)
+
+    let nextPowerOfTwo (v : int) =
+        let mutable x = v - 1
+        x <- x ||| (x >>> 1)
+        x <- x ||| (x >>> 2)
+        x <- x ||| (x >>> 4)
+        x <- x ||| (x >>> 8)
+        x <- x ||| (x >>> 16)
+        x + 1
+
     type Context with
         member x.CreateTexture(t : ITexture) =
             match t with
@@ -64,12 +92,44 @@ module TextureImpl =
                     let gl = x.GL
                     let tex = gl.createTexture()
                     gl.bindTexture(gl.TEXTURE_2D, tex)
-                    gl.texImage2D(gl.TEXTURE_2D, 0.0, gl.RGBA, float bmp.width, float bmp.height, 0.0, gl.RGBA, gl.UNSIGNED_BYTE, bmp :> obj)
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
-                    gl.generateMipmap(gl.TEXTURE_2D)
+
+                    
+                    
+                    let ext = gl.getExtension("EXT_texture_filter_anisotropic") |> unbox<EXT_texture_filter_anisotropic>
+                    
+                    if gl.IsGL2 then
+                        gl.texImage2D(gl.TEXTURE_2D, 0.0, gl.RGBA, float bmp.width, float bmp.height, 0.0, gl.RGBA, gl.UNSIGNED_BYTE, bmp :> obj)
+                    
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+                        if unbox ext then
+                            let v = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) |> unbox<float>
+                            gl.texParameteri(gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, v)
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
+                        
+                        gl.generateMipmap(gl.TEXTURE_2D)
+                    
+                    
+                    
+                    else
+                        let w = nextPowerOfTwo (int bmp.width)
+                        let h = nextPowerOfTwo (int bmp.height)
+                        let bmp = resize(bmp, V2i(w,h))
+
+
+                        gl.texImage2D(gl.TEXTURE_2D, 0.0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bmp)
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+                        if unbox ext then
+                            let v = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) |> unbox<float>
+                            gl.texParameteri(gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, v)
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
+                        gl.generateMipmap(gl.TEXTURE_2D)
+                    
+
+
                     gl.bindTexture(gl.TEXTURE_2D, null)
                     Texture(x, tex)
                 )

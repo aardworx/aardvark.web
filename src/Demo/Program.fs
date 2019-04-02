@@ -215,6 +215,27 @@ type Trie<'k, 'a>(create : 'a -> ILinked) =
 
 
 module Compiler =
+
+    let private setUniform (gl : WebGL2RenderingContext) (typ : PrimitiveType) (loc : WebGLUniformLocation) (r : nref<UniformLocation>) =
+        match typ with
+        | Bool -> fun () -> gl.uniform1iv(loc, Int32Array.Create(r.Value.Store.buffer, 0.0, 1.0))
+
+        | Float _ -> fun () -> gl.uniform1fv(loc, Float32Array.Create(r.Value.Store.buffer, 0.0, 1.0))
+        | Vec (Float _, 2) -> fun () -> gl.uniform2fv(loc, Float32Array.Create(r.Value.Store.buffer, 0.0, 2.0))
+        | Vec (Float _, 3) -> fun () -> gl.uniform3fv(loc, Float32Array.Create(r.Value.Store.buffer, 0.0, 3.0))
+        | Vec (Float _, 4) -> fun () -> gl.uniform4fv(loc, Float32Array.Create(r.Value.Store.buffer, 0.0, 4.0))
+
+        | Int _ -> fun () -> gl.uniform1iv(loc, Int32Array.Create(r.Value.Store.buffer, 0.0, 1.0))
+        | Vec (Int _, 2) -> fun () -> gl.uniform2iv(loc, Int32Array.Create(r.Value.Store.buffer, 0.0, 2.0))
+        | Vec (Int _, 3) -> fun () -> gl.uniform3iv(loc, Int32Array.Create(r.Value.Store.buffer, 0.0, 3.0))
+        | Vec (Int _, 4) -> fun () -> gl.uniform4iv(loc, Int32Array.Create(r.Value.Store.buffer, 0.0, 4.0))
+
+        | Mat (Float _, 2, 2) -> fun () -> gl.uniformMatrix2fv(loc, false, Float32Array.Create(r.Value.Store.buffer, 0.0, 4.0))
+        | Mat (Float _, 3, 3) -> fun () -> gl.uniformMatrix3fv(loc, false, Float32Array.Create(r.Value.Store.buffer, 0.0, 9.0))
+        | Mat (Float _, 4, 4) -> fun () -> gl.uniformMatrix4fv(loc, false, Float32Array.Create(r.Value.Store.buffer, 0.0, 16.0))
+
+        | _ -> failwithf "bad uniform type : %A" typ
+
     let compile (o : PreparedRenderObject) =
         let gl = o.program.Context.GL
 
@@ -261,6 +282,9 @@ module Compiler =
                     gl.activeTexture(gl.TEXTURE0 + float id)
                     gl.uniform1i(loc, float id)
                     gl.bindTexture(gl.TEXTURE_2D, r.Value.Handle)
+
+            for (loc, (typ,r)) in o.uniforms do
+                yield setUniform gl typ loc r.Handle
 
             match o.indexBuffer with
             | Some (ib, info) ->
@@ -338,7 +362,13 @@ module Compiler =
                         gl.activeTexture(gl.TEXTURE0 + float id)
                         gl.uniform1i(loc, float id)
                         gl.bindTexture(gl.TEXTURE_2D, r.Value.Handle)
-
+                        
+            for (loc, (typ,r)) in o.uniforms do
+                match HMap.tryFind loc prev.uniforms with
+                | Some (tt, tr) when typ = tt && tr.Handle = r.Handle ->
+                    ()
+                | _ -> 
+                    yield setUniform gl typ loc r.Handle
 
             match prev.indexBuffer, o.indexBuffer with
             | Some (ob,oi), Some (ib, info) when ib.Handle = ob.Handle && oi = info ->
@@ -616,14 +646,19 @@ let main argv =
         
             precision highp float;
             precision highp int;
-            uniform PerModel {
-                mat4 ModelTrafo;
-                mat3 NormalMatrix;
-            };
-            uniform PerView {
-                mat4 ViewProjTrafo;
-                vec3 CameraLocation;
-            };
+            uniform mat4 ModelTrafo;
+            uniform mat3 NormalMatrix;
+            uniform mat4 ViewProjTrafo;
+            uniform vec3 CameraLocation;
+            
+            //uniform PerModel {
+            //    mat3 NormalMatrix;
+            //    mat4 ModelTrafo;
+            //};
+            //uniform PerView {
+            //    mat4 ViewProjTrafo;
+            //    vec3 CameraLocation;
+            //};
 
             uniform sampler2D Tex;
 
@@ -653,7 +688,7 @@ let main argv =
                 vec3 v = normalize(CameraLocation);
                 float diff = abs(dot(normalize(fs_Normals), normalize(CameraLocation - fs_WorldPosition.xyz)));
 
-                vec4 color = texture(Tex, fs_DiffuseColorCoordinates);
+                vec4 color = texture(Tex, fs_DiffuseColorCoordinates, -0.5);
 
 
                 Colors = vec4(vec3(0.05,0.05,0.05) + color.xyz * diff * 0.95, 1);

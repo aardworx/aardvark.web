@@ -35,6 +35,7 @@ type UniformBlockInfo =
 type ProgramInterface =
     {
         attributes      : Map<int, ProgramParameter>
+        uniforms        : Map<string, WebGLUniformLocation * PrimitiveType>
         samplers        : Map<string, WebGLUniformLocation>
         uniformBlocks   : Map<int, UniformBlockInfo>
     }
@@ -80,6 +81,10 @@ module ProgramImpl =
             else failwithf "invalid type: %A" t
 
     type WebGL2RenderingContext with
+        member x.IsGL2 = 
+            let v = unbox<string> (x.getParameter(x.VERSION)) 
+            //Log.error "VERSION: %A" v
+            v.Contains "WebGL 2.0"
         member x.GetAttributes(p : WebGLProgram) =
             Map.ofList [
                 let cnt = x.getProgramParameter(p, x.ACTIVE_ATTRIBUTES) |> unbox<int>
@@ -92,43 +97,46 @@ module ProgramImpl =
             ]
 
         member x.GetUniformBlocks(p : WebGLProgram) =
-            let cnt = x.getProgramParameter(p, x.ACTIVE_UNIFORM_BLOCKS) |> unbox<int>
-            Map.ofList [
-                for bi in 0 .. cnt - 1 do
-                    let name = x.getActiveUniformBlockName(p, float bi)
-                    let indices = x.getActiveUniformBlockParameter(p, float bi, x.UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES) |> unbox<Uint32Array>
-                    let size = x.getActiveUniformBlockParameter(p, float bi, x.UNIFORM_BLOCK_DATA_SIZE) |> unbox<int>
+            if x.IsGL2 then
+                let cnt = x.getProgramParameter(p, x.ACTIVE_UNIFORM_BLOCKS) |> unbox<int>
+                Map.ofList [
+                    for bi in 0 .. cnt - 1 do
+                        let name = x.getActiveUniformBlockName(p, float bi)
+                        let indices = x.getActiveUniformBlockParameter(p, float bi, x.UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES) |> unbox<Uint32Array>
+                        let size = x.getActiveUniformBlockParameter(p, float bi, x.UNIFORM_BLOCK_DATA_SIZE) |> unbox<int>
 
-                    let offsets     = x.getActiveUniforms(p, indices, x.UNIFORM_OFFSET) |> unbox<Uint32Array>
-                    let sizes       = x.getActiveUniforms(p, indices, x.UNIFORM_SIZE) |> unbox<Uint32Array>
-                    let strides     = x.getActiveUniforms(p, indices, x.UNIFORM_ARRAY_STRIDE) |> unbox<Uint32Array>
-                    let rowMajors   = x.getActiveUniforms(p, indices, x.UNIFORM_IS_ROW_MAJOR) |> unbox<bool[]>
-                    let types       = x.getActiveUniforms(p, indices, x.UNIFORM_TYPE) |> unbox<Uint32Array>
+                        let offsets     = x.getActiveUniforms(p, indices, x.UNIFORM_OFFSET) |> unbox<Uint32Array>
+                        let sizes       = x.getActiveUniforms(p, indices, x.UNIFORM_SIZE) |> unbox<Uint32Array>
+                        let strides     = x.getActiveUniforms(p, indices, x.UNIFORM_ARRAY_STRIDE) |> unbox<Uint32Array>
+                        let rowMajors   = x.getActiveUniforms(p, indices, x.UNIFORM_IS_ROW_MAJOR) |> unbox<bool[]>
+                        let types       = x.getActiveUniforms(p, indices, x.UNIFORM_TYPE) |> unbox<Uint32Array>
         
-                    x.uniformBlockBinding(p, float bi, float bi)
-                    let fields =
-                        List.init (int indices.length) (fun i ->
-                            let off = offsets.[i] |> unbox<int>
-                            let size = sizes.[i] |> unbox<int>
-                            let stride = strides.[i] |> unbox<int>
-                            let rowMajor = rowMajors.[i] |> unbox<bool>
-                            let t = types.[i] |> PrimitiveType.ofGLType x
+                        x.uniformBlockBinding(p, float bi, float bi)
+                        let fields =
+                            List.init (int indices.length) (fun i ->
+                                let off = offsets.[i] |> unbox<int>
+                                let size = sizes.[i] |> unbox<int>
+                                let stride = strides.[i] |> unbox<int>
+                                let rowMajor = rowMajors.[i] |> unbox<bool>
+                                let t = types.[i] |> PrimitiveType.ofGLType x
 
-                            let r = x.getActiveUniform(p, indices.[i])
-                            if unbox r.name then
-                                Some { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }
-                            else
-                                document.write(sprintf "bad: %A" (JSON.stringify { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }))
-                                None
+                                let r = x.getActiveUniform(p, indices.[i])
+                                if unbox r.name then
+                                    Some { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }
+                                else
+                                    document.write(sprintf "bad: %A" (JSON.stringify { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }))
+                                    None
                                 
-                        )
-                        |> List.choose id
-                        |> List.sortBy (fun f -> f.offset)
+                            )
+                            |> List.choose id
+                            |> List.sortBy (fun f -> f.offset)
 
-                    yield bi, { index = bi; size = size; name = name; fields = fields; fieldsByName = fields |> Seq.map (fun f -> f.name, f) |> Map.ofSeq }
-            ]
+                        yield bi, { index = bi; size = size; name = name; fields = fields; fieldsByName = fields |> Seq.map (fun f -> f.name, f) |> Map.ofSeq }
+                ]
+            else
+                Map.empty
 
-        member x.GetActiveSamplers (p : WebGLProgram) =
+        member x.GetActiveSamplers(p : WebGLProgram, known : Set<string>) =
             let cnt = x.getProgramParameter(p, x.ACTIVE_UNIFORMS) |> unbox<int>
 
             let samplers = 
@@ -143,28 +151,61 @@ module ProgramImpl =
                 )
                 |> List.choose id
             Map.ofList samplers
+            
+        member x.GetActiveUniforms(p : WebGLProgram, known : Set<string>) =
+            let cnt = x.getProgramParameter(p, x.ACTIVE_UNIFORMS) |> unbox<int>
+
+            let uniforms = 
+                List.init cnt (fun i ->
+                    let u = x.getActiveUniform(p, float i)
+                    if not (Set.contains u.name known) then
+                        let loc = x.getUniformLocation(p, u.name)
+                        if unbox loc then Some (u.name, (loc, PrimitiveType.ofGLType x u.``type``))
+                        else None
+                    else    
+                        None
+                )
+                |> List.choose id
+            Map.ofList uniforms
 
         member x.FindOutputLocation(p : WebGLProgram, name : string) =
             let names = [name; name + "Out"; "fs_" + name]
             names |> List.tryPick (fun name ->
-                let v = x.getFragDataLocation(p, name) |> unbox<int>
+                let v = 0 //x.getFragDataLocation(p, name) |> unbox<int>
                 if v >= 0 then Some v
                 else None
             )
 
         member x.GetProgramInterface(signature : FramebufferSignature, p : WebGLProgram) =  
             let valid = 
-                signature.Colors |> Map.forall (fun slot name ->
-                    match x.FindOutputLocation(p, name) with
-                    | Some loc when loc = slot -> true
-                    | None -> console.warn (sprintf "[GL] program does not contain output: %s" name); false
-                    | Some l -> console.warn (sprintf "[GL] program location for %s is %d (expected %d)" name l slot);false
-                )
+                if x.IsGL2 then
+                    signature.Colors |> Map.forall (fun slot name ->
+                        match x.FindOutputLocation(p, name) with
+                        | Some loc when loc = slot -> true
+                        | None -> console.warn (sprintf "[GL] program does not contain output: %s" name); false
+                        | Some l -> console.warn (sprintf "[GL] program location for %s is %d (expected %d)" name l slot);false
+                    )
+                else
+                    true
             if valid then
+                let blocks = x.GetUniformBlocks(p)
+
+                let known =
+                    blocks 
+                    |> Map.toSeq
+                    |> Seq.collect (fun (_,b) -> b.fields |> Seq.map (fun f -> f.name))
+                    |> Set.ofSeq
+
+                let samplers = x.GetActiveSamplers(p, known)
+
+                let known = samplers |> Map.fold (fun s n _ -> Set.add n s) known
+                let uniforms = x.GetActiveUniforms(p, known)
+
                 Some {
                     attributes = x.GetAttributes(p)
-                    uniformBlocks = x.GetUniformBlocks(p)
-                    samplers = x.GetActiveSamplers(p)
+                    uniformBlocks = blocks
+                    uniforms = uniforms
+                    samplers = samplers
                 }
             else
                 None

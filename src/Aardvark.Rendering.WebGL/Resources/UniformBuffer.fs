@@ -69,7 +69,7 @@ module private Blit =
         | Trafo -> fun (value : obj) -> (unbox<Trafo3d> value).Forward.ToFloat32Array()
         | _ -> failwith "bad type"
 
-    let rec getBlit (src : PrimitiveType) (dst : PrimitiveType) =
+    let rec getBlit (buffer : bool) (src : PrimitiveType) (dst : PrimitiveType) =
         match src, dst with
             | Bool, Bool                -> 4, fun (view : DataView) (offset : int) (value : obj) -> view.setUint32(float offset, (if unbox value then 1.0 else 0.0), true)
             | Scalar, Bool              -> 4, fun (view : DataView) (offset : int) (value : obj) -> view.setUint32(float offset, number value, true)
@@ -84,7 +84,7 @@ module private Blit =
 
             | Vec(tSrc, _), Vec(tDst, dDst) ->
                 let toArray = toFloatArray src
-                let dstSize, writer = getBlit tSrc tDst
+                let dstSize, writer = getBlit buffer tSrc tDst
                 dDst * dstSize, fun (view : DataView) (offset : int) (value : obj) ->
                     
                     let mutable off = offset
@@ -93,15 +93,15 @@ module private Blit =
                         writer view off arr.[i]
                         off <- off + dstSize
                     
-            | Scalar, Vec(tDst, _) -> getBlit src tDst
-            | Vec _, Scalar -> getBlit src (Vec(dst, 1))
+            | Scalar, Vec(tDst, _) -> getBlit buffer src tDst
+            | Vec _, Scalar -> getBlit buffer src (Vec(dst, 1))
 
             | Trafo, Mat _ ->
-                let s, w = getBlit (Mat(Float 64, 4, 4)) dst
+                let s, w = getBlit buffer (Mat(Float 64, 4, 4)) dst
                 s, fun (view : DataView) (offset : int) (value : obj) -> w view offset (unbox<M44d> value?forward)
                 
-            | Mat(s, 3, 3), Mat(d, 3, 3) ->
-                let s, w = getBlit (Mat(s, 3, 4)) (Mat(d, 3, 4))
+            | Mat(s, 3, 3), Mat(d, 3, 3) when buffer ->
+                let s, w = getBlit buffer (Mat(s, 3, 4)) (Mat(d, 3, 4))
                 s, fun (view : DataView) (offset : int) (value : obj) -> w view offset (M34d (unbox<M33d> value))
 
             | Mat(Scalar, r0, c0), Mat(Float 32, r1, c1) when r0 = r1 && c0 = c1 ->
@@ -128,7 +128,7 @@ type UniformBuffer(ctx : Context, handle : WebGLBuffer, layout : UniformBlockInf
         match Map.tryFind name layout.fieldsByName with
         | Some f ->
             let srcType = Blit.getShaderType template
-            let _,blit = Blit.getBlit srcType f.typ
+            let _,blit = Blit.getBlit true srcType f.typ
             fun value -> blit view f.offset value
         | None ->
             fun value -> Log.warn "[GL] unknown field: %s" name
@@ -160,6 +160,34 @@ type UniformBuffer(ctx : Context, handle : WebGLBuffer, layout : UniformBlockInf
         store <- null
         ctx.GL.deleteBuffer handle
 
+type UniformLocation(ctx : Context, typ : PrimitiveType) =
+    inherit Resource(ctx)
+
+    let store = Uint8Array.Create(float (PrimitiveType.size typ))
+    let view = DataView.Create(store.buffer)
+
+    member x.GetWriterTemplate(template : obj) =
+        let srcType = Blit.getShaderType template
+        let _,blit = Blit.getBlit false srcType typ
+        fun value -> blit view 0 value
+        
+    member x.GetWriter(m : IMod) =
+        let writer = ref None
+        Mod.custom (fun t ->
+            let v = m.GetValueObj t
+            let write = 
+                match !writer with
+                | Some w -> w
+                | None ->
+                    let w = x.GetWriterTemplate(v)
+                    writer := Some w
+                    w
+            write v
+        )
+
+    member x.Store = store
+
+    override x.Destroy() = ()
 
 [<AutoOpen>]
 module UniformBufferImpl =
@@ -172,3 +200,7 @@ module UniformBufferImpl =
             x.GL.bufferData(x.GL.UNIFORM_BUFFER, U3.Case1 (float layout.size), x.GL.DYNAMIC_DRAW)
             x.GL.bindBuffer(x.GL.UNIFORM_BUFFER, null)
             UniformBuffer(x, handle, layout)
+
+        member x.CreateUniformLocation(typ : PrimitiveType) =
+            Log.debug "create uniformlocation"
+            UniformLocation(x, typ)

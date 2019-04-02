@@ -35,6 +35,7 @@ type PreparedRenderObject =
         uniformBuffers      : Map<int, IResource<UniformBuffer>>
         vertexBuffers       : Map<int, IResource<Buffer> * list<VertexAttrib>>
         samplers            : Map<int, WebGLUniformLocation * IResource<Texture>>
+        uniforms            : hmap<WebGLUniformLocation, PrimitiveType * IResource<UniformLocation>>
         indexBuffer         : Option<IResource<Buffer> * IndexInfo>
         mode                : float
         depthMode           : IResource<Option<float>>
@@ -58,6 +59,7 @@ module PreparedRenderObject =
     let resources (o : PreparedRenderObject) =
         seq {
             yield! o.uniformBuffers |> Map.toSeq |> Seq.map (fun (_,b) -> b :> IResource)
+            yield! o.uniforms |> Seq.map (fun (_,(_,l)) -> l :> IResource)
             yield! o.vertexBuffers |> Map.toSeq |> Seq.map (fun (_,(b,_)) -> b :> IResource)
             yield! o.samplers |> Map.toSeq |> Seq.map (fun (_,(_,b)) -> b :> IResource)
             match o.indexBuffer with
@@ -73,6 +75,7 @@ module PreparedRenderObject =
         let all = 
             seq {
                 yield! o.uniformBuffers |> Map.toSeq |> Seq.map (fun (_,b) -> b.Update t)
+                yield! o.uniforms |> HMap.toSeq |> Seq.map (fun (_,(_,b)) -> b.Update t)
                 yield! o.vertexBuffers  |> Map.toSeq |> Seq.map (fun (_,(b,_)) -> b.Update t)
                 yield! o.samplers  |> Map.toSeq |> Seq.map (fun (_,(_,b)) -> b.Update t)
                 match o.indexBuffer with
@@ -87,6 +90,7 @@ module PreparedRenderObject =
     let acquire (o : PreparedRenderObject) =
         o.program.Acquire()
         o.uniformBuffers |> Map.iter (fun _ b -> b.Acquire())
+        o.uniforms |> HMap.iter (fun _ (_,b) -> b.Acquire())
         o.vertexBuffers |> Map.iter (fun _ (b,_) -> b.Acquire())
         o.samplers |> Map.iter (fun _ (_,b) -> b.Acquire())
         o.indexBuffer |> FSharp.Core.Option.iter (fun (b,_) -> b.Acquire())
@@ -96,6 +100,7 @@ module PreparedRenderObject =
     let release (o : PreparedRenderObject) =
         o.program.Release()
         o.uniformBuffers |> Map.iter (fun _ b -> b.Release())
+        o.uniforms |> HMap.iter (fun _ (_,b) -> b.Release())
         o.vertexBuffers |> Map.iter (fun _ (b,_) -> b.Release())
         o.samplers |> Map.iter (fun _ (_,b) -> b.Release())
         o.indexBuffer |> FSharp.Core.Option.iter (fun (b,_) -> b.Release())
@@ -208,6 +213,17 @@ module Resources =
                 |> Seq.mapi (fun i v -> i, v)
                 |> Map.ofSeq
 
+            let uniforms =
+                program.Interface.uniforms |> Map.toSeq |> Seq.choose (fun (name, (location, typ)) ->
+                    match o.pipeline.uniforms name with
+                    | Some m ->
+                        let l = x.CreateUniformLocation(typ, m)
+                        Some (location, (typ, l))
+                    | None ->
+                        None
+                )
+                |> HMap.ofSeq
+
 
             let indexBuffer =
                 match o.indexBuffer with
@@ -238,6 +254,7 @@ module Resources =
                 id                  = newId()
                 program             = program
                 uniformBuffers      = uniformBuffers
+                uniforms            = uniforms
                 indexBuffer         = indexBuffer
                 samplers            = samplers
                 vertexBuffers       = vertexBuffers
