@@ -35,6 +35,7 @@ type UniformBlockInfo =
 type ProgramInterface =
     {
         attributes      : Map<int, ProgramParameter>
+        samplers        : Map<string, WebGLUniformLocation>
         uniformBlocks   : Map<int, UniformBlockInfo>
     }
 
@@ -127,6 +128,22 @@ module ProgramImpl =
                     yield bi, { index = bi; size = size; name = name; fields = fields; fieldsByName = fields |> Seq.map (fun f -> f.name, f) |> Map.ofSeq }
             ]
 
+        member x.GetActiveSamplers (p : WebGLProgram) =
+            let cnt = x.getProgramParameter(p, x.ACTIVE_UNIFORMS) |> unbox<int>
+
+            let samplers = 
+                List.init cnt (fun i ->
+                    let u = x.getActiveUniform(p, float i)
+                    if u.``type`` = x.SAMPLER_2D then
+                        let loc = x.getUniformLocation(p, u.name)
+                        if unbox loc then Some (u.name, loc)
+                        else None
+                    else    
+                        None
+                )
+                |> List.choose id
+            Map.ofList samplers
+
         member x.FindOutputLocation(p : WebGLProgram, name : string) =
             let names = [name; name + "Out"; "fs_" + name]
             names |> List.tryPick (fun name ->
@@ -147,6 +164,7 @@ module ProgramImpl =
                 Some {
                     attributes = x.GetAttributes(p)
                     uniformBlocks = x.GetUniformBlocks(p)
+                    samplers = x.GetActiveSamplers(p)
                 }
             else
                 None

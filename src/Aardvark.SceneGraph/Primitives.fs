@@ -67,6 +67,15 @@ module SgPrimitives =
         let normals = V3fBuffer.init indices.Length (fun i -> normals.[int (i / 6)])
         let texcoords = V2fBuffer.init indices.Length (fun i -> texcoords.[i % 6])
 
+
+        //let texcoords = 
+        //    let bla =
+        //        promise { 
+        //            do! Prom.delay 1000
+        //            return HostBuffer texcoords :> IBuffer 
+        //        }
+        //    PromiseBuffer(bla) 
+
         let p = { buffer = Mod.constant (HostBuffer positions :> IBuffer); offset = 0; typ = Vec(Float 32, 3) }
         let n = { buffer = Mod.constant (HostBuffer normals :> IBuffer); offset = 0; typ = Vec(Float 32, 3) }
         let t = { buffer = Mod.constant (HostBuffer texcoords :> IBuffer); offset = 0; typ = Vec(Float 32, 2) }
@@ -118,21 +127,29 @@ module SgPrimitives =
         let ps = tris.Length * 3
         let p = V3fBuffer(ps)
         let n = V3fBuffer(ps)
+        let tc = V2fBuffer(ps)
 
         let mutable i = 0
         for t in tris do
+            let nv = Vec.normalize t.P0
             p.[i] <- t.P0
-            n.[i] <- Vec.normalize t.P0
+            n.[i] <- nv
+            tc.[i] <- V2d((atan2 nv.Y nv.X + Constant.Pi) / Constant.PiTimesTwo, (asin nv.Z + Constant.PiHalf) / Constant.Pi)
             i <- i + 1
+            let nv = Vec.normalize t.P1
             p.[i] <- t.P1
-            n.[i] <- Vec.normalize t.P1
+            n.[i] <- nv
+            tc.[i] <- V2d((atan2 nv.Y nv.X + Constant.Pi) / Constant.PiTimesTwo, (asin nv.Z + Constant.PiHalf) / Constant.Pi)
             i <- i + 1
+            let nv = Vec.normalize t.P2
             p.[i] <- t.P2
             n.[i] <- Vec.normalize t.P2
+            tc.[i] <- V2d((atan2 nv.Y nv.X + Constant.Pi) / Constant.PiTimesTwo, (asin nv.Z + Constant.PiHalf) / Constant.Pi)
             i <- i + 1
 
         Sg.RenderNode(PrimitiveTopology.TriangleList, Mod.constant { faceVertexCount = p.Length; instanceCount = 1; first = 0 })
         |> Sg.vertexAttribute DefaultSemantic.Positions p
+        |> Sg.vertexAttribute DefaultSemantic.DiffuseColorCoordinates tc
         |> Sg.vertexAttribute DefaultSemantic.Normals n
 
     type private LazyList<'a> =

@@ -38,142 +38,16 @@ type ILinked =
     abstract member Update : AdaptiveToken -> unit
 
 [<AllowNullLiteral>]
-type TrieNode<'k, 'a>(dirty : DictSet<ILinked>, nodeKey : Option<'k>, parent : TrieNode<'k, 'a>, create : 'a -> ILinked) =
+type TrieNode<'k, 'a>(dirty : DictSet<ILinked>, parent : TrieNode<'k, 'a>, create : 'a -> ILinked) =
+    let mutable value : Option<ILinked> = None
+
     let mutable prev : TrieNode<'k, 'a> = null
     let mutable next : TrieNode<'k, 'a> = null
 
-    let mutable firstChild : TrieNode<'k, 'a>  = null
-    let mutable lastChild : TrieNode<'k, 'a>  = null
+    let mutable lastChild : TrieNode<'k, 'a> = null
+    let mutable firstChild : TrieNode<'k, 'a> = null
+
     let children = Dict<'k, TrieNode<'k, 'a>>(Unchecked.hash, Unchecked.equals)
-    
-    let mutable firstValue : ILinked = null
-    let mutable lastValue : ILinked = null
-
-    member x.LastValue = lastValue
-
-    member x.Prev
-        with get() = prev
-        and set p = prev <- p
-        
-    member x.Next
-        with get() = next
-        and set p = next <- p
-        
-    member x.FirstChild
-        with get() = firstChild
-        and set p = firstChild <- p
-            
-    member x.LastChild
-        with get() = lastChild
-        and set p = lastChild <- p
-
-    member x.Parent = parent
-
-    member x.Last =
-        if unbox lastChild then
-            lastChild.Last
-        else
-            if unbox lastValue then lastValue
-            elif unbox prev then prev.Last
-            else null
-
-    member x.First =
-        if unbox firstValue then firstValue
-        elif unbox firstChild then firstChild.First
-        elif unbox next then next.First
-        elif unbox parent then parent.LastValue
-        else null
-
-    member x.Add(keys : list<'k>, value : 'a) =
-        match keys with
-        | [] -> 
-            let prev =
-                if unbox lastValue then lastValue
-                elif unbox prev then prev.Last
-                elif unbox parent then parent.Last
-                else null
-
-            let next =
-                if children.Count > 0 then firstChild.First
-                elif unbox next then next.First
-                else null
-
-
-            let l = create(value)
-            dirty.Add l |> ignore
-            if unbox next then dirty.Add next |> ignore
-            l.Prev <- prev
-            l.Next <- next
-            
-            if not (unbox lastValue) then firstValue <- l
-            lastValue <- l
-
-            if unbox prev then prev.Next <- l
-            if unbox next then next.Prev <- l
-
-            l
-        | k :: ks ->
-            match children.TryGetValue k with
-            | Some c -> c.Add(ks, value)
-            | None -> 
-                let c = TrieNode<'k, 'a>(dirty, Some k, x, create, Prev = lastChild, Next = null)
-                let res = c.Add(ks, value)
-                children.[k] <- c
-
-                if unbox lastChild then lastChild.Next <- c
-                else firstChild <- c
-                lastChild <- c
-
-                res
-
-    member x.Remove(keys : list<'k>) =
-        match keys with
-        | [] ->
-            let f = x.First
-            let l = x.Last
-            if unbox f then 
-                if unbox l.Next then dirty.Add l.Next |> ignore
-
-                let mutable c = f
-                while c <> l.Next do
-                    dirty.Remove(c) |> ignore
-                    c <- c.Next
-
-                if unbox f.Prev then f.Prev.Next <- l.Next
-                if unbox l.Next then l.Next.Prev <- f.Prev
-
-            if unbox prev then prev.Next <- next
-            else parent.FirstChild <- next
-
-            if unbox next then next.Prev <- prev
-            else parent.LastChild <- prev
-
-            true
-
-        | k :: ks ->
-            match children.TryGetValue k with
-            | Some c ->
-                if c.Remove(ks) then
-                    children.Remove k |> ignore
-                    children.Count = 0
-                else
-                    false
-            | None ->
-                false
-
-
-
-[<AllowNullLiteral>]
-type TrieNodeNew<'k, 'a>(dirty : DictSet<ILinked>, parent : TrieNodeNew<'k, 'a>, create : 'a -> ILinked) =
-    let mutable value : Option<ILinked> = None
-
-    let mutable prev : TrieNodeNew<'k, 'a> = null
-    let mutable next : TrieNodeNew<'k, 'a> = null
-
-    let mutable lastChild : TrieNodeNew<'k, 'a> = null
-    let mutable firstChild : TrieNodeNew<'k, 'a> = null
-
-    let children = Dict<'k, TrieNodeNew<'k, 'a>>(Unchecked.hash, Unchecked.equals)
 
     member x.First : ILinked =
         match value with
@@ -243,7 +117,7 @@ type TrieNodeNew<'k, 'a>(dirty : DictSet<ILinked>, parent : TrieNodeNew<'k, 'a>,
 
                 c.Add(ks, v, l, r)
             | None ->
-                let c = TrieNodeNew(dirty, x, create)
+                let c = TrieNode(dirty, x, create)
                 let l = 
                     if unbox lastChild then Trie lastChild
                     elif FSharp.Core.Option.isSome value then Value value.Value
@@ -301,7 +175,7 @@ type TrieNodeNew<'k, 'a>(dirty : DictSet<ILinked>, parent : TrieNodeNew<'k, 'a>,
 
 and TrieRef<'k, 'a> =
     | Nothing
-    | Trie of TrieNodeNew<'k, 'a>
+    | Trie of TrieNode<'k, 'a>
     | Value of ILinked
 
     member x.First = 
@@ -318,46 +192,9 @@ and TrieRef<'k, 'a> =
 
 
 
-
-[<AllowNullLiteral>]
-type Fragment(value : int) =
-    let mutable code = "none"
-    let mutable prev : Fragment = null
-    let mutable next : Fragment = null
-    
-    member x.Value = value
-    member x.Code = code
-
-    override x.ToString() =
-        x.Code
-
-    member x.Prev
-        with get() = prev
-        and set (p : Fragment) = prev <- p
-            
-    member x.Next
-        with get() = next
-        and set p = next <- p
-
-    interface ILinked with
-        member x.Update(t) =
-            if unbox x.Prev then code <- sprintf "step(%d,%d)" x.Prev.Value value
-            else code <- sprintf "init %d" value
-        
-
-        member x.Prev
-            with get() = x.Prev :> ILinked
-            and set p = x.Prev <- unbox p
-
-        member x.Next
-            with get() = x.Next :> ILinked
-            and set p = x.Next <- unbox p
-
-
-
 type Trie<'k, 'a>(create : 'a -> ILinked) =
     let dirty = DictSet<ILinked>(Unchecked.hash, Unchecked.equals)
-    let mutable root = TrieNodeNew<'k, 'a>(dirty, null, create)
+    let mutable root = TrieNode<'k, 'a>(dirty, null, create)
 
     member x.First = root.First
     member x.Last = root.Last
@@ -368,7 +205,7 @@ type Trie<'k, 'a>(create : 'a -> ILinked) =
 
     member x.Remove(keys : list<'k>) =
         if root.Remove keys then
-            root <- TrieNodeNew<'k, 'a>(dirty, null, create)
+            root <- TrieNode<'k, 'a>(dirty, null, create)
 
     member x.Update(token : AdaptiveToken) =
         for d in dirty do 
@@ -381,12 +218,12 @@ module Compiler =
     let compile (o : PreparedRenderObject) =
         let gl = o.program.Context.GL
 
-        [
-            Log.start "init(%d)" o.id
-            Log.line "set program"
+        [|
+            //Log.start "init(%d)" o.id
+            //Log.line "set program"
             yield fun () -> gl.useProgram(o.program.Handle)
             
-            Log.line "set depthMode"
+            //Log.line "set depthMode"
             match o.depthMode.Handle.Value with
             | Some m ->
                 yield fun () -> 
@@ -399,14 +236,14 @@ module Compiler =
 
             // bind uniforms
             for (id, b) in Map.toSeq o.uniformBuffers do
-                Log.line "set UB %d" id
+                //Log.line "set UB %d" id
                 yield fun () -> 
                     let b = b.Handle.Value
                     gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
 
             // bind buffers
             for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
-                Log.line "set VB %d" id
+                //Log.line "set VB %d" id
                 yield fun () -> 
                     let b = b.Handle.Value
                     gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
@@ -417,6 +254,13 @@ module Compiler =
                         gl.vertexAttribPointer(float id, float att.size, att.typ, att.norm, float att.stride, float att.offset)
                         mid <- mid + 1
                     gl.bindBuffer(gl.ARRAY_BUFFER, null)
+
+            for (id, (loc, tex)) in Map.toSeq o.samplers do
+                let r = tex.Handle
+                yield fun () ->
+                    gl.activeTexture(gl.TEXTURE0 + float id)
+                    gl.uniform1i(loc, float id)
+                    gl.bindTexture(gl.TEXTURE_2D, r.Value.Handle)
 
             match o.indexBuffer with
             | Some (ib, info) ->
@@ -430,22 +274,22 @@ module Compiler =
                     let call = o.call.Handle.Value
                     gl.drawArrays(o.mode, float call.first, float call.faceVertexCount)
 
-            Log.stop()
-        ]
+            //Log.stop()
+        |]
 
     let compileDiff (prev : PreparedRenderObject) (o : PreparedRenderObject) =
         let gl = o.program.Context.GL
 
         //compile o
 
-        [
-            Log.start "compile(%d, %d)" prev.id o.id
+        [|
+            //Log.start "compile(%d, %d)" prev.id o.id
             if prev.program.Handle <> o.program.Handle then
-                Log.line "set program"
+                //Log.line "set program"
                 yield fun () -> gl.useProgram(o.program.Handle)
 
             if prev.depthMode.Handle <> o.depthMode.Handle then
-                Log.line "set depthMode"
+                //Log.line "set depthMode"
                 yield fun () -> 
                     match o.depthMode.Handle.Value with
                     | Some m ->
@@ -460,7 +304,7 @@ module Compiler =
                 | Some ob when ob.Handle = b.Handle -> 
                     ()
                 | _ -> 
-                    Log.line "set UB %d" id
+                    //Log.line "set UB %d" id
                     yield fun () -> 
                         let b = b.Handle.Value
                         gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
@@ -471,7 +315,7 @@ module Compiler =
                 | Some (ob,oa) when ob.Handle = b.Handle && oa = atts ->
                     ()
                 | _ -> 
-                    Log.line "set VB %d" id
+                    //Log.line "set VB %d" id
                     yield fun () -> 
                         let b = b.Handle.Value
                         gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
@@ -481,6 +325,20 @@ module Compiler =
                             gl.vertexAttribPointer(float id, float att.size, att.typ, att.norm, float att.stride, float att.offset)
                             id <- id + 1
                         gl.bindBuffer(gl.ARRAY_BUFFER, null)
+
+
+            
+            for (id, (loc, tex)) in Map.toSeq o.samplers do
+                match Map.tryFind id prev.samplers with
+                | Some (ol,ot) when ol = loc && ot.Handle = tex.Handle ->
+                    ()
+                | _ -> 
+                    let r = tex.Handle
+                    yield fun () ->
+                        gl.activeTexture(gl.TEXTURE0 + float id)
+                        gl.uniform1i(loc, float id)
+                        gl.bindTexture(gl.TEXTURE_2D, r.Value.Handle)
+
 
             match prev.indexBuffer, o.indexBuffer with
             | Some (ob,oi), Some (ib, info) when ib.Handle = ob.Handle && oi = info ->
@@ -496,108 +354,16 @@ module Compiler =
                     
 
             | _,  Some (ib, info) ->
-                Log.line "set IB"
+                //Log.line "set IB"
                 yield fun () ->
                     let call = o.call.Handle.Value
                     let ib = ib.Handle.Value
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib.Handle)
                     gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
 
-            Log.stop()
-        ]
+            //Log.stop()
+        |]
 
-    let compileDiff2 (prev : PreparedRenderObject) (o : PreparedRenderObject) =
-        let gl = o.program.Context.GL
-
-        //compile o
-
-        let args = System.Collections.Generic.List<obj>()
-
-        let code = 
-            [
-                yield "var gl = tup[0];"
-                yield "var args = tup[1];"
-                yield "debugger;"
-                if prev.program.Handle <> o.program.Handle then
-                    Log.line "set program"
-                    yield sprintf "gl.useProgram(args[%d])" args.Count //fun () -> gl.useProgram(o.program.Handle)
-                    args.Add(o.program.Handle)
-
-                if prev.depthMode.Handle <> o.depthMode.Handle then
-                    Log.line "set depthMode"
-                    yield sprintf "if(args[%d].value) { gl.enable(gl.DEPTH_TEST); gl.depthFunc(args[%d].value); } else { gl.disable(gl.DEPTH_TEST); }" args.Count args.Count
-                    args.Add(o.depthMode.Handle)
-
-                // bind uniforms
-                for (id, b) in Map.toSeq o.uniformBuffers do
-                    match Map.tryFind id prev.uniformBuffers with
-                    | Some ob when ob.Handle = b.Handle -> 
-                        ()
-                    | _ -> 
-                        yield sprintf "gl.bindBufferBase(gl.UNIFORM_BUFFER, %d, args[%d].value.handle)" id args.Count
-                        args.Add(b.Handle)
-                        Log.line "set UB %d" id
-                        //yield fun () -> 
-                        //    let b = b.Handle.Value
-                        //    gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
-
-                // bind buffers
-                for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
-                    match Map.tryFind id prev.vertexBuffers with
-                    | Some (ob,oa) when ob.Handle = b.Handle && oa = atts ->
-                        ()
-                    | _ -> 
-                        yield sprintf "gl.bindBuffer(gl.ARRAY_BUFFER, args[%d].value.handle)" args.Count
-                        args.Add b.Handle
-                        let mutable id = id
-                        for att in atts do
-                            yield sprintf "gl.enableVertexAttribArray(%d)" id
-                            yield sprintf "gl.vertexAttribPointer(%d, %d, %f, %A, %d, %d)" id att.size att.typ att.norm att.stride att.offset
-                            id <- id + 1
-                        yield "gl.bindBuffer(gl.ARRAY_BUFFER, null)"
-
-
-                        Log.line "set VB %d" id
-                        //yield fun () -> 
-                        //    let b = b.Handle.Value
-                        //    gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
-                        //    let mutable id = id
-                        //    for att in atts do
-                        //        gl.enableVertexAttribArray(float id)
-                        //        gl.vertexAttribPointer(float id, float att.size, att.typ, att.norm, float att.stride, float att.offset)
-                        //        id <- id + 1
-                        //    gl.bindBuffer(gl.ARRAY_BUFFER, null)
-
-                match prev.indexBuffer, o.indexBuffer with
-                | Some (ob,oi), Some (ib, info) when ib.Handle = ob.Handle && oi = info ->
-                    
-                    yield sprintf "gl.drawElements(%f, args[%d].value.faceVertexCount, %f, (%d + args[%d].value.first * %d))" o.mode args.Count info.typ info.offset args.Count info.size
-                    args.Add(o.call.Handle)
-                    //yield fun () ->
-                    //    let call = o.call.Handle.Value
-                    //    gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
-
-                | _, None ->
-                    yield sprintf "gl.drawArrays(%f, args[%d].value.first, args[%d].value.faceVertexCount)" o.mode args.Count args.Count
-                    args.Add o.call.Handle
-                
-
-                | _,  Some (ib, info) ->
-                    failwith "" "set IB"
-                    //yield fun () ->
-                    //    let call = o.call.Handle.Value
-                    //    let ib = ib.Handle.Value
-                    //    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib.Handle)
-                    //    gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
-
-                Log.stop()
-            ]
-
-        let code = FSharp.Core.String.concat ";\n" code
-        let f = Function.Create("tup", code) |> unbox<WebGLRenderingContext * System.Collections.Generic.List<obj> -> unit>
-        [ 
-            fun () -> f (gl, args)
-        ]
 
 
 
@@ -605,7 +371,7 @@ module Compiler =
 type RenderObjectFragment(o : PreparedRenderObject) =
     let mutable prev : RenderObjectFragment = null
     let mutable next : RenderObjectFragment = null
-    let mutable execute : list<unit -> unit> = []
+    let mutable execute : array<unit -> unit> = [||]
     let mutable prevChanged = true
 
 
@@ -653,7 +419,14 @@ type RenderObjectFragment(o : PreparedRenderObject) =
             with get() = x.Next :> ILinked
             and set p = x.Next <- unbox p
 
+[<AutoOpen>]
+module Helpers =
 
+    [<Emit("Symbol($0)")>]
+    let newSym(str : string) : Symbol = jsNative
+
+    [<Emit(@"delete $0[$1]")>]
+    let delete (o : obj) (str : Symbol) : unit = jsNative
 
 type RenderTask(signature : FramebufferSignature, manager : ResourceManager, objects : aset<RenderObject>) =
     inherit DirtyTrackingAdaptiveObject<IResource>("Resource")
@@ -664,16 +437,14 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
         [
             o.vertexBuffers |> Map.toList |> List.map (fun (i,(b,d)) -> i, b.Handle, d) :> obj
             o.program :> obj
-            o :> obj
+            o.id :> obj
         ]
-
-
-
 
     let preparedObjects = objects |> ASet.map (fun o -> manager.Prepare(signature, o))
     let reader = preparedObjects.GetReader()
     let allResources = Dict<IResource, int>(Unchecked.hash, Unchecked.equals)
 
+    let sym = newSym "RenderTasky"
     let addResource (r : IResource) =
         let isNew = ref false
         allResources.Alter(r, fun o ->
@@ -685,7 +456,7 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
         )
         !isNew
 
-    let removeResource (r : IResource) =
+    let removeResource (x : RenderTask) (r : IResource) =
         let isDead = ref false
         allResources.Alter(r, fun o ->
             match o with
@@ -696,7 +467,11 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
             | Some o ->
                 Some (o - 1)
         )
-        !isDead
+        if !isDead then
+            r.RemoveOutput x
+            true
+        else
+            false
 
     override x.Kind = "RenderTask"
 
@@ -704,33 +479,51 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
         x.EvaluateAlways' token (fun token dirty ->
             let mutable dirty = HRefSet.ofSeq dirty
 
-            let rand = System.Random()
+            //let rand = System.Random()
             let ops = reader.GetOperations token
             //let ops = ops |> Seq.map (fun o -> rand.Next(), o) |> Seq.toList |> List.sortBy fst |> Seq.map snd
 
-
+            let mutable inRender = true
             for o in ops do
                 match o with
                 | Add(_,o) ->
                     PreparedRenderObject.acquire o
                     for r in PreparedRenderObject.resources o do
                         if addResource r then
-                            dirty <- HRefSet.add r dirty
-                    trie.Add(getKey o, o) |> ignore
+                            ()
+                            //dirty <- HRefSet.add r dirty
+
+                    o?(sym) <- true
+
+                    (PreparedRenderObject.update token o).``then``(fun () ->
+                        if o?(sym) then
+                            trie.Add(getKey o, o) |> ignore
+                            if not inRender then transact x.MarkOutdated
+                    ) |> ignore
+                    
                 | Rem(_,o) ->
+                    delete o sym
                     trie.Remove(getKey o) |> ignore
                     for r in PreparedRenderObject.resources o do
-                        if removeResource r then
+                        if removeResource x r then
                             dirty <- HRefSet.remove r dirty
                     PreparedRenderObject.release o
 
-            if dirty.Count > 0 then
-                for d in dirty do
-                    d.Update token |> ignore
+            inRender <- false
 
-            trie.Update(token)
-            let entry = trie.First |> unbox<RenderObjectFragment>
-            entry.Run()
+            let promises = 
+                if dirty.Count > 0 then
+                    dirty |> Seq.map (fun d -> d.Update token) |> Prom.all |> unbox<Promise<unit>>
+                else
+                    Prom.value ()
+            //if dirty.Count > 0 then
+            //    for d in dirty do
+            //        d.Update token
+            promises.``then``(fun () ->
+                trie.Update(token)
+                let entry = trie.First |> unbox<RenderObjectFragment>
+                entry.Run()
+            )
         )
 
     member x.Dispose() =
@@ -749,27 +542,73 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
 
 [<EntryPoint>]
 let main argv =
-    let create (v : int) = 
-        Fragment(v) :> ILinked
 
-    let node = Trie<int, int>(create)
+    //let urls =
+    //    [
+    //        "http://localhost:8080/bundle.js"
+    //        "http://localhost:8080/index.html"
+    //        //"http://localhost:8080/asd.html"
+    //    ]
 
-    node.Add([0], 0) |> ignore
-    node.Add([0;1], 1) |> ignore
-    node.Add([0;2], 2) |> ignore
-    node.Add([1;2], 3) |> ignore
-    node.Add([1;3], 4) |> ignore
-    node.Add([1;2;3], 5) |> ignore
-    node.Update(AdaptiveToken.Top)
+    //let test =
+    //    future {
+    //        try
+    //            let start = performance.now()
+    //            let! data = urls |> List.chooseFuture Future.tryFetchBuffer
+    //            let dt = performance.now() - start
+    //            Log.warn "took: %A" dt
+    //            let total = data |> List.sumBy (fun b -> int b.byteLength)
+    //            return (dt, List.length data, total)
+    //        with e ->
+    //            Log.error "error: %A" e
+    //            return (0.0, 0, 0)
+    //    }
 
-    let w = node.Remove [0]
-    node.Update(AdaptiveToken.Top)
-    Log.warn "remove %A" w
-    let mutable c = unbox<Fragment> node.First
-    while unbox c do
-        Log.warn "%A" c.Code
-        assert (if unbox c.Next then c.Next.Prev = c else true)
-        c <- c.Next
+    //test.Continue(Log.line "success: %A", Log.error "error: %s")
+
+
+
+    //let test = 
+    //    set |> ASet.mapPromise (fun url ->
+    //        promise {
+    //            try
+    //                let! a = Prom.fetchBuffer url
+    //                return a
+    //            with e ->
+    //                Log.warn "err: %A" e
+    //                return ArrayBuffer.Create (10.0)
+    //        }
+    //    )
+
+    //let callback = ref id
+
+    //let r = test.GetReader()
+    //let o =
+    //    { new AdaptiveObject() with
+    //        member x.Kind = "Dummy"
+    //        member x.MarkObj() = 
+    //            setTimeout !callback 10 |> ignore
+    //            true
+    //    }
+    //callback := fun () ->
+    //    o.EvaluateAlways AdaptiveToken.Top (fun token ->
+    //        let ops = r.GetOperations token
+    //        ops |> HDeltaSet.iter (fun d ->
+    //            match d with
+    //            | Add(_,v) -> Log.warn "add %A" v.byteLength
+    //            | Rem(_,v) -> Log.warn "rem %A" v.byteLength
+    //        )
+    //    )
+
+    //callback.Value()
+
+    //let rem() =
+    //    transact (fun () ->
+    //        set.Remove "http://localhost:8080/bundle.js" |> ignore
+    //    )
+
+    //setTimeout rem 2000 |> ignore
+
 
 
     let shader =
@@ -786,27 +625,38 @@ let main argv =
                 vec3 CameraLocation;
             };
 
+            uniform sampler2D Tex;
+
             #ifdef VERTEX
             layout(location = 0) in vec3 Positions;
             layout(location = 1) in vec3 Normals;
+            layout(location = 2) in vec2 DiffuseColorCoordinates;
             out vec3 fs_Normals; 
             out vec4 fs_WorldPosition; 
+            out vec2 fs_DiffuseColorCoordinates;
+
             void main() {
                 vec4 wp = vec4(Positions, 1.0) * ModelTrafo;
                 gl_Position = wp * ViewProjTrafo;
                 fs_Normals = normalize(Normals * NormalMatrix);
                 fs_WorldPosition = wp;
+                fs_DiffuseColorCoordinates = DiffuseColorCoordinates;
             }
             #endif
 
             #ifdef FRAGMENT
             in vec3 fs_Normals; 
             in vec4 fs_WorldPosition; 
+            in vec2 fs_DiffuseColorCoordinates;
             layout(location = 0) out vec4 Colors;
             void main() {
                 vec3 v = normalize(CameraLocation);
                 float diff = abs(dot(normalize(fs_Normals), normalize(CameraLocation - fs_WorldPosition.xyz)));
-                Colors = vec4(diff, diff, diff, 1);
+
+                vec4 color = texture(Tex, fs_DiffuseColorCoordinates);
+
+
+                Colors = vec4(vec3(0.05,0.05,0.05) + color.xyz * diff * 0.95, 1);
             }
             #endif
         """
@@ -839,7 +689,7 @@ let main argv =
 
             let model = angle |> Mod.map Trafo3d.RotationZ
             let view = cam |> Mod.map CameraView.viewTrafo
-            let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 110.0 0.1 1000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
+            let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 0.1 1000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
             //let modelViewProj =
             //    Mod.custom (fun t ->
             //        let m = model.GetValue(t)
@@ -879,25 +729,28 @@ let main argv =
                     0; 2; 3
                 |]
 
-            let sphere() =
+            let sphere =
                 Sg.sphere 5
                 |> Sg.trafo (Mod.constant (Trafo3d.Scale(0.5) * Trafo3d.Translation(V3d(0.5, 0.5, 0.5))))
                 |> Sg.trafo model
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
+                |> Sg.uniform "Tex" (Mod.constant (FileTexture "pattern.jpg" :> ITexture))
                 
-            let sphere2() =
+            let sphere2 =
                 Sg.sphere 1
                 |> Sg.trafo (Mod.constant (Trafo3d.Scale(0.5) * Trafo3d.Translation(V3d(0.5, 0.5, 0.5))))
                 |> Sg.trafo model
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
+                |> Sg.uniform "Tex" (Mod.constant (FileTexture "pattern.jpg" :> ITexture))
                     
-            let box() =
+            let box =
                 Sg.box Box3d.Unit
                 |> Sg.trafo model
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
+                |> Sg.uniform "Tex" (Mod.constant (FileTexture "test.jpg" :> ITexture))
                 
             let rand = System.Random()
             let sett =
@@ -909,12 +762,12 @@ let main argv =
                                 let r = rand.NextDouble()
                                 
                                 let sg =
-                                    if r > 0.6 then sphere2()
-                                    elif r > 0.3 then sphere()
-                                    else box()
+                                    if r > 0.6 then sphere2
+                                    elif r > 0.3 then sphere
+                                    else box
 
                                 let t = V3d(float x, float y, float z) * 2.0
-                                let s = sg |> Sg.trafo (Mod.init <| Trafo3d.Translation t)
+                                let s = sg |> Sg.trafo (Mod.constant <| Trafo3d.Translation t)
                                 yield s
                 ]
 
@@ -923,7 +776,6 @@ let main argv =
                 let rand = System.Random()
                 Sg.set sett
                 |> Sg.shader shader
-
             let objects = sg.RenderObjects()
 
 
@@ -964,6 +816,7 @@ let main argv =
                 | Aardvark.Application.Keys.X ->
                     
                     if sett.Count > 0 then
+                        //transact (fun () -> sett.Clear())
                         let e = sett |> Seq.item (rand.Next sett.Count)
                         transact (fun () -> sett.Remove e |> ignore)
                 | _ ->

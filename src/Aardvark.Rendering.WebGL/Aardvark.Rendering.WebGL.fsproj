@@ -9,6 +9,7 @@
     <Compile Include="Resources\Program.fs" />
     <Compile Include="Resources\Buffer.fs" />
     <Compile Include="Resources\UniformBuffer.fs" />
+    <Compile Include="Resources\Texture.fs" />
     <Compile Include="ResourceManager.fs" />
     <Compile Include="PreparedRenderObject.fs" />
   </ItemGroup>

@@ -17,10 +17,20 @@ type IArrayBuffer<'a> =
 
 
 type IBuffer = interface end
+type ITexture = interface end
+
+type FileTexture(url : string) =
+    interface ITexture
+    member x.Url = url
+
 
 type HostBuffer(data : IArrayBuffer) =
     interface IBuffer
     member x.Data = data
+
+type PromiseBuffer(promise : Promise<IBuffer>) =
+    interface IBuffer
+    member x.Promise = promise
 
 
 type BufferView =

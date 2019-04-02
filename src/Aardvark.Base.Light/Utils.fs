@@ -288,3 +288,353 @@ type Conversion private() =
     static member DegreesFromRadians (r : float) = Constant.DegreesPerRadian * r
     [<Extension>]
     static member RadiansFromDegrees (r : float) = Constant.RadiansPerDegree * r
+
+
+module Prom = 
+    open Fable.Import.Browser
+
+    let fetchString (url : string) =
+        Promise.Create(fun fin err ->
+            let r = XMLHttpRequest.Create()
+            r.addEventListener_load(fun e -> fin r.responseText)
+            r.addEventListener_error(fun e -> err e.error)
+            r.``open``("GET", url, true)
+            try r.send("")
+            with e -> err e
+        ) |> unbox<Promise<string>>
+
+    
+    let fetchBuffer (url : string) =
+        Promise.Create(fun fin err ->
+            let r = XMLHttpRequest.Create()
+            r.responseType <- "arraybuffer"
+            r.addEventListener_error(fun e -> err e.error)
+            r.addEventListener_load(fun e -> if r.status = 200.0 then fin r.response else err r.status)
+            r.``open``("GET", url, true)
+            try r.send("")
+            with e -> err e
+        ) |> unbox<Promise<ArrayBuffer>>
+
+
+    let create (conts : ('a -> unit) -> (obj -> unit) -> unit) : Promise<'a> =
+        Promise.Create(fun s e ->
+            conts (unbox s) e
+        ) |> unbox<Promise<'a>>
+        
+    let delay (time : int) =
+        create (fun ok error ->
+            setTimeout ok time |> ignore
+        )
+
+    let value (v : 'a) =
+        Promise.resolve v
+
+    let map (f : 'a -> 'b) (p : Promise<'a>) =
+        create (fun s e ->
+            p.``then``(
+                (fun v -> s (f v)),
+                (fun str -> e str)
+            ) |> ignore
+        )
+
+    let all (ps : seq<Promise<'a>>) =
+        Promise.all(Seq.toArray ps) |> unbox<Promise<seq<'a>>>
+
+    let bind (f : 'a -> Promise<'b>) (m : Promise<'a>) =
+        create (fun s e ->
+            m.``then``(
+                (fun v -> (f v).``then``(s, e) |> ignore),
+                (fun err -> e err)
+            ) |> ignore
+        )
+
+type Status =
+    | Waiting   = 0
+    | Finished  = 1
+    | Canceled  = 2
+    | Faulted   = 3
+
+type Future<'a> =
+    abstract member Status : Status
+    abstract member Cancel : unit -> unit
+    abstract member Continue : success : ('a -> unit) * error : (string -> unit) -> unit
+
+
+
+module Future =
+    open Fable.Import.Browser
+
+
+    let create (action : ('a -> unit) -> (string -> unit) -> IDisposable) =
+        let mutable callbacks = []
+        let mutable status = Status.Waiting
+        let mutable result = null
+           
+        let success v =
+            if status = Status.Waiting then 
+                status <- Status.Finished
+                result <- v :> obj
+                callbacks |> List.iter (fun (c,_) -> c v)
+                callbacks <- []
+
+        let error e =
+            if status = Status.Waiting then
+                status <- Status.Faulted
+                result <- e :> obj
+                callbacks |> List.iter (fun (_,c) -> c e)
+                callbacks <- []
+
+        let d = action success error
+
+        { new Future<'a> with
+            member x.Status = status
+            member x.Cancel() = 
+                if status = Status.Waiting then
+                    status <- Status.Canceled
+                    if unbox d then d.Dispose()
+                    callbacks |> List.iter (fun (_,e) -> e "cancel")
+                    callbacks <- []
+            member x.Continue(success, error) =
+                match status with
+                | Status.Canceled -> error "cancel"
+                | Status.Waiting -> callbacks <- (success,error) :: callbacks
+                | Status.Finished -> success (unbox result)
+                | Status.Faulted -> error (unbox result)
+                | _ -> error (sprintf "bad status: %A" status)
+        }
+
+
+        
+    let waitAll (fs : seq<Future<'a>>) =
+        let arr = Seq.toArray fs
+        if arr.Length = 0 then
+            create (fun success error -> success (); null)
+        elif arr.Length = 1 then
+            create (fun s e -> arr.[0].Continue(ignore >> s, e); null)
+        else
+            create (fun success error ->
+                let mutable cnt = arr.Length
+                let s v =
+                    cnt <- cnt  - 1 
+                    if cnt = 0 then success ()
+
+                let e err =
+                    cnt <- -1
+                    for a in arr do a.Cancel()
+                    error err
+
+                arr |> FSharp.Collections.Array.iteri (fun i a -> a.Continue(s, e))
+                null
+            )
+
+    let whenAll (fs : seq<Future<'a>>) =
+        let arr = Seq.toArray fs
+        if arr.Length = 0 then
+            create (fun success error -> success [||]; null)
+        elif arr.Length = 1 then
+            create (fun s e -> arr.[0].Continue(FSharp.Collections.Array.singleton >> s, e); null)
+        else
+            create (fun success error ->
+                let res = FSharp.Collections.Array.zeroCreate arr.Length
+                let mutable cnt = arr.Length
+                let s i v =
+                    cnt <- cnt  - 1 
+                    res.[i] <- v
+                    if cnt = 0 then success res
+
+                let e err =
+                    cnt <- -1
+                    for a in arr do a.Cancel()
+                    error err
+
+                arr |> FSharp.Collections.Array.iteri (fun i a -> a.Continue(s i, e))
+                null
+            )
+
+    let whenAny (fs : seq<Future<'a>>) =
+        let arr = Seq.toArray fs
+        if arr.Length = 0 then
+            failwith "[Future] empty sequence in whenAny"
+        elif arr.Length = 1 then
+            arr.[0]
+        else
+            create (fun success error ->
+                let mutable ecnt = arr.Length
+                let mutable fin = false
+                let s v =
+                    ecnt <- -1
+                    if not fin then 
+                        fin <- true
+                        success v
+                let e err =
+                    ecnt <- ecnt - 1
+                    if ecnt = 0 then error err
+             
+                for a in arr do a.Continue(s, e)
+                null
+            )
+
+    let map (mapping : 'a -> 'b) (f : Future<'a>) =
+        create (fun success error ->
+            f.Continue(
+                (fun v ->
+                    let res = try Choice1Of2 (mapping v) with e -> Choice2Of2 (string e)
+                    match res with
+                    | Choice1Of2 v -> success v
+                    | Choice2Of2 e -> error e
+                ),
+                (fun e -> error e)
+            )
+            null
+        )
+
+    let bind (mappping : 'a -> Future<'b>) (f : Future<'a>) =
+        create (fun success error ->
+            f.Continue(
+                (fun v -> 
+                    let res = try Choice1Of2 (mappping(v)) with e -> Choice2Of2 (string e)
+                    match res with
+                    | Choice1Of2 v -> v.Continue(success, error)
+                    | Choice2Of2 e -> error e
+                ),
+                error
+            )
+            null
+        )
+
+    let attempt (f : Future<'a>) =
+        create (fun success _error ->
+            f.Continue(Result.Ok >> success, Result.Error >> success)
+            null
+        )
+
+    let tryWith (f : Future<'a>) (comp : string -> Future<'a>) =
+        create (fun success error ->
+            f.Continue(
+                success,
+                (fun e -> 
+                    let res = try Choice1Of2 (comp e) with e -> Choice2Of2 (string e)
+                    match res with
+                    | Choice1Of2 v -> v.Continue(success, error)
+                    | Choice2Of2 e -> error e
+                )
+            )
+            null
+        )
+
+    let value (v : 'a) =
+        create (fun success _ -> success v; null)
+
+
+    
+    let fetchBuffer (url : string) =
+        create (fun fin err ->
+            let r = XMLHttpRequest.Create()
+            r.responseType <- "arraybuffer"
+            r.addEventListener_error(fun e -> err (string e.error))
+            r.addEventListener_load(fun e -> if r.status = 200.0 then fin (unbox<ArrayBuffer> r.response) elif r.status = 404.0 then err "not found" else err (string r.status))
+            
+            r.``open``("GET", url, true)
+            try r.send("")
+            with e -> err (string e)
+
+            { new IDisposable with member x.Dispose() = r.abort() }
+        )
+
+    let tryFetchBuffer (url : string) =
+        tryWith (fetchBuffer url |> map Some) (fun e -> value None) 
+
+[<AutoOpen>]
+module PromiseMonad =
+
+    type FutureBuilder() =
+        member x.Return (v : 'a) = Future.value v
+        member x.Bind (m : Future<'a>, f : 'a -> Future<'b>) = Future.bind f m
+        member x.Delay (f : unit -> Future<'a>) = f
+        member x.Zero () = Future.value ()
+        member x.Combine(l : Future<unit>, r : unit -> Future<'a>) = Future.bind r l
+        member x.TryWith(b : unit -> Future<'a>, comp : string -> Future<'a>) = 
+            let b = try b() |> Ok with e -> Result.Error (string e)
+            match b with
+            | Ok b -> Future.tryWith b comp
+            | Error e -> comp e
+        member x.For(s : seq<'a>, f : 'a -> Future<unit>) = s |> Seq.map f |> Future.waitAll
+        member x.While(guard : unit -> bool, body : unit -> Future<unit>) =
+            if guard() then x.Bind (body(), fun () -> x.While(guard, body))
+            else Future.value ()
+
+        member x.Run (f : unit -> Future<'a>) = f()
+
+    let future = FutureBuilder()
+
+
+    module Seq =
+        let mapFuture (f : 'a -> Future<'b>) (l : seq<'a>) =
+            l |> Seq.map f |> Future.whenAll |> Future.map (fun f -> f :> seq<_>)
+            
+        let collectFuture (f : 'a -> Future<seq<'b>>) (l : seq<'a>) =
+            l |> Seq.map f |> Future.whenAll |> Future.map Seq.concat
+
+        let chooseFuture (f : 'a -> Future<Option<'b>>) (l : seq<'a>) =
+            l |> Seq.map f |> Future.whenAll |> Future.map (Seq.choose id)
+            
+        let filterFuture (f : 'a -> Future<bool>) (l : seq<'a>) =
+            let f v = v |> f |> Future.map (function true -> Some v | _ -> None)
+            chooseFuture f l
+
+    module List =
+        let mapFuture (f : 'a -> Future<'b>) (l : list<'a>) =
+            l |> Seq.map f |> Future.whenAll |> Future.map FSharp.Collections.Array.toList
+            
+        let collectFuture (f : 'a -> Future<list<'b>>) (l : list<'a>) =
+            l |> Seq.map f |> Future.whenAll |> Future.map (Seq.concat >> Seq.toList)
+
+        let chooseFuture (f : 'a -> Future<Option<'b>>) (l : list<'a>) =
+            l |> Seq.map f |> Future.whenAll |> Future.map (Seq.choose id >> Seq.toList)
+            
+        let filterFuture (f : 'a -> Future<bool>) (l : list<'a>) =
+            let f v = v |> f |> Future.map (function true -> Some v | _ -> None)
+            chooseFuture f l
+
+    module Array =
+        let mapFuture (f : 'a -> Future<'b>) (l : array<'a>) =
+            l |> Seq.map f |> Future.whenAll
+            
+        let collectFuture (f : 'a -> Future<array<'b>>) (l : array<'a>) =
+            l |> Seq.map f |> Future.whenAll |> Future.map (FSharp.Collections.Array.concat)
+
+        let chooseFuture (f : 'a -> Future<Option<'b>>) (l : array<'a>) =
+            l |> Seq.map f |> Future.whenAll |> Future.map (FSharp.Collections.Array.choose id)
+            
+        let filterFuture (f : 'a -> Future<bool>) (l : array<'a>) =
+            let f v = v |> f |> Future.map (function true -> Some v | _ -> None)
+            chooseFuture f l
+
+
+
+    type PromiseBuilder() =
+        member x.Return v = Prom.value v
+        member x.Bind(m : Promise<'a>, mapping : 'a -> Promise<'b>) = Prom.bind mapping m
+        member x.Delay (f : unit -> Promise<'a>) = f
+
+        member x.For(s : seq<'a>, f : 'a -> Promise<unit>) =
+            s |> Seq.map f |> Seq.toArray |> Prom.all |> unbox<Promise<unit>>
+
+        member x.Zero() = Prom.value ()
+        member x.Combine(l : Promise<unit>, r : unit -> Promise<'a>) = Prom.bind r l
+
+        member x.TryWith (f : unit -> Promise<'a>, err : obj -> Promise<'a>) =
+            Prom.create (fun s realError ->
+                try 
+                    f().``then``(
+                        (fun v -> try s v with e -> err(e).``then``(s, realError) |> ignore),
+                        (fun e -> err(e).``then``(s, realError) |> ignore)
+                    ) |> ignore
+                with e ->
+                    err(e).``then``(s, realError) |> ignore
+            )
+
+        member x.Run(f : unit -> Promise<'a>) = f()
+
+    let promise = PromiseBuilder()
+

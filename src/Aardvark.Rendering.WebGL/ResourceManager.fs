@@ -6,6 +6,9 @@ open Aardvark.Base.Incremental
 open FSharp.Collections
 open Aardvark.Base.Rendering
 open Aardvark.Rendering.WebGL
+open Fable.Import.JS
+
+
 
 type nref<'a>(v : 'a) =
     let id = newId()
@@ -40,7 +43,7 @@ type IResource =
     abstract member Acquire : unit -> unit
     abstract member Release : unit -> unit
     abstract member ReleaseAll : unit -> unit
-    abstract member Update : AdaptiveToken -> unit
+    abstract member Update : AdaptiveToken -> Promise<unit>
 
 type IResource<'a> =
     inherit IResource
@@ -86,13 +89,13 @@ and private ResourceCacheEntry (cache : ResourceCache, key : list<obj>) =
 type AbstractResource<'a>(entry : IDisposable) =
     inherit AdaptiveObject()
 
-    let mutable hasHandle = false
     let handle = nref Unchecked.defaultof<'a>
+    let mutable promise : Option<Promise<unit>> = None
     let mutable refCount = 0
 
     abstract member ResourceKind : string
-    abstract member CreateRes : AdaptiveToken -> 'a
-    abstract member UpdateRes : AdaptiveToken * 'a -> 'a
+    abstract member CreateRes : AdaptiveToken -> Promise<'a>
+    abstract member UpdateRes : AdaptiveToken * 'a -> Promise<'a>
     abstract member DestroyRes : 'a -> unit
 
     override x.Kind = "Resource"
@@ -103,9 +106,15 @@ type AbstractResource<'a>(entry : IDisposable) =
     member x.ReleaseAll() =
         entry.Dispose()
         refCount <- 0
-        if hasHandle then
-            hasHandle <- false
-            x.DestroyRes handle.Value
+        match promise with
+        | Some p ->
+            p.``then``(fun () ->
+                x.DestroyRes handle.Value |> ignore
+                handle.Value <- Unchecked.defaultof<_>
+            ) |> ignore
+            promise <- None
+        | None ->
+            x.DestroyRes handle.Value |> ignore
             handle.Value <- Unchecked.defaultof<_>
         
 
@@ -113,24 +122,77 @@ type AbstractResource<'a>(entry : IDisposable) =
     member x.Release() =
         refCount <- refCount - 1
         if refCount = 0 then
-            if hasHandle then
-                hasHandle <- false
-                x.DestroyRes handle.Value
+            match promise with
+            | Some p ->
+                p.``then``(fun () ->
+                    x.DestroyRes handle.Value |> ignore
+                    handle.Value <- Unchecked.defaultof<_>
+                ) |> ignore
+                promise <- None
+            | None ->
+                x.DestroyRes handle.Value |> ignore
                 handle.Value <- Unchecked.defaultof<_>
-                entry.Dispose()
+            
 
     member x.Update(t) =
         x.EvaluateAlways t (fun t ->
-            if refCount <= 0 then failwith "updating unreferenced resource"
-
-            if hasHandle then
-                if x.OutOfDate then 
-                    let hh = x.UpdateRes(t, handle.Value)
-                    handle.Value <- hh
+            if refCount <= 0 then 
+                Log.error "updating unreferenced resource"
+                Prom.value ()
             else
-                let h = x.CreateRes t
-                handle.Value <- h
-                hasHandle <- true
+                match promise with
+                | Some p ->
+                    if x.OutOfDate then
+                        let np = 
+                            p |> Prom.bind (fun () ->
+                                x.UpdateRes(t, handle.Value).``then`` (fun h ->
+                                    handle.Value <- h
+                                )
+                            )
+                        promise <- Some np
+                        np
+                    else
+                        p
+                | None ->
+                    if x.OutOfDate then
+                        let h = x.CreateRes t
+                        let p = h.``then``(fun h -> handle.Value <- h)
+                        promise <- Some p
+                        p
+                    else
+                        failwith "strange"
+                
+
+
+            //if hasHandle then
+            //    if x.OutOfDate then 
+            //        match promise with
+            //        | Some p -> 
+            //            let np = 
+            //                p |> Prom.bind (fun () ->
+            //                    x.UpdateRes(t, handle.Value).``then`` (fun h ->
+            //                        handle.Value <- h
+            //                    )
+            //                )
+            //            promise <- Some np
+            //            np
+            //        | None ->
+            //            let hh = x.UpdateRes(t, handle.Value)
+            //            let p =
+            //                hh.``then``(fun hh ->
+            //                    handle.Value <- hh
+            //                )
+            //            promise <- Some p
+            //            p
+            //    else
+            //        Prom.value ()
+            //else
+            //    if x.OutOfDate then 
+            //        let h = x.CreateRes t
+            //        h.``then``(fun h ->
+            //            handle.Value <- h
+            //            hasHandle <- true
+            //        )
         )
 
 
@@ -158,11 +220,29 @@ type BufferResource(token : IResourceToken, target : float, data : IMod<IBuffer>
     override x.UpdateRes(t, b) =
         let data = data.GetValue t
         let n = token.Context.CreateBuffer(target, data)
-        b.Destroy()
+        b.Release()
         n
 
     override x.DestroyRes b =
-        b.Destroy()
+        b.Release()
+
+type TextureResource(token : IResourceToken, data : IMod<ITexture>) =
+    inherit AbstractResource<Texture>(token)
+
+    override x.ResourceKind = "Buffer"
+
+    override x.CreateRes(t) =
+        let data = data.GetValue t
+        token.Context.CreateTexture(data)
+
+    override x.UpdateRes(t, b) =
+        let data = data.GetValue t
+        let n = token.Context.CreateTexture(data)
+        b.Release()
+        n
+
+    override x.DestroyRes b =
+        b.Release()
 
 type UniformBufferResource(token : IResourceToken, layout : UniformBlockInfo, tryGetUniform : string -> Option<IMod>) =
     inherit AbstractResource<UniformBuffer>(token)
@@ -192,11 +272,11 @@ type UniformBufferResource(token : IResourceToken, layout : UniformBlockInfo, tr
 
         write.GetValue t
 
-        b
+        Prom.value b
 
     override x.UpdateRes(t, b) =
         write.GetValue t
-        b
+        Prom.value b
            
     override x.DestroyRes b =
         write <- Mod.constant ()
@@ -212,6 +292,7 @@ type ResourceManager(ctx : Context) =
         }
 
     let bufferCache = ResourceCache(ctx)
+    let textureCache = ResourceCache(ctx)
     let indexBufferCache = ResourceCache(ctx)
     let uniformBufferCache = ResourceCache(ctx)
     let depthModeCache = ResourceCache(ctx)
@@ -236,6 +317,11 @@ type ResourceManager(ctx : Context) =
             BufferResource(token, ctx.GL.ARRAY_BUFFER, data)
         )
            
+    member x.CreateTexture(data : IMod<ITexture>) =
+        textureCache.GetOrCreate([data], fun token ->
+            TextureResource(token, data)
+        )
+                  
     member x.CreateIndexBuffer(data : IMod<IBuffer>) =
         indexBufferCache.GetOrCreate([data], fun token ->
             BufferResource(token, ctx.GL.ELEMENT_ARRAY_BUFFER, data)
@@ -259,8 +345,8 @@ type ResourceManager(ctx : Context) =
         depthModeCache.GetOrCreate([mode], fun token ->
             { new AbstractResource<Option<float>>(token) with
                 member x.ResourceKind = "DepthTestMode"
-                member x.UpdateRes(t,_) = create (mode.GetValue t)
-                member x.CreateRes(t) = create (mode.GetValue t)
+                member x.UpdateRes(t,_) = create (mode.GetValue t) |> Prom.value
+                member x.CreateRes(t) = create (mode.GetValue t) |> Prom.value
                 member x.DestroyRes(_) = ()
             }
         )
@@ -268,8 +354,8 @@ type ResourceManager(ctx : Context) =
     member x.CreateDrawCall(call : IMod<DrawCall>) =
         { new AbstractResource<DrawCall>(noToken) with
             member x.ResourceKind = "DrawCall"
-            member x.UpdateRes(t,_) = call.GetValue t
-            member x.CreateRes(t) = call.GetValue t
+            member x.UpdateRes(t,_) = call.GetValue t |> Prom.value
+            member x.CreateRes(t) = call.GetValue t |> Prom.value
             member x.DestroyRes(_) = ()
         }
 

@@ -44,7 +44,7 @@ type RenderControl(canvas : HTMLCanvasElement) =
         if unbox dbgRenderInfo then
           let name = gl.getParameter(dbgRenderInfo.UNMASKED_RENDERER_WEBGL) |> unbox<string>
           let vendor = gl.getParameter(dbgRenderInfo.UNMASKED_VENDOR_WEBGL) |> unbox<string>
-          Log.warn "%s %s" vendor name
+          Log.line "%s %s" vendor name
 
     let signature = ctx.DefaultFramebufferSignature
 
@@ -139,40 +139,44 @@ type RenderControl(canvas : HTMLCanvasElement) =
             let rect = canvas.getBoundingClientRect()
             let s = V2i(int rect.width, int rect.height)
             if s <> size.Value then transact (fun () -> size.Value <- s)
-            caller.EvaluateAlways AdaptiveToken.Top (fun token ->
+            let pp = 
+                caller.EvaluateAlways AdaptiveToken.Top (fun token ->
 
-                if canvas.width <> rect.width then canvas.width <- rect.width
-                if canvas.height <> rect.height then canvas.height <- rect.height
-                //console.log(sprintf "%.0fx%.0f" rect.width rect.height)
-                gl.viewport(0.0, 0.0, rect.width, rect.height)
-                gl.clearColor(0.0, 0.0, 0.0, 1.0)
-                gl.clearDepth(1.0)
-                gl.clear(float (int gl.COLOR_BUFFER_BIT ||| int gl.DEPTH_BUFFER_BIT))
-                task.Run(token)
+                    if canvas.width <> rect.width then canvas.width <- rect.width
+                    if canvas.height <> rect.height then canvas.height <- rect.height
+                    //console.log(sprintf "%.0fx%.0f" rect.width rect.height)
+                    gl.viewport(0.0, 0.0, rect.width, rect.height)
+                    gl.clearColor(0.0, 0.0, 0.0, 1.0)
+                    gl.clearDepth(1.0)
+                    gl.clear(float (int gl.COLOR_BUFFER_BIT ||| int gl.DEPTH_BUFFER_BIT))
+                    let p = task.Run(token)
 
+                    p.``then``(fun () ->
+                        frameCount <- frameCount + 1
+                        if frameCount > 100 then
+                            let n = performance.now()
+                            fps <- 1000.0 * float frameCount / (n - baseTime)
+                            console.log fps
+                            baseTime <- n
+                            frameCount <- 0
+                            if showFps then overlay.innerText <- sprintf "%.1ffps" fps
+                    )
+                    //if showFps then
+                    //    ctx2d.textAlign <- "right"
+                    //    ctx2d.font <- "Consolas"
+                    //    ctx2d.strokeStyle <- (U3.Case1 "color: white")
+                    //    ctx2d.strokeText(sprintf "%.1ffps" fps, rect.width, rect.height, 100.0)
 
-                frameCount <- frameCount + 1
-                if frameCount > 100 then
-                    let n = performance.now()
-                    fps <- 1000.0 * float frameCount / (n - baseTime)
-                    console.log fps
-                    baseTime <- n
-                    frameCount <- 0
-                    if showFps then overlay.innerText <- sprintf "%.1ffps" fps
-                //if showFps then
-                //    ctx2d.textAlign <- "right"
-                //    ctx2d.font <- "Consolas"
-                //    ctx2d.strokeStyle <- (U3.Case1 "color: white")
-                //    ctx2d.strokeText(sprintf "%.1ffps" fps, rect.width, rect.height, 100.0)
+                )
+            pp.``then``(fun () ->
+                transact (fun () -> time.MarkOutdated())
+                inRender <- false
+                clearTimeout hide
+                hide <- setTimeout hideOverlay 300
+                if rafap then 
+                    setTimeout (fun () -> !render 0.0) 0 |> ignore //window.requestAnimationFrame(!render) |> ignore
 
-            )
-            transact (fun () -> time.MarkOutdated())
-            inRender <- false
-            clearTimeout hide
-            hide <- setTimeout hideOverlay 300
-            if rafap then 
-                setTimeout (fun () -> !render 0.0) 0 |> ignore //window.requestAnimationFrame(!render) |> ignore
-
+            ) |> ignore
         !render 0.0
 
 

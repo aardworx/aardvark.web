@@ -73,6 +73,79 @@ module ASet =
 
     [<AutoOpen>]
     module Readers =
+        open Fable.Import.JS
+
+        type MyPromise<'a>(p : Promise<'a>) =
+            let mutable live = true
+            let mutable value = None
+
+            let mutable cont = []
+
+            do  p.``then``(fun v ->
+                    if live then
+                        value <- Some v
+                        for c in cont do c v
+                        cont <- []
+                ) |> ignore
+
+            member x.Value = value
+
+            member x.Kill() =
+                live <- false
+                let v = value
+                value <- None
+                v
+
+            member x.fin(f : 'a -> unit) =
+                match value with
+                | Some v -> f v
+                | None ->
+                    cont <- f :: cont
+
+
+        type MapPromiseReader<'a, 'b>(input : aset<'a>, f : 'a -> Promise<'b>) =
+            inherit AbstractReader<hdeltaset<'b>>(HDeltaSet.monoid)
+            
+            
+            let cache = Cache (fun v -> v |> f |> MyPromise)
+            let r = input.GetReader()
+            let mutable deltas = HDeltaSet.empty
+
+            member x.Perform(delta : SetOperation<'b>) =
+                deltas <- HDeltaSet.add delta deltas
+                x.MarkOutdated()
+
+            override x.Kind = "SetReader"
+
+            override x.Release() =
+                r.Dispose()
+                cache.Clear ignore
+
+            override x.Compute(token) =
+                let directOps = 
+                    r.GetOperations(token) |> HDeltaSet.choose (fun d ->
+                        match d with
+                        | Add(_,v) ->
+                            let p = cache.Invoke(v)
+                            match p.Value with
+                            | Some v -> Some (Add v)
+                            | None ->
+                                p.fin (fun v ->
+                                    transact (fun () -> x.Perform (Add v))
+                                )
+                                None
+
+                        | Rem(_,v) ->
+                            let p = cache.Revoke(v)
+                            match p.Kill() with
+                            | Some v -> Some (Rem v)
+                            | None -> None
+                    )
+                let dd = deltas
+                deltas <- HDeltaSet.empty
+                HDeltaSet.combine directOps dd
+
+            
         type MapReader<'a, 'b>(input : aset<'a>, f : 'a -> 'b) =
             inherit AbstractReader<hdeltaset<'b>>(HDeltaSet.monoid)
             
@@ -343,7 +416,7 @@ module ASet =
                 let delta = 
                     match old with
                         | None -> HDeltaSet.ofList [Add n]
-                        | Some o when Object.Equals(o, n) -> HDeltaSet.empty
+                        | Some o when Unchecked.equals o n -> HDeltaSet.empty
                         | Some o -> HDeltaSet.ofList [Rem o; Add n]
                 old <- Some n
                 delta
@@ -356,7 +429,7 @@ module ASet =
             
             override x.Kind = "SetReader"
             override x.InputChangedObj(t : obj, i : IAdaptiveObject) =
-                inputChanged <- inputChanged || Object.ReferenceEquals(i, input)
+                inputChanged <- inputChanged || System.Object.ReferenceEquals(i, input)
 
             override x.Release() =
                 lock input (fun () -> input.Outputs.Remove x |> ignore)
@@ -446,7 +519,7 @@ module ASet =
 
                 for d in !dirty do
                     let o, n = x.Invoke2(token, d)
-                    if not <| Object.Equals(o,n) then
+                    if not <| Unchecked.equals o n then
                         deltas <- HDeltaSet.combine deltas (HDeltaSet.ofList [Add n; Rem o])
 
                 deltas
@@ -555,7 +628,7 @@ module ASet =
 
                 for d in !dirty do
                     let o, n = x.Invoke2(token, d)
-                    if not <| Object.Equals(o,n) then
+                    if not <| Unchecked.equals o n then
                         deltas <- HDeltaSet.combine deltas (HDeltaSet.ofList [Add n; Rem o])
 
                 deltas
@@ -686,7 +759,7 @@ module ASet =
                                 HDeltaSet.single (Rem o)
 
                             | Some o, Some n ->
-                                if Object.Equals(o, n) then
+                                if Unchecked.equals o n then
                                     HDeltaSet.empty
                                 else
                                     HDeltaSet.ofList [Rem o; Add n]
@@ -802,6 +875,8 @@ module ASet =
         else
             aset <| fun () -> new MapReader<'a, 'b>(set, mapping)
  
+    let mapPromise (mapping : 'a -> Fable.Import.JS.Promise<'b>) (set : aset<'a>) =
+        aset <| fun () -> new MapPromiseReader<'a, 'b>(set, mapping)
 
     let mapUse<'a, 'b when 'b :> IDisposable> (mapping : 'a -> 'b) (set : aset<'a>) : aset<'b> =
         aset <| fun () -> new MapUseReader<'a, 'b>(set, mapping)

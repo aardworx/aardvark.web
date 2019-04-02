@@ -6,7 +6,10 @@ open Aardvark.Base.Incremental
 open FSharp.Collections
 open Aardvark.Base.Rendering
 open Aardvark.Rendering.WebGL
-   
+open Fable.Import.Browser
+open Fable.Import.JS
+open FSharp.Collections
+
 
 type VertexAttrib =
     {
@@ -31,6 +34,7 @@ type PreparedRenderObject =
         program             : Program
         uniformBuffers      : Map<int, IResource<UniformBuffer>>
         vertexBuffers       : Map<int, IResource<Buffer> * list<VertexAttrib>>
+        samplers            : Map<int, WebGLUniformLocation * IResource<Texture>>
         indexBuffer         : Option<IResource<Buffer> * IndexInfo>
         mode                : float
         depthMode           : IResource<Option<float>>
@@ -55,6 +59,7 @@ module PreparedRenderObject =
         seq {
             yield! o.uniformBuffers |> Map.toSeq |> Seq.map (fun (_,b) -> b :> IResource)
             yield! o.vertexBuffers |> Map.toSeq |> Seq.map (fun (_,(b,_)) -> b :> IResource)
+            yield! o.samplers |> Map.toSeq |> Seq.map (fun (_,(_,b)) -> b :> IResource)
             match o.indexBuffer with
             | Some(ib,_) -> yield ib :> IResource
             | None -> ()
@@ -64,17 +69,26 @@ module PreparedRenderObject =
 
         }
 
-    //let update (t : AdaptiveToken) (o : PreparedRenderObject) =
-    //    o.uniformBuffers |> Map.iter (fun _ b -> b.Update(t))
-    //    o.vertexBuffers |> Map.iter (fun _ (b,_) -> b.Update(t))
-    //    o.indexBuffer |> FSharp.Core.Option.iter (fun (b,_) -> b.Update t)
-    //    o.call.Update(t) |> ignore
-    //    o.depthMode.Update t |> ignore
+    let update (t : AdaptiveToken) (o : PreparedRenderObject) =
+        let all = 
+            seq {
+                yield! o.uniformBuffers |> Map.toSeq |> Seq.map (fun (_,b) -> b.Update t)
+                yield! o.vertexBuffers  |> Map.toSeq |> Seq.map (fun (_,(b,_)) -> b.Update t)
+                yield! o.samplers  |> Map.toSeq |> Seq.map (fun (_,(_,b)) -> b.Update t)
+                match o.indexBuffer with
+                | Some(ib,_) -> yield ib.Update(t)
+                | None -> ()
+                yield o.call.Update(t)
+                yield o.depthMode.Update t
+            }
+
+        Prom.all all |> unbox<Promise<unit>>
 
     let acquire (o : PreparedRenderObject) =
         o.program.Acquire()
         o.uniformBuffers |> Map.iter (fun _ b -> b.Acquire())
         o.vertexBuffers |> Map.iter (fun _ (b,_) -> b.Acquire())
+        o.samplers |> Map.iter (fun _ (_,b) -> b.Acquire())
         o.indexBuffer |> FSharp.Core.Option.iter (fun (b,_) -> b.Acquire())
         o.call.Acquire()
         o.depthMode.Acquire()
@@ -83,51 +97,52 @@ module PreparedRenderObject =
         o.program.Release()
         o.uniformBuffers |> Map.iter (fun _ b -> b.Release())
         o.vertexBuffers |> Map.iter (fun _ (b,_) -> b.Release())
+        o.samplers |> Map.iter (fun _ (_,b) -> b.Release())
         o.indexBuffer |> FSharp.Core.Option.iter (fun (b,_) -> b.Release())
         o.call.Release()
         o.depthMode.Release()
 
 
-    let render (o : PreparedRenderObject) =
-        let gl = o.program.Context.GL
+    //let render (o : PreparedRenderObject) =
+    //    let gl = o.program.Context.GL
 
-        gl.useProgram(o.program.Handle)
+    //    gl.useProgram(o.program.Handle)
         
-        match o.depthMode.Handle.Value with
-        | Some m ->
-            gl.enable(gl.DEPTH_TEST)
-            gl.depthFunc(m)
-        | None ->
-            gl.disable(gl.DEPTH_TEST)
+    //    match o.depthMode.Handle.Value with
+    //    | Some m ->
+    //        gl.enable(gl.DEPTH_TEST)
+    //        gl.depthFunc(m)
+    //    | None ->
+    //        gl.disable(gl.DEPTH_TEST)
 
 
-        // bind uniforms
-        for (id, b) in Map.toSeq o.uniformBuffers do
-            let b = b.Handle.Value
-            gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
+    //    // bind uniforms
+    //    for (id, b) in Map.toSeq o.uniformBuffers do
+    //        let b = b.Handle.Value
+    //        gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
 
-        // bind buffers
-        for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
-            let b = b.Handle.Value
-            gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
-            let mutable id = id
-            for att in atts do
-                gl.enableVertexAttribArray(float id)
-                gl.vertexAttribPointer(float id, float att.size, att.typ, att.norm, float att.stride, float att.offset)
-                id <- id + 1
-            gl.bindBuffer(gl.ARRAY_BUFFER, null)
+    //    // bind buffers
+    //    for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
+    //        let b = b.Handle.Value
+    //        gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
+    //        let mutable id = id
+    //        for att in atts do
+    //            gl.enableVertexAttribArray(float id)
+    //            gl.vertexAttribPointer(float id, float att.size, att.typ, att.norm, float att.stride, float att.offset)
+    //            id <- id + 1
+    //        gl.bindBuffer(gl.ARRAY_BUFFER, null)
 
 
 
         
-        let call = o.call.Handle.Value
-        match o.indexBuffer with
-        | Some (ib, info) ->
-            let ib = ib.Handle.Value
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib.Handle)
-            gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
-        | None ->
-            gl.drawArrays(o.mode, float call.first, float call.faceVertexCount)
+    //    let call = o.call.Handle.Value
+    //    match o.indexBuffer with
+    //    | Some (ib, info) ->
+    //        let ib = ib.Handle.Value
+    //        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib.Handle)
+    //        gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
+    //    | None ->
+    //        gl.drawArrays(o.mode, float call.first, float call.faceVertexCount)
 
 
 [<AutoOpen>]
@@ -181,15 +196,18 @@ module Resources =
                         failwithf "[GL] could not get vertex attribute %s" p.name
                 )
 
-            let vertexAttributes =
-                program.Interface.attributes |> Map.map (fun index p ->
-                    match Map.tryFind p.name o.vertexBuffers with
-                    | Some b ->
-                        b.typ, b.offset
+            let samplers =
+                program.Interface.samplers |> Map.toSeq |> Seq.choose (fun (name, location) ->
+                    match o.pipeline.uniforms name with
+                    | Some m ->
+                        let tex = x.CreateTexture(unbox m)
+                        Some (location, tex)
                     | None ->
-                        failwithf "[GL] could not get vertex attribute %s" p.name
-                            
+                        None
                 )
+                |> Seq.mapi (fun i v -> i, v)
+                |> Map.ofSeq
+
 
             let indexBuffer =
                 match o.indexBuffer with
@@ -221,6 +239,7 @@ module Resources =
                 program             = program
                 uniformBuffers      = uniformBuffers
                 indexBuffer         = indexBuffer
+                samplers            = samplers
                 vertexBuffers       = vertexBuffers
                 mode                = mode
                 depthMode           = depthMode

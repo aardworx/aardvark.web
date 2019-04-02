@@ -9,6 +9,9 @@ open Fable.Import.Browser
 type WebGLVertexArrayObject =
     interface end
 
+type WebGLSync =
+    interface end
+
 type WebGL2RenderingContext =
     inherit WebGLRenderingContext
     abstract member UNIFORM_BUFFER : float
@@ -41,6 +44,31 @@ type WebGL2RenderingContext =
     abstract member createVertexArray : unit -> WebGLVertexArrayObject
     abstract member deleteVertexArray : WebGLVertexArrayObject -> unit
     abstract member bindVertexArray : WebGLVertexArrayObject -> unit
+
+    abstract member texImage2D : target : float * level : float * internalformat : float * width : float * height : float * border : float * format : float * typ: float * data : obj -> unit
+
+    abstract member SYNC_GPU_COMMANDS_COMPLETE : float
+    abstract member SYNC_FLUSH_COMMANDS_BIT : float
+
+    abstract member ALREADY_SIGNALED : float
+    abstract member TIMEOUT_EXPIRED : float
+    abstract member CONDITION_SATISFIED : float
+    abstract member WAIT_FAILED : float
+    abstract member SYNC_STATUS : float
+    abstract member UNSIGNALED : float
+    abstract member SIGNALED : float
+    abstract member SYNC_CONDITION : float
+    abstract member SYNC_FLAGS : float
+    abstract member SYNC_FENCE : float
+
+    abstract member MAX_CLIENT_WAIT_TIMEOUT_WEBGL : float
+
+    abstract member fenceSync : float * float -> WebGLSync
+    abstract member deleteSync : WebGLSync -> unit
+    abstract member isSync : WebGLSync -> bool
+    abstract member clientWaitSync : WebGLSync * float * float -> float
+    abstract member waitSync : WebGLSync * float * float -> unit
+    abstract member getSyncParameter : WebGLSync * float -> float
 
 type Context(gl : WebGL2RenderingContext) =
     let mutable id = 1

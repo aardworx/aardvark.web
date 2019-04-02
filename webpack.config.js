@@ -17,6 +17,11 @@ module.exports = {
         contentBase: "./public",
         port: 8080,
 		host: '0.0.0.0',
+		headers: {
+		  'Access-Control-Allow-Origin': '*',
+		  'Access-Control-Allow-Headers': '*',
+		},
+
     },
 	devtool: production ? false : "eval-source-map",
     module: {
