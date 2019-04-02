@@ -695,6 +695,51 @@ let main argv =
             }
             #endif
         """
+        
+    let shader100 =
+        """#version 100
+            
+            precision highp float;
+            precision highp int;
+            uniform mat4 ModelTrafo;
+            uniform mat3 NormalMatrix;
+            uniform mat4 ViewProjTrafo;
+            uniform vec3 CameraLocation;
+            uniform sampler2D Tex;
+
+            #ifdef VERTEX
+            attribute vec3 Positions;
+            attribute vec3 Normals;
+            attribute vec2 DiffuseColorCoordinates;
+            varying vec3 fs_Normals; 
+            varying vec4 fs_WorldPosition; 
+            varying vec2 fs_DiffuseColorCoordinates;
+
+            void main() {
+                vec4 wp = vec4(Positions, 1.0) * ModelTrafo;
+                gl_Position = wp * ViewProjTrafo;
+                fs_Normals = normalize(Normals * NormalMatrix);
+                fs_WorldPosition = wp;
+                fs_DiffuseColorCoordinates = DiffuseColorCoordinates;
+            }
+            #endif
+
+            #ifdef FRAGMENT
+            varying vec3 fs_Normals; 
+            varying vec4 fs_WorldPosition; 
+            varying vec2 fs_DiffuseColorCoordinates;
+                
+            void main() {
+                vec3 v = normalize(CameraLocation);
+                float diff = abs(dot(normalize(fs_Normals), normalize(CameraLocation - fs_WorldPosition.xyz)));
+
+                vec4 color = texture2D(Tex, fs_DiffuseColorCoordinates, -0.5);
+
+
+                gl_FragColor = vec4(vec3(0.05,0.05,0.05) + color.xyz * diff * 0.95, 1);
+            }
+            #endif
+        """
 
 
     document.addEventListener_readystatechange(fun e ->
@@ -773,7 +818,7 @@ let main argv =
                 let s = 7
                 let rand = System.Random()
                 Sg.set sett
-                |> Sg.shader shader
+                |> Sg.shader shader100
             let objects = sg.RenderObjects()
 
 
