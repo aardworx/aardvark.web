@@ -115,6 +115,8 @@ type Subject<'a>() =
     interface IDisposable with
         member x.Dispose() = x.Dispose()
 
+
+open Fable.Core.JsInterop
 type Mouse(c : HTMLElement) =
 
     let mutable states =
@@ -191,7 +193,7 @@ type Mouse(c : HTMLElement) =
     let downHandler     = createHandler (fun (e : MouseEvent) ->        setPos true e; down.OnNext(unbox (int e.which)); e.preventDefault(); e.stopPropagation(); handleButton true e.which )
     let upHandler       = createHandler (fun (e : MouseEvent) ->        setPos true e; up.OnNext(unbox (int e.which)); e.preventDefault(); e.stopPropagation();  handleButton false e.which)
     let moveHandler     = createHandler (fun (e : MouseEvent) ->        let o = pos.Value in setPos true e; move.OnNext(o, pos.Value); e.preventDefault(); e.stopPropagation())
-    let wheelHandler    = createHandler (fun (e : MouseWheelEvent) ->   setPosAndScroll e; wheel.OnNext(e.wheelDelta / 120.0); e.preventDefault(); e.stopPropagation() )
+    let wheelHandler    = createHandler (fun (e : MouseWheelEvent) ->   setPosAndScroll e; (if unbox e.wheelDelta then wheel.OnNext(e.wheelDelta / 120.0) else wheel.OnNext(e?deltaY / -3.0)); e.preventDefault(); e.stopPropagation() )
     let contextHandler  = createHandler (fun (e : Event) ->             e.preventDefault())
 
     do
@@ -201,7 +203,7 @@ type Mouse(c : HTMLElement) =
         c.addEventListener("mousedown", downHandler, true)
         c.addEventListener("mouseup", upHandler, true)
         c.addEventListener("mousemove", moveHandler, true)
-        c.addEventListener("mousewheel", wheelHandler, true)
+        c.addEventListener("wheel", wheelHandler, true)
         c.addEventListener("click", clickHandler, true)
         c.addEventListener("auxclick", clickHandler, true)
         c.addEventListener("dblclick", dblclickHandler, true)

@@ -674,7 +674,7 @@ let main argv =
             
             let control = new Aardvark.Application.RenderControl(canvas)
 
-            let initial = CameraView.lookAt (V3d.III * 6.0) V3d.Zero V3d.OOI
+            let initial = CameraView.lookAt (V3d(10.0, 10.0, 6.0)) V3d.Zero V3d.OOI
             let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
             let anim = control.Keyboard.IsDown(Aardvark.Application.Keys.Space)
             let angle =
@@ -690,56 +690,18 @@ let main argv =
             let model = angle |> Mod.map Trafo3d.RotationZ
             let view = cam |> Mod.map CameraView.viewTrafo
             let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 0.1 1000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
-            //let modelViewProj =
-            //    Mod.custom (fun t ->
-            //        let m = model.GetValue(t)
-            //        let v = view.GetValue(t)
-            //        let p = proj.GetValue(t)
-            //        m * v * p
-                
-            //    )
-
-            
-            let pos = V3fList()
-            pos.Add(V3d(-1.0, -1.0, 0.0))
-            pos.Add(V3d(1.0, -1.0, 0.0))
-            pos.Add(V3d(1.0, 1.0, 0.0))
-            pos.Add(V3d(-1.0, 1.0, 0.0))
-
-            //let pos =   
-            //    V3fBuffer.ofArray [|
-            //        V3d(-1.0, -1.0, 0.0)
-            //        V3d(1.0, -1.0, 0.0)
-            //        V3d(1.0, 1.0, 0.0)
-            //        V3d(-1.0, 1.0, 0.0)
-            //    |]
-                
-                
-            let tc =   
-                V2fBuffer.ofArray [|
-                    V2d(0.0, 0.0)
-                    V2d(1.0, 0.0)
-                    V2d(1.0, 1.0)
-                    V2d(0.0, 1.0)
-                |]
-
-            let index =
-                Int32Buffer.ofArray [|
-                    0; 1; 2
-                    0; 2; 3
-                |]
 
             let sphere =
                 Sg.sphere 5
-                |> Sg.trafo (Mod.constant (Trafo3d.Scale(0.5) * Trafo3d.Translation(V3d(0.5, 0.5, 0.5))))
+                |> Sg.trafo (Mod.constant (Trafo3d.Scale(0.5)))
                 |> Sg.trafo model
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
-                |> Sg.uniform "Tex" (Mod.constant (FileTexture "pattern.jpg" :> ITexture))
+                |> Sg.uniform "Tex" (Mod.constant (FileTexture "cliffs_color.jpg" :> ITexture))
                 
             let sphere2 =
                 Sg.sphere 1
-                |> Sg.trafo (Mod.constant (Trafo3d.Scale(0.5) * Trafo3d.Translation(V3d(0.5, 0.5, 0.5))))
+                |> Sg.trafo (Mod.constant (Trafo3d.Scale(0.5) ))
                 |> Sg.trafo model
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
@@ -747,6 +709,7 @@ let main argv =
                     
             let box =
                 Sg.box Box3d.Unit
+                |> Sg.trafo (Mod.constant (Trafo3d.Translation(-0.5, -0.5, -0.5)))
                 |> Sg.trafo model
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
@@ -754,7 +717,7 @@ let main argv =
                 
             let rand = System.Random()
             let sett =
-                let s = 7
+                let s = 5
                 cset [
                     for x in -s/2 .. s/2 do
                         for y in -s/2 .. s/2 do
@@ -766,7 +729,7 @@ let main argv =
                                     elif r > 0.3 then sphere
                                     else box
 
-                                let t = V3d(float x, float y, float z) * 2.0
+                                let t = V3d(float x, float y, float z) * 1.5
                                 let s = sg |> Sg.trafo (Mod.constant <| Trafo3d.Translation t)
                                 yield s
                 ]
