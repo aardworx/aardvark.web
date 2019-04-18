@@ -7,13 +7,13 @@
   <ItemGroup>
     <Compile Include="Program.fs" />
   </ItemGroup>
-  <ItemGroup />
   <ItemGroup>
     <ProjectReference Include="..\Aardvark.Application\Aardvark.Application.fsproj" />
     <ProjectReference Include="..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />
     <ProjectReference Include="..\Aardvark.Base.Rendering\Aardvark.Base.Rendering.fsproj" />
     <ProjectReference Include="..\Aardvark.Rendering.WebGL\Aardvark.Rendering.WebGL.fsproj" />
     <ProjectReference Include="..\Aardvark.SceneGraph\Aardvark.SceneGraph.fsproj" />
+    <ProjectReference Include="..\FShade\FShade.Imperative\FShade.Imperative.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

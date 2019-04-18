@@ -283,6 +283,43 @@ type UniformBufferResource(token : IResourceToken, layout : UniformBlockInfo, tr
         b.Destroy()
 
 
+type UniformBufferSlotResource(token : IResourceToken, man : UniformBufferManager, tryGetUniform : string -> Option<IMod>) =
+    inherit AbstractResource<UniformBufferSlot>(token)
+
+    let mutable write = Mod.constant ()
+    
+    override x.ResourceKind = "UniformBufferSlot"
+    override x.CreateRes(t) =
+        let b = man.Alloc()
+
+        let writers = 
+            man.Layout.fields |> List.choose (fun f ->
+                match tryGetUniform f.name with
+                | Some value ->
+                    let writer = b.GetWriter(f.name, value)
+                    Some writer
+                | None ->
+                    None
+            )
+
+        if not (List.isEmpty writers) then
+            write <- 
+                Mod.custom (fun t ->
+                    for w in writers do w.GetValue t
+                )
+
+        write.GetValue t
+        Prom.value b
+
+    override x.UpdateRes(t, b) =
+        write.GetValue t
+        Prom.value b
+           
+    override x.DestroyRes b =
+        write <- Mod.constant ()
+        b.Free()
+
+
 type UniformLocationResource(token : IResourceToken, typ : PrimitiveType, value : IMod) =
     inherit AbstractResource<UniformLocation>(token)
     
@@ -316,12 +353,28 @@ type ResourceManager(ctx : Context) =
     let textureCache = ResourceCache(ctx)
     let indexBufferCache = ResourceCache(ctx)
     let uniformBufferCache = ResourceCache(ctx)
+    let uniformBufferSlotCache = ResourceCache(ctx)
     let uniformLocationCache = ResourceCache(ctx)
     let depthModeCache = ResourceCache(ctx)
     let programCache = Dict<FramebufferSignature * string, Option<Program>>(Unchecked.hash, Unchecked.equals)
 
+    let ubManagers = Dict<UniformBlockInfo, UniformBufferManager>(Unchecked.hash, Unchecked.equals)
+
     member x.Context = ctx
 
+    member x.CreateUniformBufferSlot(block : UniformBlockInfo, tryGetUniform : string -> Option<IMod>) =
+        let values = 
+            block.fields |> List.map (fun f ->
+                match tryGetUniform f.name with
+                | Some m -> m
+                | None -> failwithf "[GL] could not get uniform: %s" f.name
+            )
+
+        let key = (block :> obj) :: unbox values
+        uniformBufferSlotCache.GetOrCreate(key, fun token ->
+            let man = ubManagers.GetOrCreate(block, fun b -> UniformBufferManager(ctx, b))
+            UniformBufferSlotResource(token, man, tryGetUniform)
+        )
     member x.CreateUniformBuffer(block : UniformBlockInfo, tryGetUniform : string -> Option<IMod>) =
         let values = 
             block.fields |> List.map (fun f ->

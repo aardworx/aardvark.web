@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="Utilities.fs" />
+    <Compile Include="Frontend.fs" />
+    <Compile Include="Ast.fs" />
+    <Compile Include="Intrinsics.fs" />
+    <Compile Include="UtilityFunction.fs" />
+    <Compile Include="Compiler.fs" />
+    <Compile Include="ModuleCompiler.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />
+  </ItemGroup>
+
+</Project>

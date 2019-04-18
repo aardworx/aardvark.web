@@ -260,7 +260,7 @@ module Compiler =
                 //Log.line "set UB %d" id
                 yield fun () -> 
                     let b = b.Handle.Value
-                    gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
+                    gl.bindBufferRange(gl.UNIFORM_BUFFER, float id, b.Handle, float b.Offset, float b.Size)
 
             // bind buffers
             for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
@@ -325,13 +325,13 @@ module Compiler =
             // bind uniforms
             for (id, b) in Map.toSeq o.uniformBuffers do
                 match Map.tryFind id prev.uniformBuffers with
-                | Some ob when ob.Handle = b.Handle -> 
+                | Some ob when ob = b -> 
                     ()
                 | _ -> 
                     //Log.line "set UB %d" id
                     yield fun () -> 
                         let b = b.Handle.Value
-                        gl.bindBufferBase(gl.UNIFORM_BUFFER, float id, b.Handle)
+                        gl.bindBufferRange(gl.UNIFORM_BUFFER, float id, b.Handle, float b.Offset, float b.Size)
 
             // bind buffers
             for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
@@ -550,6 +550,7 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
             //    for d in dirty do
             //        d.Update token
             promises.``then``(fun () ->
+                UniformBufferManager.UploadAll()
                 trie.Update(token)
                 let entry = trie.First |> unbox<RenderObjectFragment>
                 entry.Run()
@@ -567,11 +568,18 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
         member x.Dispose() = x.Dispose()
         member x.Run t = x.Run t
 
-
+type MyUnion =
+    | A of int
+    | B 
+    | C of string
 
 
 [<EntryPoint>]
 let main argv =
+
+
+    //console.error typedefof<int * int * int>
+
 
     //let urls =
     //    [
@@ -646,19 +654,15 @@ let main argv =
         
             precision highp float;
             precision highp int;
-            uniform mat4 ModelTrafo;
-            uniform mat3 NormalMatrix;
-            uniform mat4 ViewProjTrafo;
-            uniform vec3 CameraLocation;
-            
-            //uniform PerModel {
-            //    mat3 NormalMatrix;
-            //    mat4 ModelTrafo;
-            //};
-            //uniform PerView {
-            //    mat4 ViewProjTrafo;
-            //    vec3 CameraLocation;
-            //};
+
+            uniform PerModel {
+                mat3 NormalMatrix;
+                mat4 ModelTrafo;
+            };
+            uniform PerView {
+                mat4 ViewProjTrafo;
+                vec3 CameraLocation;
+            };
 
             uniform sampler2D Tex;
 
@@ -701,6 +705,7 @@ let main argv =
             
             precision highp float;
             precision highp int;
+
             uniform mat4 ModelTrafo;
             uniform mat3 NormalMatrix;
             uniform mat4 ViewProjTrafo;
@@ -744,6 +749,9 @@ let main argv =
 
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
+
+            //console.error (typeof<int[]>.GetElementType())
+
             let canvas = document.createElement_canvas()
             canvas.tabIndex <- 1.0
             document.body.appendChild(canvas) |> ignore
@@ -754,9 +762,9 @@ let main argv =
             
             let control = new Aardvark.Application.RenderControl(canvas)
 
-            let initial = CameraView.lookAt (V3d(10.0, 10.0, 6.0)) V3d.Zero V3d.OOI
+            let initial = CameraView.lookAt (V3d(3.0, 3.0, 2.0)) V3d.Zero V3d.OOI
             let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
-            let anim = control.Keyboard.IsDown(Aardvark.Application.Keys.Space)
+            let anim = Mod.constant true //control.Keyboard.IsDown(Aardvark.Application.Keys.Space)
             let angle =
                 Mod.integrate 0.0 control.Time [
                     anim |> Mod.map (fun a ->
@@ -767,22 +775,36 @@ let main argv =
                     )
                 ]
 
-            let model = angle |> Mod.map Trafo3d.RotationZ
+            //let asdasd =
+            //    Mod.integrate 0.0 control.Time [
+            //        control.Time |> Mod.stepTime (fun _ dt o -> o + 0.1 * dt) |> Mod.constant
+            //    ]
+
+            //let cam = 
+            //    Mod.map2 (fun a (cam : CameraView) -> 
+            //        let t = Trafo3d.RotationZ(a)
+
+            //        cam.WithLocation(t.Forward.TransformPos cam.Location)
+            //    ) asdasd cam
+
             let view = cam |> Mod.map CameraView.viewTrafo
             let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 0.1 1000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
 
+
+
+
             let sphere =
-                Sg.sphere 5
+                Sg.sphere 1
                 |> Sg.trafo (Mod.constant (Trafo3d.Scale(0.5)))
-                |> Sg.trafo model
+
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
                 |> Sg.uniform "Tex" (Mod.constant (FileTexture "cliffs_color.jpg" :> ITexture))
                 
             let sphere2 =
-                Sg.sphere 1
+                Sg.sphere 4
                 |> Sg.trafo (Mod.constant (Trafo3d.Scale(0.5) ))
-                |> Sg.trafo model
+
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
                 |> Sg.uniform "Tex" (Mod.constant (FileTexture "pattern.jpg" :> ITexture))
@@ -790,18 +812,18 @@ let main argv =
             let box =
                 Sg.box Box3d.Unit
                 |> Sg.trafo (Mod.constant (Trafo3d.Translation(-0.5, -0.5, -0.5)))
-                |> Sg.trafo model
+
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
                 |> Sg.uniform "Tex" (Mod.constant (FileTexture "test.jpg" :> ITexture))
                 
             let rand = System.Random()
             let sett =
-                let s = 5
+                let s = 3
                 cset [
-                    for x in -s/2 .. s/2 do
-                        for y in -s/2 .. s/2 do
-                            for z in -s/2 .. s/2 do
+                    for x in -s/2 .. (s - s/2 - 1) do
+                        for y in -s/2 .. (s - s/2 - 1) do
+                            for z in -s/2 .. (s - s/2 - 1) do
                                 let r = rand.NextDouble()
                                 
                                 let sg =
@@ -810,17 +832,26 @@ let main argv =
                                     else box
 
                                 let t = V3d(float x, float y, float z) * 1.5
-                                let s = sg |> Sg.trafo (Mod.constant <| Trafo3d.Translation t)
+                                let axis = V3d(rand.NextDouble() * 20.0 - 10.0, rand.NextDouble() * 20.0 - 10.0, rand.NextDouble() * 20.0 - 10.0)|> Vec.normalize
+
+                                let speed = rand.NextDouble() * 40.0 - 20.0
+                                let model = angle |> Mod.map (fun a -> Trafo3d.Rotation(axis, speed * a))
+                                let s = 
+                                    sg 
+                                    //|> Sg.trafo model
+                                    |> Sg.trafo (Mod.constant <| Trafo3d.Translation t)
                                 yield s
                 ]
 
             let sg =
-                let s = 7
-                let rand = System.Random()
                 Sg.set sett
-                |> Sg.shader shader100
+                |> Sg.shader shader
             let objects = sg.RenderObjects()
 
+            //let test = <@ (1 + 2) * 3 @>
+            //console.warn(string test)
+            //let test = MapExt.ofList [1,2;3,4]
+            //let res = FShade.Imperative.ModuleCompiler.compile (failwith "") (failwith "")
 
             let task() = 
                 new RenderTask(control.FramebufferSignature, control.Manager, objects) :> IRenderTask
@@ -849,7 +880,7 @@ let main argv =
 
             control.Keyboard.DownWithRepeats.Add(fun k ->
                 match k with
-                | Aardvark.Application.Keys.Return ->
+                | Aardvark.Application.Keys.Delete ->
                     if active then
                         active <- false
                         control.RenderTask <- RenderTask.empty

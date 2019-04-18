@@ -115,6 +115,134 @@ module private Blit =
                 failwithf "[GL] bad uniform conversion form %A to %A" src dst
                     
 
+
+[<AllowNullLiteral>]
+type UniformBufferSlot(parent : UniformBufferStore, handle : WebGLBuffer, store : Uint8Array, index : int, offset : int, layout : UniformBlockInfo) =
+    
+    let mutable next : UniformBufferSlot = null
+    let view = DataView.Create(store.buffer, float offset)
+
+    member x.Index = index
+    member x.Handle = handle
+    member x.Offset = offset
+    member x.Size = layout.size
+    member x.Layout = layout
+    member x.Next
+        with get() = next
+        and set n = next <- n
+
+    member x.GetWriterTemplate(name : string, template : obj) =
+        match Map.tryFind name layout.fieldsByName with
+        | Some f ->
+            let srcType = Blit.getShaderType template
+            let _,blit = Blit.getBlit true srcType f.typ
+            fun value -> blit view f.offset value
+        | None ->
+            fun value -> Log.warn "[GL] unknown field: %s" name
+
+    member x.GetWriter(name : string, m : IMod) =
+        let writer = ref None
+        Mod.custom (fun t ->
+            let v = m.GetValueObj t
+            let write = 
+                match !writer with
+                | Some w -> w
+                | None ->
+                    let w = x.GetWriterTemplate(name, v)
+                    writer := Some w
+                    w
+            write v
+            parent.Dirty()
+        )
+
+    member x.Free() = parent.Free x
+
+and UniformBufferStore(parent : UniformBufferManager, ctx : Context, layout : UniformBlockInfo, capacity : int) =
+    let gl = ctx.GL
+
+    let virtualSize = 
+        let align = gl.getParameter(gl.UNIFORM_BUFFER_OFFSET_ALIGNMENT) |> unbox<int>
+        if layout.size % align = 0 then layout.size
+        else (layout.size / align + 1) * align
+        
+
+    let buffer =
+        let b = gl.createBuffer()
+        gl.bindBuffer(gl.UNIFORM_BUFFER, b)
+        gl.bufferData(gl.UNIFORM_BUFFER, U3.Case1 (float capacity * float virtualSize), gl.DYNAMIC_DRAW)
+        gl.bindBuffer(gl.UNIFORM_BUFFER, null)
+        b
+
+    let store = 
+        Uint8Array.Create(float (capacity * virtualSize))
+
+    let mutable dirty = false
+    let mutable count = 0
+    let mutable free : UniformBufferSlot = null
+
+    let tryAlloc(x : UniformBufferStore) =
+        if unbox free then
+            let n = free
+            free <- n.Next
+            n.Next <- null
+            Some n
+        elif count < capacity then
+            let i = count
+            let n = UniformBufferSlot(x, buffer, store, i, i * virtualSize, layout)
+            count <- count + 1
+            Some n
+        else
+            None
+
+    let free(slot : UniformBufferSlot) =
+        slot.Next <- free
+        free <- slot
+
+    member x.Upload() = 
+        if dirty then
+            dirty <- false
+            gl.bindBuffer(gl.UNIFORM_BUFFER, buffer)
+            gl.bufferSubData(gl.UNIFORM_BUFFER, 0.0, U2.Case2 store.buffer)
+            gl.bindBuffer(gl.UNIFORM_BUFFER, null)
+
+    member x.Dirty() =
+        if not dirty then
+            dirty <- true
+            parent.Dirty x
+
+    member x.TryAlloc() = tryAlloc x
+    member x.Free(s : UniformBufferSlot) = free s
+
+and UniformBufferManager(ctx : Context, layout : UniformBlockInfo) =
+    let stores = System.Collections.Generic.List<UniformBufferStore>()
+
+    static let dirty = System.Collections.Generic.List<UniformBufferStore>()
+
+    member x.Layout = layout
+
+    member x.Dirty(s : UniformBufferStore) =
+        dirty.Add s
+
+
+    member x.Alloc() =
+        let mutable res = None
+        use mutable e = stores.GetEnumerator()
+        while not (unbox res) && e.MoveNext() do
+            res <- e.Current.TryAlloc()
+
+        match res with
+        | None ->
+            let store = UniformBufferStore(x, ctx, layout, 128)
+            stores.Add store
+            store.TryAlloc().Value
+        | Some r -> 
+            r
+
+    static member UploadAll() =
+        for d in dirty do d.Upload()
+        dirty.Clear()
+
+
 type UniformBuffer(ctx : Context, handle : WebGLBuffer, layout : UniformBlockInfo) =
     inherit Resource(ctx)
 
@@ -123,6 +251,9 @@ type UniformBuffer(ctx : Context, handle : WebGLBuffer, layout : UniformBlockInf
 
     member x.Handle = handle
     member x.Layout = layout
+    
+    member x.Offset = 0
+    member x.Size = layout.size
 
     member x.GetWriterTemplate(name : string, template : obj) =
         match Map.tryFind name layout.fieldsByName with

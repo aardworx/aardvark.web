@@ -3,7 +3,7 @@ namespace Aardvark.Base
 open System.Collections
 open System.Collections.Generic
 
-module private HMapList =
+module HMapList =
     let rec alter (k : 'k) (f : Option<'v> -> Option<'v>) (l : list<'k * 'v>) =
         match l with
             | [] ->

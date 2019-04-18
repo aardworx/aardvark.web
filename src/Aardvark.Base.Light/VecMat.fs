@@ -1,8 +1,17 @@
 ﻿namespace Aardvark.Base
 
-open System
-open Aardvark.Base
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Trafo =
+    let forward (t : Trafo3d) = t.Forward
+    let backward (t : Trafo3d) = t.Backward
 
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Mat =
+    let upperLeftM33 (m : M44d) = M33d m
+    let inline transformDir (m : ^m) (v : ^a) : ^c = (^m : (member TransformDir : ^a -> ^c) (m, v))
+    let inline transformPos (m : ^m) (v : ^a) : ^c = (^m : (member TransformPos : ^a -> ^c) (m, v))
+    let inline transpose (m : ^m) : ^b = (^m : (member Transposed : ^b) (m))
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Vec =

@@ -14,8 +14,14 @@ type WebGLSync =
 
 type WebGL2RenderingContext =
     inherit WebGLRenderingContext
+    abstract member SRGB_EXT : float
+    abstract member SRGB_ALPHA_EXT : float
+    abstract member SRGB8_ALPHA8_EXT : float
+    abstract member FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING_EXT : float
+
     abstract member UNIFORM_BUFFER : float
     abstract member ACTIVE_UNIFORM_BLOCKS : float
+    abstract member UNIFORM_BUFFER_OFFSET_ALIGNMENT : float
 
     abstract member UNIFORM_BLOCK_BINDING : float
     abstract member UNIFORM_BLOCK_DATA_SIZE : float

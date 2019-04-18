@@ -193,7 +193,8 @@ module Frustum =
         projTrafo f
 
     let private isTrafoOrtho (t : Trafo3d) =
-        t.Forward.M30.IsTiny() && t.Forward.M31.IsTiny() && t.Forward.M32.IsTiny()
+        let fw = Trafo.forward t
+        fw.M30.IsTiny() && fw.M31.IsTiny() && fw.M32.IsTiny()
 
     let ofTrafo (t : Trafo3d) =
         let bw = t.Backward

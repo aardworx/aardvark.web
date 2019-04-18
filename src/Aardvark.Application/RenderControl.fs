@@ -20,6 +20,16 @@ type ContextAttribs =
         stencil : bool
      }
 
+type EXT_sRGB =
+    abstract member SRGB_EXT : float
+    abstract member SRGB_ALPHA_EXT : float
+    abstract member SRGB8_ALPHA8_EXT : float
+    abstract member FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING_EXT : float
+
+[<AutoOpen>]
+module Exts = 
+    [<Emit("Element.ALLOW_KEYBOARD_INPUT")>]
+    let ALLOW_KEYBOARD_INPUT : float = jsNative
 
 type RenderControl(canvas : HTMLCanvasElement) =
 
@@ -41,6 +51,11 @@ type RenderControl(canvas : HTMLCanvasElement) =
     let manager = new ResourceManager(ctx)
 
     do
+        //let e = gl.getFramebufferAttachmentParameter(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING_EXT) |> unbox<float>
+        //if e = gl.LINEAR then Log.error "linear"
+        //elif e = gl.SRGB_EXT then Log.error "srgb"
+        //else Log.error "strange: %A" e
+
         canvas.addEventListener("webglcontextlost", EventListenerOrEventListenerObject.Case1 (fun _ -> Log.warn "context lost"))
         canvas.addEventListener("webglcontextrestored", EventListenerOrEventListenerObject.Case1 (fun _ -> Log.warn "context restored"))
         let dbgRenderInfo = gl.getExtension("WEBGL_debug_renderer_info") |> unbox<WEBGL_debug_renderer_info>
@@ -109,14 +124,70 @@ type RenderControl(canvas : HTMLCanvasElement) =
 
     do 
         
-        canvas.addEventListener_pointerdown(fun e ->
-            if unbox e.pointerType = "touch" then
-                overlay.innerHTML <- "RAFAP"
-                overlay.style.display <- "block"
+        //canvas.addEventListener_pointerdown(fun e ->
+        //    if unbox e.pointerType = "touch" then
+        //        overlay.innerHTML <- "RAFAP"
+        //        overlay.style.display <- "block"
 
-                if not rafap then transact caller.MarkOutdated
-                rafap <- not rafap
+        //        if not rafap then transact caller.MarkOutdated
+        //        rafap <- not rafap
+        //)
+
+        let alt = keyboard.IsDown Keys.LeftAlt
+        keyboard.KeyDown(Keys.Return).Add(fun () ->
+            if document?fullscreenElement || document?mozFullScreenElement || document?webkitFullscreenElement || document?msFullscreenElement then
+                if document?exitFullscreen then document?exitFullscreen()
+                elif document?msExitFullscreen then document?msExitFullscreen()
+                elif document?mozCancelFullScreen then document?mozCancelFullScreen()
+                elif document?webkitExitFullscreen then document?webkitExitFullscreen()
+            else
+                if canvas?requestFullscreen then canvas?requestFullscreen()
+                elif canvas?msRequestFullscreen then canvas?msRequestFullscreen()
+                elif canvas?mozRequestFullScreen then canvas?mozRequestFullScreen()
+                elif canvas?webkitRequestFullscreen then canvas?webkitRequestFullscreen(ALLOW_KEYBOARD_INPUT)
         )
+
+
+        canvas.addEventListener("dblclick", EventListenerOrEventListenerObject.Case1 (fun e -> 
+            if document?fullscreenElement || document?mozFullScreenElement || document?webkitFullscreenElement || document?msFullscreenElement then
+                if document?exitFullscreen then document?exitFullscreen()
+                elif document?msExitFullscreen then document?msExitFullscreen()
+                elif document?mozCancelFullScreen then document?mozCancelFullScreen()
+                elif document?webkitExitFullscreen then document?webkitExitFullscreen()
+            else
+                if canvas?requestFullscreen then canvas?requestFullscreen()
+                elif canvas?msRequestFullscreen then canvas?msRequestFullscreen()
+                elif canvas?mozRequestFullScreen then canvas?mozRequestFullScreen()
+                elif canvas?webkitRequestFullscreen then canvas?webkitRequestFullscreen(ALLOW_KEYBOARD_INPUT)
+            e.preventDefault(); e.stopPropagation()
+        ), true)
+               
+        canvas.addEventListener("touchstart", EventListenerOrEventListenerObject.Case1 (fun e -> 
+            if document?fullscreenElement || document?mozFullScreenElement || document?webkitFullscreenElement || document?msFullscreenElement then
+                if document?exitFullscreen then document?exitFullscreen()
+                elif document?msExitFullscreen then document?msExitFullscreen()
+                elif document?mozCancelFullScreen then document?mozCancelFullScreen()
+                elif document?webkitExitFullscreen then document?webkitExitFullscreen()
+            else
+                if canvas?requestFullscreen then canvas?requestFullscreen()
+                elif canvas?msRequestFullscreen then canvas?msRequestFullscreen()
+                elif canvas?mozRequestFullScreen then canvas?mozRequestFullScreen()
+                elif canvas?webkitRequestFullscreen then canvas?webkitRequestFullscreen(ALLOW_KEYBOARD_INPUT)
+                elif canvas?webkitRequestFullScreen then canvas?webkitRequestFullScreen()
+            //if document?fullscreenElement || document?mozFullScreenElement || document?webkitFullscreenElement then
+            //    if document?cancelFullScreen then document?cancelFullScreen()
+            //    elif document?mozCancelFullScreen then document?mozCancelFullScreen()
+            //    elif document?webkitCancelFullScreen then document?webkitCancelFullScreen()
+            //else
+            //    if canvas?requestFullscreen then canvas?requestFullscreen()
+            //    elif canvas?webkitRequestFullscreen then canvas?webkitRequestFullscreen()
+            //    elif canvas?mozRequestFullScreen then canvas?mozRequestFullScreen()
+            e.preventDefault(); e.stopPropagation()
+        ), true)
+        
+        
+        
+
         let ctrl = keyboard.IsDown(Keys.LeftCtrl)
         keyboard.KeyDown(Keys.End).Add (fun () ->
             if ctrl.GetValue(AdaptiveToken.Top) then

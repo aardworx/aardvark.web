@@ -27,7 +27,14 @@ module.exports = {
     module: {
         rules: [{
             test: /\.fs(x|proj)?$/,
-            use: "fable-loader"
+            use: {
+				loader: "fable-loader",
+				options: {
+					cli: {
+						path: "C:\\Users\\Schorsch\\Development\\Fable\\src\\Fable.Cli"
+					}
+				}
+			}
         }]
     }
 }
