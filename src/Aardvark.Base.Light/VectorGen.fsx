@@ -96,7 +96,13 @@ let run () =
         else
             printfn "    member __.Length = sqrt (float (%s))" (names |> Seq.map (fun n -> sprintf "%s*%s" (n.ToLower()) (n.ToLower())) |> String.concat " + ")
             
-
+        printfn "    member __.Abs = %s(%s)" name (names |> Seq.map (fun n -> sprintf "abs %s" (n.ToLower())) |> String.concat ", ")
+        if d.fract then
+            printfn "    member __.IsNaN = %s" (names |> Seq.map (fun n -> n.ToLower() |> sprintf "Fun.IsNaN(%s)") |> String.concat " || ")
+        printfn "    static member Min(l : %s, r : %s) = %s(%s)" name name name (names |> Seq.map (fun n -> sprintf "min l.%s r.%s" n n) |> String.concat ", ")
+        printfn "    static member Max(l : %s, r : %s) = %s(%s)" name name name (names |> Seq.map (fun n -> sprintf "max l.%s r.%s" n n) |> String.concat ", ")
+        printfn "    static member Distance(l : %s, r : %s) = (l - r).Length" name name 
+        
         // hashcode/equals
         printfn "    override __.GetHashCode() = HashCode.Combine(%s)" (names |> Seq.map (fun n -> sprintf "%s.GetHashCode()" (n.ToLower())) |> String.concat ", ")
         printfn "    override __.Equals(o) = match o with | :? %s as o -> %s | _ -> false" name (names |> Seq.map (fun n -> sprintf "%s = o.%s" (n.ToLower()) n) |> String.concat " && ")
@@ -137,6 +143,7 @@ let run () =
                 | _ -> failwith "bad"
 
             printfn "    member __.%s%s(o : %s) = %s" nn nnn name (names |> Seq.map (fun n -> sprintf "%s %s o.%s" (n.ToLower()) op n) |> String.concat compose )
+            printfn "    static member %s%s(l : %s, r : %s) = l.%s%s(r)" nn nnn name name nn nnn
 
         let ops = [ ">"; ">="; "<"; "<="; "="; "<>" ]
         for a in [false; true] do

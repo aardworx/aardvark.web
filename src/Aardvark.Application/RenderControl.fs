@@ -230,7 +230,7 @@ type RenderControl(canvas : HTMLCanvasElement) =
                         if frameCount > 100 then
                             let n = performance.now()
                             fps <- 1000.0 * float frameCount / (n - baseTime)
-                            console.log fps
+                            //console.log fps
                             baseTime <- n
                             frameCount <- 0
                             if showFps then overlay.innerText <- sprintf "%.1ffps" fps

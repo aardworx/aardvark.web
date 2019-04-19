@@ -6,6 +6,8 @@ open Fable.Core
 open Fable.Import.JS
 open FSharp.Collections
 
+
+
 [<AllowNullLiteral>]
 type private LinkedNode<'a> =
     class
@@ -99,6 +101,8 @@ module ListHeapExtensions =
         let i = id
         id <- nid
         i
+
+    let pow (v : float) (e : float) = v ** e
 
 
 type HashCode =
@@ -256,7 +260,172 @@ type ArrayExtensions private() =
 type Fun private() =    
     [<Extension>]
     static member IsTiny (v : float) = v >= -1E-16 && v <= 1E-16
+    [<Extension>]
+    static member Sin(v : float) = sin v
+    [<Extension>]
+    static member Cos(v : float) = cos v
+    [<Extension>]
+    static member Tan(v : float) = tan v
+    [<Extension>]
+    static member Asin(v : float) = asin v
+    [<Extension>]
+    static member Acos(v : float) = acos v
+    [<Extension>]
+    static member Atan(v : float) = atan v
+    [<Extension>]
+    static member Atan2(y : float, x : float) = atan2 y x
+    [<Extension>]
+    static member Sinh(v : float) = Math.sinh v
+    [<Extension>]
+    static member Cosh(v : float) = Math.cosh v
+    [<Extension>]
+    static member Tanh(v : float) = Math.tanh v
+    [<Extension>]
+    static member Asinh(v : float) = Math.asinh v
+    [<Extension>]
+    static member Acosh(v : float) = Math.acosh v
+    [<Extension>]
+    static member Atanh(v : float) = Math.atanh v
+    [<Extension>]
+    static member Pow(v : float, e : float) = v ** e
+    [<Extension>]
+    static member Exp(v : float) = exp v
+    [<Extension>]
+    static member Log(v : float) = log v
+    [<Extension>]
+    static member Log2(v : float) = Math.log2 v
+    [<Extension>]
+    static member Sqrt(v : float) = sqrt v
+    [<Extension>]
+    static member Abs(v : int8) = abs v
+    [<Extension>]
+    static member Abs(v : int16) = abs v
+    [<Extension>]
+    static member Abs(v : int32) = abs v
+    [<Extension>]
+    static member Abs(v : int64) = abs v
+    [<Extension>]
+    static member Abs(v : float32) = abs v
+    [<Extension>]
+    static member Abs(v : float) = abs v
     
+    [<Extension>]
+    static member Sign(v : int8) = Math.sign (float v) |> int
+    [<Extension>]
+    static member Sign(v : int16) = Math.sign (float v) |> int
+    [<Extension>]
+    static member Sign(v : int32) = Math.sign (float v) |> int
+    [<Extension>]
+    static member Sign(v : int64) = Math.sign (float v) |> int
+    [<Extension>]
+    static member Sign(v : float) = Math.sign (float v) |> int
+    [<Extension>]
+    static member Floor(v : float) = floor v
+    [<Extension>]
+    static member Round(v : float) = round v
+    [<Extension>]
+    static member Ceiling(v : float) = ceil v
+    [<Extension>]
+    static member Frac(v : float) = v % 1.0
+
+
+    
+    [<Extension>]
+    static member Min(a : int8, b : int8) = min a b
+    [<Extension>]
+    static member Min(a : int16, b : int16) = min a b
+    [<Extension>]
+    static member Min(a : int32, b : int32) = min a b
+    [<Extension>]
+    static member Min(a : int64, b : int64) = min a b
+    [<Extension>]
+    static member Min(a : uint8, b : uint8) = min a b
+    [<Extension>]
+    static member Min(a : uint16, b : uint16) = min a b
+    [<Extension>]
+    static member Min(a : uint32, b : uint32) = min a b
+    [<Extension>]
+    static member Min(a : uint64, b : uint64) = min a b
+    [<Extension>]
+    static member Min(a : float32, b : float32) = min a b
+    [<Extension>]
+    static member Min(a : float, b : float) = min a b
+    
+    [<Extension>]
+    static member Max(a : int8, b : int8) = max a b
+    [<Extension>]
+    static member Max(a : int16, b : int16) = max a b
+    [<Extension>]
+    static member Max(a : int32, b : int32) = max a b
+    [<Extension>]
+    static member Max(a : int64, b : int64) = max a b
+    [<Extension>]
+    static member Max(a : uint8, b : uint8) = max a b
+    [<Extension>]
+    static member Max(a : uint16, b : uint16) = max a b
+    [<Extension>]
+    static member Max(a : uint32, b : uint32) = max a b
+    [<Extension>]
+    static member Max(a : uint64, b : uint64) = max a b
+    [<Extension>]
+    static member Max(a : float32, b : float32) = max a b
+    [<Extension>]
+    static member Max(a : float, b : float) = max a b
+
+    static member Clamp(min : int8, max : int8, value : int8) = 
+        if value < min then min
+        elif value > max then max
+        else value
+    static member Clamp(min : int16, max : int16, value : int16) = 
+        if value < min then min
+        elif value > max then max
+        else value
+    static member Clamp(min : int32, max : int32, value : int32) = 
+        if value < min then min
+        elif value > max then max
+        else value
+    static member Clamp(min : int64, max : int64, value : int64) = 
+        if value < min then min
+        elif value > max then max
+        else value
+        
+    static member Clamp(min : uint8, max : uint8, value : uint8) = 
+        if value < min then min
+        elif value > max then max
+        else value
+    static member Clamp(min : uint16, max : uint16, value : uint16) = 
+        if value < min then min
+        elif value > max then max
+        else value
+    static member Clamp(min : uint32, max : uint32, value : uint32) = 
+        if value < min then min
+        elif value > max then max
+        else value
+    static member Clamp(min : uint64, max : uint64, value : uint64) = 
+        if value < min then min
+        elif value > max then max
+        else value
+        
+    static member Clamp(min : float32, max : float32, value : float32) = 
+        if value < min then min
+        elif value > max then max
+        else value
+    static member Clamp(min : float, max : float, value : float) = 
+        if value < min then min
+        elif value > max then max
+        else value
+        
+    static member Lerp(min : float32, max : float32, t : float32) = 
+        min + (max - min) * t
+    static member Lerp(min : float, max : float, t : float) = 
+        min + (max - min) * t
+        
+    [<Extension>]
+    static member IsNaN (v : float) = Double.IsNaN v
+    [<Extension>]
+    static member IsInfinity (v : float) = Double.IsInfinity v
+
+
 [<AbstractClass; Sealed>]
 type Constant private() =
     
@@ -638,3 +807,31 @@ module PromiseMonad =
 
     let promise = PromiseBuilder()
 
+
+type Version(major : int, minor : int, build : int) =
+    member x.Major = major
+    member x.Minor = minor
+    member x.Build = build
+
+    new(major : int, minor : int) = Version(major, minor, 0)
+
+    override x.GetHashCode() =
+        HashCode.Combine(major, minor, build)
+
+    override x.Equals o =
+        match o with
+        | :? Version as o -> o.Major = major && o.Minor = minor && o.Build = build
+        | _ -> false
+
+    interface System.IComparable with
+        member x.CompareTo o =
+            match o with
+            | :? Version as o -> 
+                let c = compare major o.Major
+                if c <> 0 then c
+                else 
+                    let c = compare minor o.Minor
+                    if c <> 0 then c
+                    else compare build o.Build
+            | _ ->
+                failwith "uncomparable"

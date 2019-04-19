@@ -26,6 +26,10 @@ type V2i(x : int, y : int) =
     member __.Dot(r : V2i) = x * r.X + y * r.Y
     member __.LengthSquared = x*x + y*y
     member __.Length = sqrt (float (x*x + y*y))
+    member __.Abs = V2i(abs x, abs y)
+    static member Min(l : V2i, r : V2i) = V2i(min l.X r.X, min l.Y r.Y)
+    static member Max(l : V2i, r : V2i) = V2i(max l.X r.X, max l.Y r.Y)
+    static member Distance(l : V2i, r : V2i) = (l - r).Length
     override __.GetHashCode() = HashCode.Combine(x.GetHashCode(), y.GetHashCode())
     override __.Equals(o) = match o with | :? V2i as o -> x = o.X && y = o.Y | _ -> false
     override __.ToString() = sprintf "[%d, %d]" x y
@@ -38,17 +42,29 @@ type V2i(x : int, y : int) =
                 else compare y o.Y
             | _ -> failwith "uncomparable"
     member __.AnyGreater(o : V2i) = x > o.X || y > o.Y
+    static member AnyGreater(l : V2i, r : V2i) = l.AnyGreater(r)
     member __.AnyGreaterOrEqual(o : V2i) = x >= o.X || y >= o.Y
+    static member AnyGreaterOrEqual(l : V2i, r : V2i) = l.AnyGreaterOrEqual(r)
     member __.AnySmaller(o : V2i) = x < o.X || y < o.Y
+    static member AnySmaller(l : V2i, r : V2i) = l.AnySmaller(r)
     member __.AnySmallerOrEqual(o : V2i) = x <= o.X || y <= o.Y
+    static member AnySmallerOrEqual(l : V2i, r : V2i) = l.AnySmallerOrEqual(r)
     member __.AnyEqual(o : V2i) = x = o.X || y = o.Y
+    static member AnyEqual(l : V2i, r : V2i) = l.AnyEqual(r)
     member __.AnyDifferent(o : V2i) = x <> o.X || y <> o.Y
+    static member AnyDifferent(l : V2i, r : V2i) = l.AnyDifferent(r)
     member __.AllGreater(o : V2i) = x > o.X && y > o.Y
+    static member AllGreater(l : V2i, r : V2i) = l.AllGreater(r)
     member __.AllGreaterOrEqual(o : V2i) = x >= o.X && y >= o.Y
+    static member AllGreaterOrEqual(l : V2i, r : V2i) = l.AllGreaterOrEqual(r)
     member __.AllSmaller(o : V2i) = x < o.X && y < o.Y
+    static member AllSmaller(l : V2i, r : V2i) = l.AllSmaller(r)
     member __.AllSmallerOrEqual(o : V2i) = x <= o.X && y <= o.Y
+    static member AllSmallerOrEqual(l : V2i, r : V2i) = l.AllSmallerOrEqual(r)
     member __.AllEqual(o : V2i) = x = o.X && y = o.Y
+    static member AllEqual(l : V2i, r : V2i) = l.AllEqual(r)
     member __.AllDifferent(o : V2i) = x <> o.X && y <> o.Y
+    static member AllDifferent(l : V2i, r : V2i) = l.AllDifferent(r)
 type V3i(x : int, y : int, z : int) = 
     member __.X = x
     member __.Y = y
@@ -114,6 +130,10 @@ type V3i(x : int, y : int, z : int) =
     member __.Cross(r : V3i) = V3i(y * r.Z - z * r.Y, z * r.X - x * r.Z, x * r.Y - y * r.X)
     member __.LengthSquared = x*x + y*y + z*z
     member __.Length = sqrt (float (x*x + y*y + z*z))
+    member __.Abs = V3i(abs x, abs y, abs z)
+    static member Min(l : V3i, r : V3i) = V3i(min l.X r.X, min l.Y r.Y, min l.Z r.Z)
+    static member Max(l : V3i, r : V3i) = V3i(max l.X r.X, max l.Y r.Y, max l.Z r.Z)
+    static member Distance(l : V3i, r : V3i) = (l - r).Length
     override __.GetHashCode() = HashCode.Combine(x.GetHashCode(), y.GetHashCode(), z.GetHashCode())
     override __.Equals(o) = match o with | :? V3i as o -> x = o.X && y = o.Y && z = o.Z | _ -> false
     override __.ToString() = sprintf "[%d, %d, %d]" x y z
@@ -127,17 +147,29 @@ type V3i(x : int, y : int, z : int) =
                 else compare z o.Z
             | _ -> failwith "uncomparable"
     member __.AnyGreater(o : V3i) = x > o.X || y > o.Y || z > o.Z
+    static member AnyGreater(l : V3i, r : V3i) = l.AnyGreater(r)
     member __.AnyGreaterOrEqual(o : V3i) = x >= o.X || y >= o.Y || z >= o.Z
+    static member AnyGreaterOrEqual(l : V3i, r : V3i) = l.AnyGreaterOrEqual(r)
     member __.AnySmaller(o : V3i) = x < o.X || y < o.Y || z < o.Z
+    static member AnySmaller(l : V3i, r : V3i) = l.AnySmaller(r)
     member __.AnySmallerOrEqual(o : V3i) = x <= o.X || y <= o.Y || z <= o.Z
+    static member AnySmallerOrEqual(l : V3i, r : V3i) = l.AnySmallerOrEqual(r)
     member __.AnyEqual(o : V3i) = x = o.X || y = o.Y || z = o.Z
+    static member AnyEqual(l : V3i, r : V3i) = l.AnyEqual(r)
     member __.AnyDifferent(o : V3i) = x <> o.X || y <> o.Y || z <> o.Z
+    static member AnyDifferent(l : V3i, r : V3i) = l.AnyDifferent(r)
     member __.AllGreater(o : V3i) = x > o.X && y > o.Y && z > o.Z
+    static member AllGreater(l : V3i, r : V3i) = l.AllGreater(r)
     member __.AllGreaterOrEqual(o : V3i) = x >= o.X && y >= o.Y && z >= o.Z
+    static member AllGreaterOrEqual(l : V3i, r : V3i) = l.AllGreaterOrEqual(r)
     member __.AllSmaller(o : V3i) = x < o.X && y < o.Y && z < o.Z
+    static member AllSmaller(l : V3i, r : V3i) = l.AllSmaller(r)
     member __.AllSmallerOrEqual(o : V3i) = x <= o.X && y <= o.Y && z <= o.Z
+    static member AllSmallerOrEqual(l : V3i, r : V3i) = l.AllSmallerOrEqual(r)
     member __.AllEqual(o : V3i) = x = o.X && y = o.Y && z = o.Z
+    static member AllEqual(l : V3i, r : V3i) = l.AllEqual(r)
     member __.AllDifferent(o : V3i) = x <> o.X && y <> o.Y && z <> o.Z
+    static member AllDifferent(l : V3i, r : V3i) = l.AllDifferent(r)
     new(v : V2i, l : int) = V3i(v.X, v.Y, l)
 type V4i(x : int, y : int, z : int, w : int) = 
     member __.X = x
@@ -511,6 +543,10 @@ type V4i(x : int, y : int, z : int, w : int) =
     member __.Dot(r : V4i) = x * r.X + y * r.Y + z * r.Z + w * r.W
     member __.LengthSquared = x*x + y*y + z*z + w*w
     member __.Length = sqrt (float (x*x + y*y + z*z + w*w))
+    member __.Abs = V4i(abs x, abs y, abs z, abs w)
+    static member Min(l : V4i, r : V4i) = V4i(min l.X r.X, min l.Y r.Y, min l.Z r.Z, min l.W r.W)
+    static member Max(l : V4i, r : V4i) = V4i(max l.X r.X, max l.Y r.Y, max l.Z r.Z, max l.W r.W)
+    static member Distance(l : V4i, r : V4i) = (l - r).Length
     override __.GetHashCode() = HashCode.Combine(x.GetHashCode(), y.GetHashCode(), z.GetHashCode(), w.GetHashCode())
     override __.Equals(o) = match o with | :? V4i as o -> x = o.X && y = o.Y && z = o.Z && w = o.W | _ -> false
     override __.ToString() = sprintf "[%d, %d, %d, %d]" x y z w
@@ -525,17 +561,29 @@ type V4i(x : int, y : int, z : int, w : int) =
                 else compare w o.W
             | _ -> failwith "uncomparable"
     member __.AnyGreater(o : V4i) = x > o.X || y > o.Y || z > o.Z || w > o.W
+    static member AnyGreater(l : V4i, r : V4i) = l.AnyGreater(r)
     member __.AnyGreaterOrEqual(o : V4i) = x >= o.X || y >= o.Y || z >= o.Z || w >= o.W
+    static member AnyGreaterOrEqual(l : V4i, r : V4i) = l.AnyGreaterOrEqual(r)
     member __.AnySmaller(o : V4i) = x < o.X || y < o.Y || z < o.Z || w < o.W
+    static member AnySmaller(l : V4i, r : V4i) = l.AnySmaller(r)
     member __.AnySmallerOrEqual(o : V4i) = x <= o.X || y <= o.Y || z <= o.Z || w <= o.W
+    static member AnySmallerOrEqual(l : V4i, r : V4i) = l.AnySmallerOrEqual(r)
     member __.AnyEqual(o : V4i) = x = o.X || y = o.Y || z = o.Z || w = o.W
+    static member AnyEqual(l : V4i, r : V4i) = l.AnyEqual(r)
     member __.AnyDifferent(o : V4i) = x <> o.X || y <> o.Y || z <> o.Z || w <> o.W
+    static member AnyDifferent(l : V4i, r : V4i) = l.AnyDifferent(r)
     member __.AllGreater(o : V4i) = x > o.X && y > o.Y && z > o.Z && w > o.W
+    static member AllGreater(l : V4i, r : V4i) = l.AllGreater(r)
     member __.AllGreaterOrEqual(o : V4i) = x >= o.X && y >= o.Y && z >= o.Z && w >= o.W
+    static member AllGreaterOrEqual(l : V4i, r : V4i) = l.AllGreaterOrEqual(r)
     member __.AllSmaller(o : V4i) = x < o.X && y < o.Y && z < o.Z && w < o.W
+    static member AllSmaller(l : V4i, r : V4i) = l.AllSmaller(r)
     member __.AllSmallerOrEqual(o : V4i) = x <= o.X && y <= o.Y && z <= o.Z && w <= o.W
+    static member AllSmallerOrEqual(l : V4i, r : V4i) = l.AllSmallerOrEqual(r)
     member __.AllEqual(o : V4i) = x = o.X && y = o.Y && z = o.Z && w = o.W
+    static member AllEqual(l : V4i, r : V4i) = l.AllEqual(r)
     member __.AllDifferent(o : V4i) = x <> o.X && y <> o.Y && z <> o.Z && w <> o.W
+    static member AllDifferent(l : V4i, r : V4i) = l.AllDifferent(r)
     new(v : V3i, l : int) = V4i(v.X, v.Y, v.Z, l)
 type V2d(x : float, y : float) = 
     member __.X = x
@@ -564,6 +612,11 @@ type V2d(x : float, y : float) =
     member __.LengthSquared = x*x + y*y
     member __.Length = sqrt (x*x + y*y)
     member this.Normalized = let l = this.Length in V2d(x/l, y/l)
+    member __.Abs = V2d(abs x, abs y)
+    member __.IsNaN = Fun.IsNaN(x) || Fun.IsNaN(y)
+    static member Min(l : V2d, r : V2d) = V2d(min l.X r.X, min l.Y r.Y)
+    static member Max(l : V2d, r : V2d) = V2d(max l.X r.X, max l.Y r.Y)
+    static member Distance(l : V2d, r : V2d) = (l - r).Length
     override __.GetHashCode() = HashCode.Combine(x.GetHashCode(), y.GetHashCode())
     override __.Equals(o) = match o with | :? V2d as o -> x = o.X && y = o.Y | _ -> false
     override __.ToString() = sprintf "[%f, %f]" x y
@@ -576,17 +629,29 @@ type V2d(x : float, y : float) =
                 else compare y o.Y
             | _ -> failwith "uncomparable"
     member __.AnyGreater(o : V2d) = x > o.X || y > o.Y
+    static member AnyGreater(l : V2d, r : V2d) = l.AnyGreater(r)
     member __.AnyGreaterOrEqual(o : V2d) = x >= o.X || y >= o.Y
+    static member AnyGreaterOrEqual(l : V2d, r : V2d) = l.AnyGreaterOrEqual(r)
     member __.AnySmaller(o : V2d) = x < o.X || y < o.Y
+    static member AnySmaller(l : V2d, r : V2d) = l.AnySmaller(r)
     member __.AnySmallerOrEqual(o : V2d) = x <= o.X || y <= o.Y
+    static member AnySmallerOrEqual(l : V2d, r : V2d) = l.AnySmallerOrEqual(r)
     member __.AnyEqual(o : V2d) = x = o.X || y = o.Y
+    static member AnyEqual(l : V2d, r : V2d) = l.AnyEqual(r)
     member __.AnyDifferent(o : V2d) = x <> o.X || y <> o.Y
+    static member AnyDifferent(l : V2d, r : V2d) = l.AnyDifferent(r)
     member __.AllGreater(o : V2d) = x > o.X && y > o.Y
+    static member AllGreater(l : V2d, r : V2d) = l.AllGreater(r)
     member __.AllGreaterOrEqual(o : V2d) = x >= o.X && y >= o.Y
+    static member AllGreaterOrEqual(l : V2d, r : V2d) = l.AllGreaterOrEqual(r)
     member __.AllSmaller(o : V2d) = x < o.X && y < o.Y
+    static member AllSmaller(l : V2d, r : V2d) = l.AllSmaller(r)
     member __.AllSmallerOrEqual(o : V2d) = x <= o.X && y <= o.Y
+    static member AllSmallerOrEqual(l : V2d, r : V2d) = l.AllSmallerOrEqual(r)
     member __.AllEqual(o : V2d) = x = o.X && y = o.Y
+    static member AllEqual(l : V2d, r : V2d) = l.AllEqual(r)
     member __.AllDifferent(o : V2d) = x <> o.X && y <> o.Y
+    static member AllDifferent(l : V2d, r : V2d) = l.AllDifferent(r)
     new(v : V2i) = V2d(float v.X, float v.Y)
 type V3d(x : float, y : float, z : float) = 
     member __.X = x
@@ -654,6 +719,11 @@ type V3d(x : float, y : float, z : float) =
     member __.LengthSquared = x*x + y*y + z*z
     member __.Length = sqrt (x*x + y*y + z*z)
     member this.Normalized = let l = this.Length in V3d(x/l, y/l, z/l)
+    member __.Abs = V3d(abs x, abs y, abs z)
+    member __.IsNaN = Fun.IsNaN(x) || Fun.IsNaN(y) || Fun.IsNaN(z)
+    static member Min(l : V3d, r : V3d) = V3d(min l.X r.X, min l.Y r.Y, min l.Z r.Z)
+    static member Max(l : V3d, r : V3d) = V3d(max l.X r.X, max l.Y r.Y, max l.Z r.Z)
+    static member Distance(l : V3d, r : V3d) = (l - r).Length
     override __.GetHashCode() = HashCode.Combine(x.GetHashCode(), y.GetHashCode(), z.GetHashCode())
     override __.Equals(o) = match o with | :? V3d as o -> x = o.X && y = o.Y && z = o.Z | _ -> false
     override __.ToString() = sprintf "[%f, %f, %f]" x y z
@@ -667,17 +737,29 @@ type V3d(x : float, y : float, z : float) =
                 else compare z o.Z
             | _ -> failwith "uncomparable"
     member __.AnyGreater(o : V3d) = x > o.X || y > o.Y || z > o.Z
+    static member AnyGreater(l : V3d, r : V3d) = l.AnyGreater(r)
     member __.AnyGreaterOrEqual(o : V3d) = x >= o.X || y >= o.Y || z >= o.Z
+    static member AnyGreaterOrEqual(l : V3d, r : V3d) = l.AnyGreaterOrEqual(r)
     member __.AnySmaller(o : V3d) = x < o.X || y < o.Y || z < o.Z
+    static member AnySmaller(l : V3d, r : V3d) = l.AnySmaller(r)
     member __.AnySmallerOrEqual(o : V3d) = x <= o.X || y <= o.Y || z <= o.Z
+    static member AnySmallerOrEqual(l : V3d, r : V3d) = l.AnySmallerOrEqual(r)
     member __.AnyEqual(o : V3d) = x = o.X || y = o.Y || z = o.Z
+    static member AnyEqual(l : V3d, r : V3d) = l.AnyEqual(r)
     member __.AnyDifferent(o : V3d) = x <> o.X || y <> o.Y || z <> o.Z
+    static member AnyDifferent(l : V3d, r : V3d) = l.AnyDifferent(r)
     member __.AllGreater(o : V3d) = x > o.X && y > o.Y && z > o.Z
+    static member AllGreater(l : V3d, r : V3d) = l.AllGreater(r)
     member __.AllGreaterOrEqual(o : V3d) = x >= o.X && y >= o.Y && z >= o.Z
+    static member AllGreaterOrEqual(l : V3d, r : V3d) = l.AllGreaterOrEqual(r)
     member __.AllSmaller(o : V3d) = x < o.X && y < o.Y && z < o.Z
+    static member AllSmaller(l : V3d, r : V3d) = l.AllSmaller(r)
     member __.AllSmallerOrEqual(o : V3d) = x <= o.X && y <= o.Y && z <= o.Z
+    static member AllSmallerOrEqual(l : V3d, r : V3d) = l.AllSmallerOrEqual(r)
     member __.AllEqual(o : V3d) = x = o.X && y = o.Y && z = o.Z
+    static member AllEqual(l : V3d, r : V3d) = l.AllEqual(r)
     member __.AllDifferent(o : V3d) = x <> o.X && y <> o.Y && z <> o.Z
+    static member AllDifferent(l : V3d, r : V3d) = l.AllDifferent(r)
     new(v : V2d, l : float) = V3d(v.X, v.Y, l)
     new(v : V3i) = V3d(float v.X, float v.Y, float v.Z)
 type V4d(x : float, y : float, z : float, w : float) = 
@@ -1053,6 +1135,11 @@ type V4d(x : float, y : float, z : float, w : float) =
     member __.LengthSquared = x*x + y*y + z*z + w*w
     member __.Length = sqrt (x*x + y*y + z*z + w*w)
     member this.Normalized = let l = this.Length in V4d(x/l, y/l, z/l, w/l)
+    member __.Abs = V4d(abs x, abs y, abs z, abs w)
+    member __.IsNaN = Fun.IsNaN(x) || Fun.IsNaN(y) || Fun.IsNaN(z) || Fun.IsNaN(w)
+    static member Min(l : V4d, r : V4d) = V4d(min l.X r.X, min l.Y r.Y, min l.Z r.Z, min l.W r.W)
+    static member Max(l : V4d, r : V4d) = V4d(max l.X r.X, max l.Y r.Y, max l.Z r.Z, max l.W r.W)
+    static member Distance(l : V4d, r : V4d) = (l - r).Length
     override __.GetHashCode() = HashCode.Combine(x.GetHashCode(), y.GetHashCode(), z.GetHashCode(), w.GetHashCode())
     override __.Equals(o) = match o with | :? V4d as o -> x = o.X && y = o.Y && z = o.Z && w = o.W | _ -> false
     override __.ToString() = sprintf "[%f, %f, %f, %f]" x y z w
@@ -1067,16 +1154,28 @@ type V4d(x : float, y : float, z : float, w : float) =
                 else compare w o.W
             | _ -> failwith "uncomparable"
     member __.AnyGreater(o : V4d) = x > o.X || y > o.Y || z > o.Z || w > o.W
+    static member AnyGreater(l : V4d, r : V4d) = l.AnyGreater(r)
     member __.AnyGreaterOrEqual(o : V4d) = x >= o.X || y >= o.Y || z >= o.Z || w >= o.W
+    static member AnyGreaterOrEqual(l : V4d, r : V4d) = l.AnyGreaterOrEqual(r)
     member __.AnySmaller(o : V4d) = x < o.X || y < o.Y || z < o.Z || w < o.W
+    static member AnySmaller(l : V4d, r : V4d) = l.AnySmaller(r)
     member __.AnySmallerOrEqual(o : V4d) = x <= o.X || y <= o.Y || z <= o.Z || w <= o.W
+    static member AnySmallerOrEqual(l : V4d, r : V4d) = l.AnySmallerOrEqual(r)
     member __.AnyEqual(o : V4d) = x = o.X || y = o.Y || z = o.Z || w = o.W
+    static member AnyEqual(l : V4d, r : V4d) = l.AnyEqual(r)
     member __.AnyDifferent(o : V4d) = x <> o.X || y <> o.Y || z <> o.Z || w <> o.W
+    static member AnyDifferent(l : V4d, r : V4d) = l.AnyDifferent(r)
     member __.AllGreater(o : V4d) = x > o.X && y > o.Y && z > o.Z && w > o.W
+    static member AllGreater(l : V4d, r : V4d) = l.AllGreater(r)
     member __.AllGreaterOrEqual(o : V4d) = x >= o.X && y >= o.Y && z >= o.Z && w >= o.W
+    static member AllGreaterOrEqual(l : V4d, r : V4d) = l.AllGreaterOrEqual(r)
     member __.AllSmaller(o : V4d) = x < o.X && y < o.Y && z < o.Z && w < o.W
+    static member AllSmaller(l : V4d, r : V4d) = l.AllSmaller(r)
     member __.AllSmallerOrEqual(o : V4d) = x <= o.X && y <= o.Y && z <= o.Z && w <= o.W
+    static member AllSmallerOrEqual(l : V4d, r : V4d) = l.AllSmallerOrEqual(r)
     member __.AllEqual(o : V4d) = x = o.X && y = o.Y && z = o.Z && w = o.W
+    static member AllEqual(l : V4d, r : V4d) = l.AllEqual(r)
     member __.AllDifferent(o : V4d) = x <> o.X && y <> o.Y && z <> o.Z && w <> o.W
+    static member AllDifferent(l : V4d, r : V4d) = l.AllDifferent(r)
     new(v : V3d, l : float) = V4d(v.X, v.Y, v.Z, l)
     new(v : V4i) = V4d(float v.X, float v.Y, float v.Z, float v.W)

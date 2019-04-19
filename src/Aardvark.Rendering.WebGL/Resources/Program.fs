@@ -216,8 +216,8 @@ module ProgramImpl =
 
         member x.CompileShader (stage : float, code : string) =
             let def =
-                if stage = x.GL.VERTEX_SHADER then "VERTEX"
-                elif stage = x.GL.FRAGMENT_SHADER then "FRAGMENT"
+                if stage = x.GL.VERTEX_SHADER then "Vertex"
+                elif stage = x.GL.FRAGMENT_SHADER then "Fragment"
                 else "UNKNOWN"
 
             let code = versionRx.Replace(code, fun m -> m.Value + "#define " + def + "\r\n")

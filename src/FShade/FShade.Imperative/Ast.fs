@@ -61,7 +61,7 @@ type IBackend =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CType =
     let private primitiveTypes =
-        HMap.ofList [
+        [
             typeof<unit>, CType.CVoid
             typeof<System.Void>, CType.CVoid
             typeof<bool>, CType.CBool
@@ -84,15 +84,17 @@ module CType =
 
         ]
 
-    let private typeCache =
+    let private typeCacheDict =
         let dict = Dict<Option<IBackend> * Type, CType>(Unchecked.hash, Unchecked.equals)
-        for (k,v) in HMap.toSeq primitiveTypes do
+        for (k,v) in primitiveTypes do
             dict.[(None, k)] <- v
-        
-        fun (b : IBackend) (t : Type) (f : IBackend -> Type -> CType) ->
-            match dict.TryGetValue((None, t)) with
-                | Some res -> res
-                | _ -> dict.GetOrCreate((Some b,t), fun _ -> f b t)
+        dict
+
+    let typeCache (b : IBackend) (t : Type) (f : IBackend -> Type -> CType) =
+        match typeCacheDict.TryGetValue ((None, t)) with
+        | Some res -> res
+        | None -> 
+            typeCacheDict.GetOrCreate((Some b,t), fun _ -> f b t)
 
 
     let rec private ofTypeInternal (seen : hset<Type>) (b : IBackend) (t : Type) =
@@ -842,7 +844,7 @@ module CUniform =
                     | _ ->
                         all.[u.cUniformName] <- u
                         res.Add u
-        res |> Seq.toArray |> Array.sortWith (fun l r -> compare l.cUniformName r.cUniformName)
+        res |> Seq.toList |> List.sortWith (fun l r -> compare l.cUniformName r.cUniformName)
         //res.QuickSort(fun l r -> compare l.cUniformName r.cUniformName)
         //res |> CSharpList.toList
 

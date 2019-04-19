@@ -28,8 +28,12 @@ module MissingInBase =
             ofSeq l
 
     let (|Method|_|) (mi : MethodInfo) =
-        Some (mi.Name, mi.GetParameters() |> Array.toList |> List.map (fun p -> p.ParameterType))
-
+        let args = mi.GetParameters() |> Array.toList |> List.map (fun p -> p.ParameterType)
+        if mi.IsStatic then
+            Some (mi.Name, args)
+        else
+            Some (mi.Name, mi.DeclaringType :: args)
+            
     open Microsoft.FSharp.Quotations
 
     //extracts the (optional) top-most method call from an expression
@@ -470,13 +474,13 @@ module ExprExtensions =
                             let args = args |> List.map Expr.TryEval |> List.toArray
                             let t = Expr.TryEval t
                             match t, args |> reduce with
-                                | Some t, Some args -> mi.Invoke(t, args) |> Some
+                                | Some t, Some args -> try mi.Invoke(t, args) |> Some with _ -> Log.warn "could not invoke %A" mi; None
                                 | _ -> None
 
                         | None -> 
                             let args = args |> List.map Expr.TryEval |> List.toArray
                             match args |> reduce with
-                                | Some args -> mi.Invoke(null, args) |> Some
+                                | Some args -> try mi.Invoke(null, args) |> Some with _ -> Log.warn "could not invoke %A" mi;  None
                                 | _ -> None
 
                 | Patterns.Let(var,value,body) ->
@@ -904,6 +908,21 @@ module ExprExtensions =
 
 [<AutoOpen>]
 module StateExtensions =
+
+    module Seq =
+        let mapS (f : 'a -> State<'s, 'b>) (m : seq<'a>) =
+            { new State<'s, seq<'b>>() with
+                override x.Run(s : ref<'s>) =
+                    let res = System.Collections.Generic.List<'b>()
+                    for e in m do
+                        res.Add (f(e).Run(s))
+                    res :> seq<'b>
+            }
+    module Option =
+        let mapS (f : 'a -> State<'s, 'b>) (m : Option<'a>) =
+            match m with
+                | Some a -> a |> f |> State.map Some
+                | None -> State.value None
 
     module Array =
         let mapS (f : 'a -> State<'s, 'b>) (m : 'a[]) : State<'s, 'b[]> =

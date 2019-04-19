@@ -19,7 +19,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FShade", "FShade", "{771857
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Imperative", "src\FShade\FShade.Imperative\FShade.Imperative.fsproj", "{06CFF9A3-01B1-431F-9A88-D754ECA46151}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.Core", "src\FShade\FShade.Core\FShade.Core.fsproj", "{B4019BFB-372F-4308-9F3B-3420B61D8844}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Core", "src\FShade\FShade.Core\FShade.Core.fsproj", "{B4019BFB-372F-4308-9F3B-3420B61D8844}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.GLSL", "src\FShade\FShade.GLSL\FShade.GLSL.fsproj", "{0C36D55E-65A7-4631-911C-DF7F4310925F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -59,6 +61,10 @@ Global
 		{B4019BFB-372F-4308-9F3B-3420B61D8844}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B4019BFB-372F-4308-9F3B-3420B61D8844}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B4019BFB-372F-4308-9F3B-3420B61D8844}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0C36D55E-65A7-4631-911C-DF7F4310925F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C36D55E-65A7-4631-911C-DF7F4310925F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C36D55E-65A7-4631-911C-DF7F4310925F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C36D55E-65A7-4631-911C-DF7F4310925F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -66,6 +72,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{06CFF9A3-01B1-431F-9A88-D754ECA46151} = {77185787-0A12-4FCD-BA95-95E81FFB64B5}
 		{B4019BFB-372F-4308-9F3B-3420B61D8844} = {77185787-0A12-4FCD-BA95-95E81FFB64B5}
+		{0C36D55E-65A7-4631-911C-DF7F4310925F} = {77185787-0A12-4FCD-BA95-95E81FFB64B5}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {5C89E353-D610-4FBC-9021-CB0980971C8C}

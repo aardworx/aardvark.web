@@ -574,9 +574,63 @@ type MyUnion =
     | C of string
 
 
+module FShadeTest =
+    open FShade.Imperative
+    open FShade
+    open FShade.GLSL
+    
+    type TexCoord() = inherit SemanticAttribute("DiffuseColorCoordinates")
+
+    type Vertex = { [<Position>] pos : V4d; [<TexCoord>] tc : V2d }
+
+    type UniformScope with
+        member x.ModelTrafo : M44d = uniform?PerModel?ModelTrafo
+        member x.ViewProjTrafo : M44d = uniform?PerView?ViewProjTrafo
+
+    let Tex =
+        sampler2d {
+            texture uniform?DiffuseColorTexture
+            addressU WrapMode.Wrap
+            addressV WrapMode.Wrap
+            filter Filter.Anisotropic
+        }
+
+    let trafo (v : Vertex) =
+        vertex {
+            let wp = uniform.ModelTrafo * v.pos
+            return { v with pos = uniform.ViewProjTrafo * wp }
+        }
+
+    let diffuseTexture (v : Vertex) =
+        fragment {
+            return Tex.Sample(v.tc)
+        }
+
+
+    let run() =
+        let testy = 
+            Effect.compose [
+                Effect.ofFunction trafo
+                Effect.ofFunction diffuseTexture
+            ]
+
+        let m = 
+            testy 
+                |> Effect.toModule { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0)] }
+
+        let shader = m |> ModuleCompiler.compileGLES300
+
+        shader.iface.samplers |> MapExt.toSeq |> Seq.iter (fun (name, sam) ->
+            Log.warn "%A %A" name sam
+        )
+
+
+        Log.warn "%s" shader.code
+        shader.code
+
 [<EntryPoint>]
 let main argv =
-
+    let shader = FShadeTest.run()
 
     //console.error typedefof<int * int * int>
 
@@ -649,102 +703,102 @@ let main argv =
 
 
 
-    let shader =
-        """#version 300 es
+    //let shader =
+    //    """#version 300 es
         
-            precision highp float;
-            precision highp int;
+    //        precision highp float;
+    //        precision highp int;
 
-            uniform PerModel {
-                mat3 NormalMatrix;
-                mat4 ModelTrafo;
-            };
-            uniform PerView {
-                mat4 ViewProjTrafo;
-                vec3 CameraLocation;
-            };
+    //        uniform PerModel {
+    //            mat3 NormalMatrix;
+    //            mat4 ModelTrafo;
+    //        };
+    //        uniform PerView {
+    //            mat4 ViewProjTrafo;
+    //            vec3 CameraLocation;
+    //        };
 
-            uniform sampler2D Tex;
+    //        uniform sampler2D Tex;
 
-            #ifdef VERTEX
-            layout(location = 0) in vec3 Positions;
-            layout(location = 1) in vec3 Normals;
-            layout(location = 2) in vec2 DiffuseColorCoordinates;
-            out vec3 fs_Normals; 
-            out vec4 fs_WorldPosition; 
-            out vec2 fs_DiffuseColorCoordinates;
+    //        #ifdef VERTEX
+    //        layout(location = 0) in vec3 Positions;
+    //        layout(location = 1) in vec3 Normals;
+    //        layout(location = 2) in vec2 DiffuseColorCoordinates;
+    //        out vec3 fs_Normals; 
+    //        out vec4 fs_WorldPosition; 
+    //        out vec2 fs_DiffuseColorCoordinates;
 
-            void main() {
-                vec4 wp = vec4(Positions, 1.0) * ModelTrafo;
-                gl_Position = wp * ViewProjTrafo;
-                fs_Normals = normalize(Normals * NormalMatrix);
-                fs_WorldPosition = wp;
-                fs_DiffuseColorCoordinates = DiffuseColorCoordinates;
-            }
-            #endif
+    //        void main() {
+    //            vec4 wp = vec4(Positions, 1.0) * ModelTrafo;
+    //            gl_Position = wp * ViewProjTrafo;
+    //            fs_Normals = normalize(Normals * NormalMatrix);
+    //            fs_WorldPosition = wp;
+    //            fs_DiffuseColorCoordinates = DiffuseColorCoordinates;
+    //        }
+    //        #endif
 
-            #ifdef FRAGMENT
-            in vec3 fs_Normals; 
-            in vec4 fs_WorldPosition; 
-            in vec2 fs_DiffuseColorCoordinates;
-            layout(location = 0) out vec4 Colors;
-            void main() {
-                vec3 v = normalize(CameraLocation);
-                float diff = abs(dot(normalize(fs_Normals), normalize(CameraLocation - fs_WorldPosition.xyz)));
+    //        #ifdef FRAGMENT
+    //        in vec3 fs_Normals; 
+    //        in vec4 fs_WorldPosition; 
+    //        in vec2 fs_DiffuseColorCoordinates;
+    //        layout(location = 0) out vec4 Colors;
+    //        void main() {
+    //            vec3 v = normalize(CameraLocation);
+    //            float diff = abs(dot(normalize(fs_Normals), normalize(CameraLocation - fs_WorldPosition.xyz)));
 
-                vec4 color = texture(Tex, fs_DiffuseColorCoordinates, -0.5);
+    //            vec4 color = texture(Tex, fs_DiffuseColorCoordinates, -0.5);
 
 
-                Colors = vec4(vec3(0.05,0.05,0.05) + color.xyz * diff * 0.95, 1);
-            }
-            #endif
-        """
+    //            Colors = vec4(vec3(0.05,0.05,0.05) + color.xyz * diff * 0.95, 1);
+    //        }
+    //        #endif
+    //    """
         
-    let shader100 =
-        """#version 100
+    //let shader100 =
+    //    """#version 100
             
-            precision highp float;
-            precision highp int;
+    //        precision highp float;
+    //        precision highp int;
 
-            uniform mat4 ModelTrafo;
-            uniform mat3 NormalMatrix;
-            uniform mat4 ViewProjTrafo;
-            uniform vec3 CameraLocation;
-            uniform sampler2D Tex;
+    //        uniform mat4 ModelTrafo;
+    //        uniform mat3 NormalMatrix;
+    //        uniform mat4 ViewProjTrafo;
+    //        uniform vec3 CameraLocation;
+    //        uniform sampler2D Tex;
 
-            #ifdef VERTEX
-            attribute vec3 Positions;
-            attribute vec3 Normals;
-            attribute vec2 DiffuseColorCoordinates;
-            varying vec3 fs_Normals; 
-            varying vec4 fs_WorldPosition; 
-            varying vec2 fs_DiffuseColorCoordinates;
+    //        #ifdef VERTEX
+    //        attribute vec3 Positions;
+    //        attribute vec3 Normals;
+    //        attribute vec2 DiffuseColorCoordinates;
+    //        varying vec3 fs_Normals; 
+    //        varying vec4 fs_WorldPosition; 
+    //        varying vec2 fs_DiffuseColorCoordinates;
 
-            void main() {
-                vec4 wp = vec4(Positions, 1.0) * ModelTrafo;
-                gl_Position = wp * ViewProjTrafo;
-                fs_Normals = normalize(Normals * NormalMatrix);
-                fs_WorldPosition = wp;
-                fs_DiffuseColorCoordinates = DiffuseColorCoordinates;
-            }
-            #endif
+    //        void main() {
+    //            vec4 wp = vec4(Positions, 1.0) * ModelTrafo;
+    //            gl_Position = wp * ViewProjTrafo;
+    //            fs_Normals = normalize(Normals * NormalMatrix);
+    //            fs_WorldPosition = wp;
+    //            fs_DiffuseColorCoordinates = DiffuseColorCoordinates;
+    //        }
+    //        #endif
 
-            #ifdef FRAGMENT
-            varying vec3 fs_Normals; 
-            varying vec4 fs_WorldPosition; 
-            varying vec2 fs_DiffuseColorCoordinates;
+    //        #ifdef FRAGMENT
+    //        varying vec3 fs_Normals; 
+    //        varying vec4 fs_WorldPosition; 
+    //        varying vec2 fs_DiffuseColorCoordinates;
                 
-            void main() {
-                vec3 v = normalize(CameraLocation);
-                float diff = abs(dot(normalize(fs_Normals), normalize(CameraLocation - fs_WorldPosition.xyz)));
+    //        void main() {
+    //            vec3 v = normalize(CameraLocation);
+    //            float diff = abs(dot(normalize(fs_Normals), normalize(CameraLocation - fs_WorldPosition.xyz)));
 
-                vec4 color = texture2D(Tex, fs_DiffuseColorCoordinates, -0.5);
+    //            vec4 color = texture2D(Tex, fs_DiffuseColorCoordinates, -0.5);
 
 
-                gl_FragColor = vec4(vec3(0.05,0.05,0.05) + color.xyz * diff * 0.95, 1);
-            }
-            #endif
-        """
+    //            gl_FragColor = vec4(vec3(0.05,0.05,0.05) + color.xyz * diff * 0.95, 1);
+    //        }
+    //        #endif
+    //    """
 
 
     document.addEventListener_readystatechange(fun e ->
@@ -852,6 +906,7 @@ let main argv =
             //console.warn(string test)
             //let test = MapExt.ofList [1,2;3,4]
             //let res = FShade.Imperative.ModuleCompiler.compile (failwith "") (failwith "")
+
 
             let task() = 
                 new RenderTask(control.FramebufferSignature, control.Manager, objects) :> IRenderTask

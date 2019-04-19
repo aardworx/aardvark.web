@@ -13,7 +13,9 @@
     <ProjectReference Include="..\Aardvark.Base.Rendering\Aardvark.Base.Rendering.fsproj" />
     <ProjectReference Include="..\Aardvark.Rendering.WebGL\Aardvark.Rendering.WebGL.fsproj" />
     <ProjectReference Include="..\Aardvark.SceneGraph\Aardvark.SceneGraph.fsproj" />
+    <ProjectReference Include="..\FShade\FShade.GLSL\FShade.GLSL.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Imperative\FShade.Imperative.fsproj" />
+    <ProjectReference Include="..\FShade\FShade.Core\FShade.Core.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

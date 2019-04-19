@@ -13,6 +13,11 @@ module Mat =
     let inline transformPos (m : ^m) (v : ^a) : ^c = (^m : (member TransformPos : ^a -> ^c) (m, v))
     let inline transpose (m : ^m) : ^b = (^m : (member Transposed : ^b) (m))
 
+    let inline inverse (m : ^m) : ^b =  (^m : (member Inverse : ^b) (m))
+    let inline det (m : ^m) : ^b =  (^m : (member Det : ^b) (m))
+
+
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Vec =
     let inline x (a : ^a) : ^b = (^a : (member X : ^b) (a))

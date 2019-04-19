@@ -33,101 +33,122 @@ module SimpleOrder =
     open System.Collections.Generic
 
     [<AllowNullLiteral>]
-    type SortKey =
-        class
-            val mutable public Clock : Order
-            val mutable public Tag : uint64
-            val mutable public Next : SortKey
-            val mutable public Prev : SortKey
+    type SortKey(clock : Order) =
+        let mutable clock = clock
+        let mutable tag = 0UL
+        let mutable next = null
+        let mutable prev = null
 
-            member x.Time =
-                x.Tag - x.Clock.Root.Tag
+        member x.Clock
+            with get() : Order = clock
+            and set (v : Order) = clock <- v
 
-            member x.CompareTo (o : SortKey) =
-                if isNull o.Next || isNull x.Next then
-                    failwith "cannot compare deleted times"
+        member x.Tag
+            with get () : uint64 = tag
+            and set (v : uint64) = tag <- v
+            
+        member x.Next
+            with get () : SortKey = next
+            and set (v : SortKey) = next <- v
+            
+        member x.Prev
+            with get () : SortKey = prev
+            and set (v : SortKey) = prev <- v
 
-                if o.Clock <> x.Clock then
-                    failwith "cannot compare times from different clocks"
+        member x.Time =
+            tag - x.Clock.Root.Tag
 
-                compare x.Time o.Time
+        member x.CompareTo (o : SortKey) =
+            if isNull o.Next || isNull x.Next then
+                failwith "cannot compare deleted times"
 
-            interface IComparable with
-                member x.CompareTo o =
-                    match o with
-                        | :? SortKey as o -> x.CompareTo(o)
-                        | _ -> failwithf "cannot compare time with %A" o
+            if o.Clock <> x.Clock then
+                failwith "cannot compare times from different clocks"
 
-            interface IComparable<ISortKey> with
-                member x.CompareTo o =
-                    match o with
-                        | :? SortKey as o -> x.CompareTo o
-                        | _ -> failwithf "cannot compare time with %A" o
+            compare x.Time o.Time
 
-            override x.GetHashCode() = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(x)
-            override x.Equals o = System.Object.ReferenceEquals(x,o)
+        interface IComparable with
+            member x.CompareTo o =
+                match o with
+                    | :? SortKey as o -> x.CompareTo(o)
+                    | _ -> failwithf "cannot compare time with %A" o
 
-            interface ISortKey with
-                member x.Clock = x.Clock :> IOrder
-                member x.IsDeleted = isNull x.Next
-                //member x.Next = x.Next :> ISortKey
+        interface IComparable<ISortKey> with
+            member x.CompareTo o =
+                match o with
+                    | :? SortKey as o -> x.CompareTo o
+                    | _ -> failwithf "cannot compare time with %A" o
 
-            new(c) = { Clock = c; Tag = 0UL; Next = null; Prev = null }
-        end
+        override x.GetHashCode() = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(x)
+        override x.Equals o = System.Object.ReferenceEquals(x,o)
 
-    and Order =
-        class
-            val mutable public Root : SortKey
-            val mutable public Count : int
+        interface ISortKey with
+            member x.Clock = x.Clock :> IOrder
+            member x.IsDeleted = isNull x.Next
+            //member x.Next = x.Next :> ISortKey
 
-            member x.After (t : SortKey) =
-                if t.Clock <> x then
-                    failwith "cannot insert after a different clock's time"
 
-                let distance (a : SortKey) (b : SortKey) =
-                    if a = b then System.UInt64.MaxValue
-                    else b.Tag - a.Tag
+    and Order() =
+        let mutable root : SortKey = null
+        let mutable count = 1
 
-                let mutable dn = distance t t.Next
+        member x.Root
+            with get() : SortKey = root
+            and set (r : SortKey) = root <- r
+            
+        member x.Count
+            with get() : int = count
+            and set (v : int) = count <- v
 
-                // if the distance to the next time is 1 (no room)
-                // relabel all times s.t. the new one can be inserted
-                if dn = 1UL then
-                    // find a range s.t. distance(range) >= 1 + |range|^2 
-                    let mutable current = t.Next
-                    let mutable j = 1UL
-                    while distance t current < 1UL + j * j do
-                        current <- current.Next
-                        j <- j + 1UL
 
-                    // distribute all times in the range equally spaced
-                    let step = (distance t current) / j
-                    current <- t.Next
-                    let mutable currentTime = t.Tag + step
-                    for k in 1UL..(j-1UL) do
-                        current.Tag <- currentTime
-                        current <- current.Next
-                        currentTime <- currentTime + step
+        member x.After (t : SortKey) =
+            if t.Clock <> x then
+                failwith "cannot insert after a different clock's time"
 
-                    // store the distance to the next time
-                    dn <- step
+            let distance (a : SortKey) (b : SortKey) =
+                if a = b then System.UInt64.MaxValue
+                else b.Tag - a.Tag
 
-                // insert the new time with distance (dn / 2) after
-                // the given one (there has to be enough room now)
-                let res = SortKey(x)
-                res.Tag <- t.Tag + dn / 2UL
+            let mutable dn = distance t t.Next
 
-                res.Next <- t.Next
-                res.Prev <- t
-                t.Next.Prev <- res
-                t.Next <- res
+            // if the distance to the next time is 1 (no room)
+            // relabel all times s.t. the new one can be inserted
+            if dn = 1UL then
+                // find a range s.t. distance(range) >= 1 + |range|^2 
+                let mutable current = t.Next
+                let mutable j = 1UL
+                while distance t current < 1UL + j * j do
+                    current <- current.Next
+                    j <- j + 1UL
 
-                res
+                // distribute all times in the range equally spaced
+                let step = (distance t current) / j
+                current <- t.Next
+                let mutable currentTime = t.Tag + step
+                for k in 1UL..(j-1UL) do
+                    current.Tag <- currentTime
+                    current <- current.Next
+                    currentTime <- currentTime + step
 
-            member x.Before (t : SortKey) =
-                if t = x.Root then
-                    failwith "cannot insert before root-time"
-                x.After t.Prev
+                // store the distance to the next time
+                dn <- step
+
+            // insert the new time with distance (dn / 2) after
+            // the given one (there has to be enough room now)
+            let res = SortKey(x)
+            res.Tag <- t.Tag + dn / 2UL
+
+            res.Next <- t.Next
+            res.Prev <- t
+            t.Next.Prev <- res
+            t.Next <- res
+
+            res
+
+        member x.Before (t : SortKey) =
+            if t = x.Root then
+                failwith "cannot insert before root-time"
+            x.After t.Prev
 
             member x.Delete (t : SortKey) =
                 if not (isNull t.Next) then
@@ -160,8 +181,6 @@ module SimpleOrder =
                 r.Prev <- r
                 c
 
-            private new() = { Root = null; Count = 1 }
-        end
 
     let create() =
         Order.New()
