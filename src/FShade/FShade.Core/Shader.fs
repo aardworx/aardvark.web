@@ -880,7 +880,7 @@ module Preprocessor =
                 else State.value e
 
             let! e1 = preprocessNormalS e0
-            return e1 //Optimizer.hoistImperativeConstructs e1
+            return Optimizer.hoistImperativeConstructs e1
         }
 
     and getOutputValues (sem : string) (value : Expr) : Preprocess<list<string * Option<Expr> * Expr>> =
@@ -1645,11 +1645,11 @@ module Shader =
         let newBody, state = 
             shader.shaderBody
                 //|> Optimizer.inlining isSideEffect
-                //|> Optimizer.hoistImperativeConstructs
-                //|> Optimizer.evaluateConstants' isSideEffect
-                //|> Optimizer.eliminateDeadCode' isSideEffect
-                //|> Optimizer.evaluateConstants' isSideEffect
-                //|> Optimizer.liftInputs
+                |> Optimizer.hoistImperativeConstructs
+                |> Optimizer.evaluateConstants' isSideEffect
+                |> Optimizer.eliminateDeadCode' isSideEffect
+                |> Optimizer.evaluateConstants' isSideEffect
+                |> Optimizer.liftInputs
                 |> Preprocessor.preprocess V3i.Zero
 
         let newOutputVertices, newOutputPrimitives =

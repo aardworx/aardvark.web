@@ -251,6 +251,7 @@ module CLiteral =
     let tryCreate (value : obj) =
         match value with
             | null                  -> CLiteral.Null |> Some
+            | :? float as v         -> CLiteral.CFractional(v) |> Some
             | :? bool as v          -> CLiteral.CBool(v) |> Some
             | :? int8 as v          -> CLiteral.CIntegral(int64 v) |> Some
             | :? int16 as v         -> CLiteral.CIntegral(int64 v) |> Some
@@ -266,7 +267,6 @@ module CLiteral =
 
             //| :? float16 as v       -> CLiteral.CFractional(float v.Float32) |> Some
             | :? float32 as v       -> CLiteral.CFractional(float v) |> Some
-            | :? float as v         -> CLiteral.CFractional(v) |> Some
             | :? decimal as v       -> CLiteral.CFractional(float v) |> Some
             | :? string as v        -> CLiteral.CString(v) |> Some
             | _                     -> None

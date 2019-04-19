@@ -580,10 +580,18 @@ module FShadeTest =
     open FShade.GLSL
     
     type TexCoord() = inherit SemanticAttribute("DiffuseColorCoordinates")
+    type Normal() = inherit SemanticAttribute("Normals")
 
-    type Vertex = { [<Position>] pos : V4d; [<TexCoord>] tc : V2d }
+    type Vertex = 
+        { 
+            [<Position>] pos : V4d
+            [<Semantic("WorldPos")>] wp : V4d
+            [<Normal>] n : V3d 
+            [<TexCoord>] tc : V2d 
+        }
 
     type UniformScope with
+        member x.CameraLocation : V3d = uniform?PerView?CameraLocation
         member x.ModelTrafo : M44d = uniform?PerModel?ModelTrafo
         member x.ViewProjTrafo : M44d = uniform?PerView?ViewProjTrafo
 
@@ -598,16 +606,21 @@ module FShadeTest =
     let trafo (v : Vertex) =
         vertex {
             let wp = uniform.ModelTrafo * v.pos
-            return { v with pos = uniform.ViewProjTrafo * wp }
+            return { v with pos = uniform.ViewProjTrafo * wp; wp = (0.5 + 0.5) * wp }
         }
 
     let diffuseTexture (v : Vertex) =
         fragment {
-            return Tex.Sample(v.tc)
+            let d = 
+                let dir = Vec.normalize (uniform.CameraLocation - v.wp.XYZ)
+                let n = Vec.normalize v.n
+                Vec.dot n dir
+            let col = Tex.Sample(v.tc)
+            return V4d(d * col.XYZ, 1.0)
         }
 
 
-    let run() =
+    let run(ctx : Context) =
         let testy = 
             Effect.compose [
                 Effect.ofFunction trafo
@@ -618,19 +631,18 @@ module FShadeTest =
             testy 
                 |> Effect.toModule { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0)] }
 
-        let shader = m |> ModuleCompiler.compileGLES300
 
-        shader.iface.samplers |> MapExt.toSeq |> Seq.iter (fun (name, sam) ->
-            Log.warn "%A %A" name sam
-        )
 
+        let shader = 
+            if ctx.GL.IsGL2 then m |> ModuleCompiler.compileGLES300
+            else m |> ModuleCompiler.compileGLES100
 
         Log.warn "%s" shader.code
         shader.code
 
 [<EntryPoint>]
 let main argv =
-    let shader = FShadeTest.run()
+    
 
     //console.error typedefof<int * int * int>
 
@@ -896,6 +908,8 @@ let main argv =
                                     |> Sg.trafo (Mod.constant <| Trafo3d.Translation t)
                                 yield s
                 ]
+
+            let shader = FShadeTest.run control.Context
 
             let sg =
                 Sg.set sett

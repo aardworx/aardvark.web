@@ -855,28 +855,28 @@ module ExprExtensions =
     //    abstract member RunUnit : ref<'s> -> unit
 
     module State =
-        let value (a : 'a) = { new State<'s, 'a>() with member x.Run(_) = a }
-        let map (f : 'a -> 'b) (m : State<'s, 'a>) = 
+        let inline value (a : 'a) = { new State<'s, 'a>() with member x.Run(_) = a }
+        let inline map (f : 'a -> 'b) (m : State<'s, 'a>) = 
             { new State<'s, 'b>() with 
                 member x.Run(s) = m.Run(s) |> f
             }
             
-        let bind (f : 'a -> State<'s, 'b>) (m : State<'s, 'a>) = 
+        let inline bind (f : 'a -> State<'s, 'b>) (m : State<'s, 'a>) = 
             { new State<'s, 'b>() with 
                 member x.Run(s) = f(m.Run(s)).Run(s)
             }
 
-        let ignore (m : State<'s, 'a>) = m |> map ignore
+        let inline ignore (m : State<'s, 'a>) = m |> map ignore
 
-        let get<'s> : State<'s, 's> = { new State<'s,'s>() with member x.Run(s) = !s }
-        let put (ns : 's) : State<'s, unit> = { new State<'s, obj>() with member x.Run(s) = s := ns; null } |> ignore
-        let modify (ns : 's -> 's) : State<'s, unit> = { new State<'s, obj>() with member x.Run(s) = s := ns !s; null } |> ignore
-        let run (s : 's) (m : State<'s, 'a>) =
+        let inline get<'s> : State<'s, 's> = { new State<'s,'s>() with member x.Run(s) = !s }
+        let inline put (ns : 's) : State<'s, unit> = { new State<'s, obj>() with member x.Run(s) = s := ns; null } |> ignore
+        let inline modify (ns : 's -> 's) : State<'s, unit> = { new State<'s, obj>() with member x.Run(s) = s := ns !s; null } |> ignore
+        let inline run (s : 's) (m : State<'s, 'a>) =
             let r = ref s
             let v = m.Run(r)
             !r, v
 
-        let custom (f : 's -> 's * 'a) =
+        let inline custom (f : 's -> 's * 'a) =
             { new State<'s, 'a>() with 
                 member x.Run(s) =
                     let (ns, r) = f !s
@@ -885,19 +885,19 @@ module ExprExtensions =
             }
 
     type StateBuilder() =
-        member x.Return(v) = State.value v
-        member x.Bind(m : State<'s, 'a>, f : 'a -> State<'s, 'b>) = State.bind f m 
-        member x.Zero() = State.value ()
-        member x.Delay(f : unit -> State<'s, 'a>) = { new State<'s, 'a>() with member x.Run(s) = f().Run(s) }
-        member x.Combine(l : State<'s, unit>, r : State<'s, 'a>) = l |> State.bind (fun () -> r)
-        member x.ReturnFrom(m : State<'s, 'a>) = m
-        member x.For(seq : seq<'a>, f : 'a -> State<'s, unit>) =
+        member inline x.Return(v) = State.value v
+        member inline x.Bind(m : State<'s, 'a>, f : 'a -> State<'s, 'b>) = State.bind f m 
+        member inline x.Zero() = State.value ()
+        member inline x.Delay(f : unit -> State<'s, 'a>) = { new State<'s, 'a>() with member x.Run(s) = f().Run(s) }
+        member inline x.Combine(l : State<'s, unit>, r : State<'s, 'a>) = l |> State.bind (fun () -> r)
+        member inline x.ReturnFrom(m : State<'s, 'a>) = m
+        member inline x.For(seq : seq<'a>, f : 'a -> State<'s, unit>) =
             { new State<'s, obj>() with
                 override x.Run(s) =
                     for e in seq do f(e).Run(s)
                     null
             } |> State.ignore
-        member x.While(guard : unit -> bool, f : State<'s, unit>) =
+        member inline x.While(guard : unit -> bool, f : State<'s, unit>) =
             { new State<'s, obj>() with
                 override x.Run(s) =
                     while guard() do f.Run(s)
@@ -992,7 +992,7 @@ module StateExtensions =
 module Helpers = 
     open System.Text.RegularExpressions
 
-    let rx = Regex @"(?<name>.*)`[0-9]+"
+    let cleanTypeNameRx = Regex @"(.*)`[0-9]+"
 
     let private typeNameCache = Dict<Type, string>(Unchecked.hash, Unchecked.equals)
     let private methodNameCache = Dict<MethodBase, string>(Unchecked.hash, Unchecked.equals)
@@ -1033,10 +1033,10 @@ module Helpers =
                 //else
                 let selfName = 
                     if t.IsGenericType then
-                        let m = rx.Match t.Name
+                        let m = cleanTypeNameRx.Match t.Name
                         let targs = t.GetGenericArguments()
                         let targstr = targs |> Seq.map typeName |> String.concat "_"
-                        m.Groups.["name"].Value + string targs.Length + "_" + targstr
+                        m.Groups.[1].Value + string targs.Length + "_" + targstr
                     else
                         t.Name
 
@@ -1053,9 +1053,9 @@ module Helpers =
                 | :? MethodInfo as mi -> 
                     let selfName =
                         if mi.IsGenericMethod then
-                            let m = rx.Match mi.Name
+                            let m = cleanTypeNameRx.Match mi.Name
                             let targs = mi.GetGenericArguments() |> Seq.map typeName |> String.concat "_"
-                            m.Groups.["name"].Value + "_" + targs
+                            m.Groups.[1].Value + "_" + targs
                         else
                             mi.Name
                     (typeName mi.DeclaringType) + "_" + selfName

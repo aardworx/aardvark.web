@@ -1,1946 +1,1932 @@
 ﻿namespace FShade
 
-//open System
-//open System.Reflection
+open System
+open System.Reflection
 
-//open Microsoft.FSharp.Quotations
-//open Microsoft.FSharp.Quotations.Patterns
-//open Microsoft.FSharp.Quotations.DerivedPatterns
-//open Microsoft.FSharp.Quotations.ExprShape
-//open Microsoft.FSharp.Reflection
+open Microsoft.FSharp.Quotations
+open Microsoft.FSharp.Quotations.Patterns
+open Microsoft.FSharp.Quotations.DerivedPatterns
+open Microsoft.FSharp.Quotations.ExprShape
+open Microsoft.FSharp.Reflection
 
-//open Aardvark.Base
-//open FShade.Imperative
+open Aardvark.Base
+open FShade.Imperative
 
-//[<AutoOpen>]
-//module Optimizer =
-//    module UtilityFunction =
+[<AutoOpen>]
+module Optimizer =
+    //module UtilityFunction =
 
-//        let rec singleReturn (e : Expr) =
-//            match e with
-//            | Lambda(_, b) ->
-//                singleReturn b
-//            | Sequential(_, r) -> 
-//                singleReturn r
-//            | IfThenElse _ ->
-//                false
-//            | LetRecursive(_, b)
-//            | Let(_, _, b) ->
-//                singleReturn b
+    //    let rec singleReturn (e : Expr) =
+    //        match e with
+    //        | Lambda(_, b) ->
+    //            singleReturn b
+    //        | Sequential(_, r) -> 
+    //            singleReturn r
+    //        | IfThenElse _ ->
+    //            false
+    //        | LetRecursive(_, b)
+    //        | Let(_, _, b) ->
+    //            singleReturn b
 
 
-//            | e ->
-//                true
+    //        | e ->
+    //            true
             
 
-//        let rec subsituteValue (s : Expr -> Expr) (e : Expr) =
-//            match e with
-//            | Lambda(v, b) ->
-//                Expr.Lambda(v, subsituteValue s b)
-//            | Sequential(l, r) -> 
-//                Expr.Sequential(l, subsituteValue s r)
-//            | IfThenElse(c, i, e) ->
-//                Expr.IfThenElse(c, subsituteValue s i, subsituteValue s e)
-//            | Let(v, e, b) ->
-//                Expr.Let(v, e, subsituteValue s b)
-//            | e ->
-//                s e
+    //    let rec subsituteValue (s : Expr -> Expr) (e : Expr) =
+    //        match e with
+    //        | Lambda(v, b) ->
+    //            Expr.Lambda(v, subsituteValue s b)
+    //        | Sequential(l, r) -> 
+    //            Expr.Sequential(l, subsituteValue s r)
+    //        | IfThenElse(c, i, e) ->
+    //            Expr.IfThenElse(c, subsituteValue s i, subsituteValue s e)
+    //        | Let(v, e, b) ->
+    //            Expr.Let(v, e, subsituteValue s b)
+    //        | e ->
+    //            s e
 
         
-//        let rec subsituteValueS (s : Expr -> State<'s, Expr>) (e : Expr) : State<'s, Expr> =
-//            state {
-//                match e with
-//                | Lambda(v, b) ->
-//                    let! b = subsituteValueS s b
-//                    return Expr.Lambda(v, b)
-//                | Sequential(l, r) -> 
-//                    let! r = subsituteValueS s r
-//                    return Expr.Sequential(l, r)
-//                | IfThenElse(c, i, e) ->
-//                    let! i = subsituteValueS s i
-//                    let! e = subsituteValueS s e
-//                    return Expr.IfThenElse(c, i, e)
-//                | Let(v, e, b) ->
-//                    let! b = subsituteValueS s b
-//                    return Expr.Let(v, e, b)
-//                | e ->
-//                    return! s e
-//            }
+    //    let rec subsituteValueS (s : Expr -> State<'s, Expr>) (e : Expr) : State<'s, Expr> =
+    //        state {
+    //            match e with
+    //            | Lambda(v, b) ->
+    //                let! b = subsituteValueS s b
+    //                return Expr.Lambda(v, b)
+    //            | Sequential(l, r) -> 
+    //                let! r = subsituteValueS s r
+    //                return Expr.Sequential(l, r)
+    //            | IfThenElse(c, i, e) ->
+    //                let! i = subsituteValueS s i
+    //                let! e = subsituteValueS s e
+    //                return Expr.IfThenElse(c, i, e)
+    //            | Let(v, e, b) ->
+    //                let! b = subsituteValueS s b
+    //                return Expr.Let(v, e, b)
+    //            | e ->
+    //                return! s e
+    //        }
 
-//        let rec (|TrivialOrInput|_|) (e : Expr) =
-//            match e with
-//                | Var _ 
-//                | Value _
-//                | FieldGet(None, _)
-//                | PropertyGet(None, _, [])
-//                | TupleGet(Trivial, _)
-//                | PropertyGet(Some TrivialOrInput, (FSharpTypeProperty | ArrayLengthProperty), [])
-//                | FieldGet(Some TrivialOrInput, _) 
-//                | ReadInput(_, _, None) 
-//                | ReadInput(_, _, Some TrivialOrInput) -> 
-//                    Some()
-//                | _ ->
-//                    None
+    //    let rec (|TrivialOrInput|_|) (e : Expr) =
+    //        match e with
+    //            | Var _ 
+    //            | Value _
+    //            | FieldGet(None, _)
+    //            | PropertyGet(None, _, [])
+    //            | TupleGet(Trivial, _)
+    //            | PropertyGet(Some TrivialOrInput, (FSharpTypeProperty | ArrayLengthProperty), [])
+    //            | FieldGet(Some TrivialOrInput, _) 
+    //            | ReadInput(_, _, None) 
+    //            | ReadInput(_, _, Some TrivialOrInput) -> 
+    //                Some()
+    //            | _ ->
+    //                None
 
-//        let inlineCode (f : UtilityFunction) (args : list<Expr>) =
-//            let rec wrap (v : list<Var>) (e : list<Expr>) (b : Expr) =
-//                match v, e with
-//                    | [], [] -> 
-//                        b
+    //    let inlineCode (f : UtilityFunction) (args : list<Expr>) =
+    //        let rec wrap (v : list<Var>) (e : list<Expr>) (b : Expr) =
+    //            match v, e with
+    //                | [], [] -> 
+    //                    b
 
-//                    | v :: vs, (TrivialOrInput as ev) :: es ->
-//                        let b = b.Substitute(fun vi -> if vi = v then Some ev else None)
-//                        wrap vs es b
+    //                | v :: vs, (TrivialOrInput as ev) :: es ->
+    //                    let b = b.Substitute(fun vi -> if vi = v then Some ev else None)
+    //                    wrap vs es b
 
-//                    | v :: vs, e :: es ->
-//                        let useCnt = ref 0
-//                        let bt = b.Substitute(fun vi -> if vi = v then useCnt := !useCnt + 1; Some e else None)
-//                        if !useCnt <= 1 then
-//                            wrap vs es bt
-//                        else
-//                            Expr.Let(v,e, wrap vs es b)
+    //                | v :: vs, e :: es ->
+    //                    let useCnt = ref 0
+    //                    let bt = b.Substitute(fun vi -> if vi = v then useCnt := !useCnt + 1; Some e else None)
+    //                    if !useCnt <= 1 then
+    //                        wrap vs es bt
+    //                    else
+    //                        Expr.Let(v,e, wrap vs es b)
 
-//                    | _ ->
-//                        failwithf "[FShade] bad arity for utility function call"
+    //                | _ ->
+    //                    failwithf "[FShade] bad arity for utility function call"
 
-//            wrap f.functionArguments args f.functionBody
+    //        wrap f.functionArguments args f.functionBody
 
-//    [<AutoOpen>]
-//    module Helpers = 
-//        module State =
-//            let withLocalState (m : State<'s, 'a>) =
-//                State.get |> State.map (fun s ->
-//                    m |> State.run s
-//                )
+    //[<AutoOpen>]
+    //module Helpers = 
+    //    module State =
+    //        let withLocalState (m : State<'s, 'a>) =
+    //            State.get |> State.map (fun s ->
+    //                m |> State.run s
+    //            )
 
-//        let rec (|LExpr|_|) (e : Expr) =
-//            // TODO: complete?
-//            match e with
-//                | Var v -> Some v
-//                | FieldGet(Some (LExpr v), fi) -> Some v
-//                | PropertyGet(Some (LExpr v), _, _) -> Some v
-//                | GetArray(LExpr a, i) -> Some a
-//                | _ -> None
+    //    let rec (|LExpr|_|) (e : Expr) =
+    //        // TODO: complete?
+    //        match e with
+    //            | Var v -> Some v
+    //            | FieldGet(Some (LExpr v), fi) -> Some v
+    //            | PropertyGet(Some (LExpr v), _, _) -> Some v
+    //            | GetArray(LExpr a, i) -> Some a
+    //            | _ -> None
 
-//        let rec (|MutableArgument|_|) (e : Expr) =
-//            match e with
-//                | Var v -> 
-//                    if v.IsMutable then
-//                        Some v
-//                    else
-//                        match v.Type with
-//                            //| ArrOf _ -> Some v
-//                            | ArrayOf _ -> Some v
-//                            | Ref _ -> Some v
-//                            | _ -> None
-//                | GetArray(Var v, _) -> Some v
+    //    let rec (|MutableArgument|_|) (e : Expr) =
+    //        match e with
+    //            | Var v -> 
+    //                if v.IsMutable then
+    //                    Some v
+    //                else
+    //                    match v.Type with
+    //                        //| ArrOf _ -> Some v
+    //                        | ArrayOf _ -> Some v
+    //                        | Ref _ -> Some v
+    //                        | _ -> None
+    //            | GetArray(Var v, _) -> Some v
 
-//                | RefOf (MutableArgument v) -> Some v
-//                | AddressOf (MutableArgument v) -> Some v
-//                | _ -> None
+    //            | RefOf (MutableArgument v) -> Some v
+    //            | AddressOf (MutableArgument v) -> Some v
+    //            | _ -> None
 
-//        let rec (|StorageArgument|_|) (e : Expr) =
-//            match e with
-//                | RefOf (GetArray(ReadInput(ParameterKind.Uniform, _, _), _)) ->
-//                    Some ()
-//                | _ ->
-//                    None
+    //    let rec (|StorageArgument|_|) (e : Expr) =
+    //        match e with
+    //            | RefOf (GetArray(ReadInput(ParameterKind.Uniform, _, _), _)) ->
+    //                Some ()
+    //            | _ ->
+    //                None
 
-//    /// The dead code elimination removes unused bindings from the code
-//    /// e.g. `let a = someFunction(x,y) in 10` gets reduced to `10` assuming
-//    /// that all functions are pure except the ones identified by the given function.
-//    /// this handling seems proper since most GLSL functions are pure (except for discard, EmitVertex, etc.)
-//    module DeadCodeElimination = 
+    ///// The dead code elimination removes unused bindings from the code
+    ///// e.g. `let a = someFunction(x,y) in 10` gets reduced to `10` assuming
+    ///// that all functions are pure except the ones identified by the given function.
+    ///// this handling seems proper since most GLSL functions are pure (except for discard, EmitVertex, etc.)
+    //module DeadCodeElimination = 
 
-//        type EliminationState =
-//            {
-//                isGlobalSideEffect : MethodInfo -> bool
-//                usedVariables : Set<Var>
-//            }
+    //    type EliminationState =
+    //        {
+    //            isGlobalSideEffect : MethodInfo -> bool
+    //            usedVariables : Set<Var>
+    //        }
 
 
-//        [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-//        module EliminationState =
-//            let empty = 
-//                { 
-//                    isGlobalSideEffect = fun mi -> mi.ReturnType = typeof<unit> || mi.ReturnType = typeof<System.Void>
-//                    usedVariables = Set.empty
-//                }
-//            let useVar (v : Var) = State.modify (fun s -> { s with usedVariables = Set.add v s.usedVariables })
-//            let remVar (v : Var) = State.modify (fun s -> { s with usedVariables = Set.remove v s.usedVariables })
-//            let isUsed (v : Var) = State.get |> State.map (fun s -> Set.contains v s.usedVariables)
-//            let useVars (vars : seq<Var>) = State.modify (fun s -> { s with usedVariables = Set.union (Set.ofSeq vars) s.usedVariables })
+    //    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    //    module EliminationState =
+    //        let empty = 
+    //            { 
+    //                isGlobalSideEffect = fun mi -> mi.ReturnType = typeof<unit> || mi.ReturnType = typeof<System.Void>
+    //                usedVariables = Set.empty
+    //            }
+    //        let useVar (v : Var) = State.modify (fun s -> { s with usedVariables = Set.add v s.usedVariables })
+    //        let remVar (v : Var) = State.modify (fun s -> { s with usedVariables = Set.remove v s.usedVariables })
+    //        let isUsed (v : Var) = State.get |> State.map (fun s -> Set.contains v s.usedVariables)
+    //        let useVars (vars : seq<Var>) = State.modify (fun s -> { s with usedVariables = Set.union (Set.ofSeq vars) s.usedVariables })
        
 
-//            let merge (l : EliminationState) (r : EliminationState) =
-//                {
-//                    isGlobalSideEffect = l.isGlobalSideEffect
-//                    usedVariables = Set.union l.usedVariables r.usedVariables
-//                }
+    //        let merge (l : EliminationState) (r : EliminationState) =
+    //            {
+    //                isGlobalSideEffect = l.isGlobalSideEffect
+    //                usedVariables = Set.union l.usedVariables r.usedVariables
+    //            }
 
-//            let rec fix (m : State<EliminationState, 'a>) =
-//                state {
-//                    let! initial = State.get
-//                    let! res = m
-//                    let! final = State.get
-//                    if initial.usedVariables = final.usedVariables then return res
-//                    else return! fix m
-//                }
+    //        let rec fix (m : State<EliminationState, 'a>) =
+    //            state {
+    //                let! initial = State.get
+    //                let! res = m
+    //                let! final = State.get
+    //                if initial.usedVariables = final.usedVariables then return res
+    //                else return! fix m
+    //            }
                 
-//        [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-//        module List =
-//            let rec existsS (f : 'a -> State<'s, bool>) (l : list<'a>) =
-//                state {
-//                    match l with
-//                        | [] -> return false
-//                        | h :: t ->
-//                            let! r = f h
-//                            if r then 
-//                                return true
-//                            else
-//                                return! existsS f t
-//                }
+    //    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    //    module List =
+    //        let rec existsS (f : 'a -> State<'s, bool>) (l : list<'a>) =
+    //            state {
+    //                match l with
+    //                    | [] -> return false
+    //                    | h :: t ->
+    //                        let! r = f h
+    //                        if r then 
+    //                            return true
+    //                        else
+    //                            return! existsS f t
+    //            }
 
-//        let private staticallyNeededCalls =
-//            HSet.ofList [
-//                MethodInfo.WriteOutputs
-//                MethodInfo.Unroll
-//            ]
+    //    let private staticallyNeededCalls =
+    //        HSet.ofList [
+    //            MethodInfo.WriteOutputs
+    //            MethodInfo.Unroll
+    //        ]
 
-//        let private callNeededS (t : Option<Expr>) (mi : MethodInfo) (args : list<Expr>) =
-//            state {
-//                let! state = State.get
+    //    let private callNeededS (t : Option<Expr>) (mi : MethodInfo) (args : list<Expr>) =
+    //        state {
+    //            let! state = State.get
 
-//                if state.isGlobalSideEffect mi || staticallyNeededCalls.Contains mi then
-//                    return true
-//                else
-//                    let needsMutableParameter (p : ParameterInfo) (v : Expr) =
-//                        let pt = p.ParameterType
-//                        if pt.IsByRef || pt.IsArray (* || pt.IsArr *) || pt.IsRef then
-//                            match v with
-//                                | MutableArgument v -> Set.contains v state.usedVariables
-//                                | StorageArgument -> true
-//                                | _ -> false
-//                        else
-//                            false
+    //            if state.isGlobalSideEffect mi || staticallyNeededCalls.Contains mi then
+    //                return true
+    //            else
+    //                let needsMutableParameter (p : ParameterInfo) (v : Expr) =
+    //                    let pt = p.ParameterType
+    //                    if pt.IsArray (* || pt.IsArr *) || pt.IsRef then
+    //                        match v with
+    //                            | MutableArgument v -> Set.contains v state.usedVariables
+    //                            | StorageArgument -> true
+    //                            | _ -> false
+    //                    else
+    //                        false
 
-//                    let parameters = mi.GetParameters() |> Array.toList
-//                    match t with
-//                        | Some t ->
-//                            match t with
-//                                | MutableArgument v when Set.contains v state.usedVariables -> 
-//                                    return true
-//                                | StorageArgument -> 
-//                                    return true
-//                                | _ -> 
-//                                    return List.exists2 needsMutableParameter parameters args
-//                        | None ->
-//                            return List.exists2 needsMutableParameter parameters args
-//            }
+    //                let parameters = mi.GetParameters() |> Array.toList
+    //                match t with
+    //                    | Some t ->
+    //                        match t with
+    //                            | MutableArgument v when Set.contains v state.usedVariables -> 
+    //                                return true
+    //                            | StorageArgument -> 
+    //                                return true
+    //                            | _ -> 
+    //                                return List.exists2 needsMutableParameter parameters args
+    //                    | None ->
+    //                        return List.exists2 needsMutableParameter parameters args
+    //        }
 
-//        let rec private hasSideEffectsS (e : Expr) =
-//            state {
-//                match e with
-//                    | CallFunction(utility, args) ->
-//                        let! aa = args |> List.existsS hasSideEffectsS
-//                        if aa then
-//                            return true
-//                        else
-//                            return! hasSideEffectsS utility.functionBody
-//                    | Call(t, mi, args) ->
-//                        let! ts = t |> Option.mapS hasSideEffectsS
-//                        match ts with
-//                            | Some true -> 
-//                                return true
-//                            | _ ->
-//                                let! aa = args |> List.existsS hasSideEffectsS
-//                                if aa then 
-//                                    return true
-//                                else
-//                                    let! state = State.get
+    //    let rec private hasSideEffectsS (e : Expr) =
+    //        state {
+    //            match e with
+    //                | CallFunction(utility, args) ->
+    //                    let! aa = args |> List.existsS hasSideEffectsS
+    //                    if aa then
+    //                        return true
+    //                    else
+    //                        return! hasSideEffectsS utility.functionBody
+    //                | Call(t, mi, args) ->
+    //                    let! ts = t |> Option.mapS hasSideEffectsS
+    //                    match ts with
+    //                        | Some true -> 
+    //                            return true
+    //                        | _ ->
+    //                            let! aa = args |> List.existsS hasSideEffectsS
+    //                            if aa then 
+    //                                return true
+    //                            else
+    //                                let! state = State.get
 
-//                                    if state.isGlobalSideEffect mi || staticallyNeededCalls.Contains mi then
-//                                        return true
-//                                    else
-//                                        return false
+    //                                if state.isGlobalSideEffect mi || staticallyNeededCalls.Contains mi then
+    //                                    return true
+    //                                else
+    //                                    return false
 
-//                    | ShapeLambda(_,b) ->
-//                        return! hasSideEffectsS b
+    //                | ShapeLambda(_,b) ->
+    //                    return! hasSideEffectsS b
 
-//                    | ShapeVar _ ->
-//                        return false
+    //                | ShapeVar _ ->
+    //                    return false
 
-//                    | ShapeCombination(o, args) ->
-//                        return! List.existsS hasSideEffectsS args
-//            }
+    //                | ShapeCombination(o, args) ->
+    //                    return! List.existsS hasSideEffectsS args
+    //        }
 
-//        let rec withoutValueS (e : Expr) : State<EliminationState, Expr> =
-//            state {
-//                match e with
-//                    | ExprOf t when t = typeof<unit> ->
-//                        return! eliminateDeadCodeS e
+    //    let rec withoutValueS (e : Expr) : State<EliminationState, Expr> =
+    //        state {
+    //            match e with
+    //                | ExprOf t when t = typeof<unit> ->
+    //                    return! eliminateDeadCodeS e
 
                     
-//                    | IfThenElse(cond, i, e) ->
-//                        let! elseState, e = State.withLocalState (withoutValueS e)
-//                        let! ifState, i = State.withLocalState (withoutValueS i)
-//                        do! State.put (EliminationState.merge ifState elseState)
+    //                | IfThenElse(cond, i, e) ->
+    //                    let! elseState, e = State.withLocalState (withoutValueS e)
+    //                    let! ifState, i = State.withLocalState (withoutValueS i)
+    //                    do! State.put (EliminationState.merge ifState elseState)
                     
-//                        match i, e with
-//                            | Unit, Unit -> 
-//                                return! withoutValueS cond
-//                            | _ ->
-//                                let! cond = eliminateDeadCodeS cond
-//                                return Expr.IfThenElse(cond, i, e)
+    //                    match i, e with
+    //                        | Unit, Unit -> 
+    //                            return! withoutValueS cond
+    //                        | _ ->
+    //                            let! cond = eliminateDeadCodeS cond
+    //                            return Expr.IfThenElse(cond, i, e)
 
-//                    | AddressOf e ->
-//                        return! withoutValueS e
+    //                | AddressOf e ->
+    //                    return! withoutValueS e
 
-//                    | AddressSet(e,v) ->
-//                        let! v = withoutValueS v
-//                        let! e = withoutValueS e
-//                        return Expr.Seq [v; e]
+    //                | AddressSet(e,v) ->
+    //                    let! v = withoutValueS v
+    //                    let! e = withoutValueS e
+    //                    return Expr.Seq [v; e]
 
-//                    | Application(l, a) ->
-//                        let! a = eliminateDeadCodeS a
-//                        let! l = eliminateDeadCodeS l
-//                        return Expr.Application(l, a)
+    //                | Application(l, a) ->
+    //                    let! a = eliminateDeadCodeS a
+    //                    let! l = eliminateDeadCodeS l
+    //                    return Expr.Application(l, a)
 
-//                    | CallFunction(utility, args) ->
-//                        let! sideEffects = hasSideEffectsS utility.functionBody
-//                        if sideEffects then
-//                            let! self = eliminateDeadCodeS e
-//                            if self.Type = typeof<unit> then
-//                                return e
-//                            else
-//                                return Expr.Ignore e
-//                        else
-//                            return Expr.Unit
+    //                | CallFunction(utility, args) ->
+    //                    let! sideEffects = hasSideEffectsS utility.functionBody
+    //                    if sideEffects then
+    //                        let! self = eliminateDeadCodeS e
+    //                        if self.Type = typeof<unit> then
+    //                            return e
+    //                        else
+    //                            return Expr.Ignore e
+    //                    else
+    //                        return Expr.Unit
 
-//                    | Call(t, mi, args) ->
-//                        let! needed = callNeededS t mi args
+    //                | Call(t, mi, args) ->
+    //                    let! needed = callNeededS t mi args
 
-//                        if needed then
-//                            let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-//                            let! t = t |> Option.mapS eliminateDeadCodeS
+    //                    if needed then
+    //                        let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+    //                        let! t = t |> Option.mapS eliminateDeadCodeS
 
-//                            match t with
-//                                | Some t -> return Expr.Call(t, mi, args) |> Expr.Ignore
-//                                | None -> return Expr.Call(mi, args) |> Expr.Ignore
-//                        else
-//                            let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
-//                            let! t = t |> Option.mapS withoutValueS
+    //                        match t with
+    //                            | Some t -> return Expr.Call(t, mi, args) |> Expr.Ignore
+    //                            | None -> return Expr.Call(mi, args) |> Expr.Ignore
+    //                    else
+    //                        let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+    //                        let! t = t |> Option.mapS withoutValueS
 
-//                            match t with
-//                                | Some t -> return Expr.Seq (t :: args)
-//                                | None -> return Expr.Seq args            
+    //                        match t with
+    //                            | Some t -> return Expr.Seq (t :: args)
+    //                            | None -> return Expr.Seq args            
 
 
-//                    | Coerce(e,t) ->
-//                        return! withoutValueS e
+    //                | Coerce(e,t) ->
+    //                    return! withoutValueS e
 
-//                    | DefaultValue t ->
-//                        return Expr.Unit
+    //                | DefaultValue t ->
+    //                    return Expr.Unit
 
-//                    | FieldGet(None, _) -> 
-//                        return Expr.Unit
+    //                | FieldGet(None, _) -> 
+    //                    return Expr.Unit
 
-//                    | FieldGet(Some t, _) ->
-//                        return! withoutValueS t
+    //                | FieldGet(Some t, _) ->
+    //                    return! withoutValueS t
 
-//                    | Lambda(v, b) ->
-//                        return Expr.Unit
+    //                | Lambda(v, b) ->
+    //                    return Expr.Unit
 
-//                    | LetRecursive _ ->
-//                        return failwith "recursive bindings not implemented"
+    //                | LetRecursive _ ->
+    //                    return failwith "recursive bindings not implemented"
                     
-//                    | Let(v,e,b) ->
-//                        let! b = withoutValueS b
-//                        let! vUsed = EliminationState.isUsed v
-//                        if vUsed then
-//                            let! e = eliminateDeadCodeS e
-//                            return Expr.Let(v, e, b)
+    //                | Let(v,e,b) ->
+    //                    let! b = withoutValueS b
+    //                    let! vUsed = EliminationState.isUsed v
+    //                    if vUsed then
+    //                        let! e = eliminateDeadCodeS e
+    //                        return Expr.Let(v, e, b)
 
-//                        else
-//                            let! e = withoutValueS e
-//                            match e with
-//                                | Unit -> return b
-//                                | _ -> return Expr.Sequential(e, b)
+    //                    else
+    //                        let! e = withoutValueS e
+    //                        match e with
+    //                            | Unit -> return b
+    //                            | _ -> return Expr.Sequential(e, b)
 
-//                    | NewArray(t, args) ->
-//                        let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
-//                        return Expr.Seq args
+    //                | NewArray(t, args) ->
+    //                    let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+    //                    return Expr.Seq args
 
-//                    | NewDelegate(t, vars, e) ->
-//                        return! withoutValueS e
+    //                | NewDelegate(t, vars, e) ->
+    //                    return! withoutValueS e
   
-//                    | NewObject(ctor, args) ->
-//                        let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
-//                        return Expr.Seq args
+    //                | NewObject(ctor, args) ->
+    //                    let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+    //                    return Expr.Seq args
 
-//                    | NewRecord(t, args) ->
-//                        let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
-//                        return Expr.Seq args
+    //                | NewRecord(t, args) ->
+    //                    let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+    //                    return Expr.Seq args
 
-//                    | NewTuple(args) ->
-//                        let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
-//                        return Expr.Seq args
+    //                | NewTuple(args) ->
+    //                    let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+    //                    return Expr.Seq args
 
-//                    | NewUnionCase(ci, args) ->
-//                        let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
-//                        return Expr.Seq args
+    //                | NewUnionCase(ci, args) ->
+    //                    let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+    //                    return Expr.Seq args
 
 
-//                    | PropertyGet(None, pi, idx) ->
-//                        let! idx = idx |> List.rev |> List.mapS withoutValueS |> State.map List.rev
-//                        return Expr.Seq idx
+    //                | PropertyGet(None, pi, idx) ->
+    //                    let! idx = idx |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+    //                    return Expr.Seq idx
 
-//                    | PropertyGet(Some t, pi, idx) ->
-//                        let! idx = idx |> List.rev |> List.mapS withoutValueS |> State.map List.rev
-//                        let! t = withoutValueS t
-//                        return Expr.Seq (t :: idx)
+    //                | PropertyGet(Some t, pi, idx) ->
+    //                    let! idx = idx |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+    //                    let! t = withoutValueS t
+    //                    return Expr.Seq (t :: idx)
                     
-//                    | QuoteRaw _ | QuoteTyped _ -> 
-//                        return failwith "not implemented"
+    //                | QuoteRaw _ | QuoteTyped _ -> 
+    //                    return failwith "not implemented"
 
-//                    | Sequential(l, r) ->
-//                        let! r = withoutValueS r
-//                        let! l = withoutValueS l
-//                        match l, r with
-//                            | Unit, r   -> return r
-//                            | l, Unit   -> return l
-//                            | l, r      -> return Expr.Sequential(l, r)
+    //                | Sequential(l, r) ->
+    //                    let! r = withoutValueS r
+    //                    let! l = withoutValueS l
+    //                    match l, r with
+    //                        | Unit, r   -> return r
+    //                        | l, Unit   -> return l
+    //                        | l, r      -> return Expr.Sequential(l, r)
 
-//                    | TryWith _ | TryFinally _ -> 
-//                        return failwith "not implemented"
+    //                | TryWith _ | TryFinally _ -> 
+    //                    return failwith "not implemented"
 
-//                    | TupleGet(t, i) ->
-//                        return! withoutValueS t
+    //                | TupleGet(t, i) ->
+    //                    return! withoutValueS t
 
-//                    | TypeTest(e, t) ->
-//                        return! withoutValueS e
+    //                | TypeTest(e, t) ->
+    //                    return! withoutValueS e
 
-//                    | UnionCaseTest(e, ci) ->
-//                        return! withoutValueS e
+    //                | UnionCaseTest(e, ci) ->
+    //                    return! withoutValueS e
 
-//                    | Value _ ->
-//                        return Expr.Unit
+    //                | Value _ ->
+    //                    return Expr.Unit
 
-//                    | Var v ->
-//                        return Expr.Unit
+    //                | Var v ->
+    //                    return Expr.Unit
 
-//                    | _ ->
-//                        return failwith ""
+    //                | _ ->
+    //                    return failwith ""
 
         
-//            }
+    //        }
 
-//        and eliminateDeadCodeS (e : Expr) : State<EliminationState, Expr> =
-//            state {
-//                match e with
+    //    and eliminateDeadCodeS (e : Expr) : State<EliminationState, Expr> =
+    //        state {
+    //            match e with
 
-//                    // side effects affecting variables
-//                    | VarSet(v, e) ->
-//                        let! vUsed = EliminationState.isUsed v
-//                        if vUsed then
-//                            let! e = eliminateDeadCodeS e
-//                            return Expr.VarSet(v, e)
-//                        else
-//                            return! withoutValueS e
+    //                // side effects affecting variables
+    //                | VarSet(v, e) ->
+    //                    let! vUsed = EliminationState.isUsed v
+    //                    if vUsed then
+    //                        let! e = eliminateDeadCodeS e
+    //                        return Expr.VarSet(v, e)
+    //                    else
+    //                        return! withoutValueS e
 
-//                    | FieldSet(Some (LExpr v as target), fi, value) ->
-//                        let! vUsed = EliminationState.isUsed v
-//                        if vUsed then
-//                            let! value = eliminateDeadCodeS value
-//                            let! target = eliminateDeadCodeS target
-//                            return Expr.FieldSet(target, fi, value)
-//                        else
-//                            let! v = withoutValueS value
-//                            let! t = withoutValueS target
-//                            return Expr.Seq [v;t]
+    //                | FieldSet(Some (LExpr v as target), fi, value) ->
+    //                    let! vUsed = EliminationState.isUsed v
+    //                    if vUsed then
+    //                        let! value = eliminateDeadCodeS value
+    //                        let! target = eliminateDeadCodeS target
+    //                        return Expr.FieldSet(target, fi, value)
+    //                    else
+    //                        let! v = withoutValueS value
+    //                        let! t = withoutValueS target
+    //                        return Expr.Seq [v;t]
 
-//                    | PropertySet(Some (LExpr v as target), pi, idx, value) ->
-//                        let! vUsed = EliminationState.isUsed v
-//                        if vUsed then
-//                            let! value = eliminateDeadCodeS value
-//                            let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-//                            let! target = eliminateDeadCodeS target
-//                            return Expr.PropertySet(target, pi, value, idx)
-//                        else 
-//                            let! value = withoutValueS value
-//                            let! idx = idx |> List.rev |> List.mapS withoutValueS |> State.map List.rev
-//                            let! target = withoutValueS target
+    //                | PropertySet(Some (LExpr v as target), pi, idx, value) ->
+    //                    let! vUsed = EliminationState.isUsed v
+    //                    if vUsed then
+    //                        let! value = eliminateDeadCodeS value
+    //                        let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+    //                        let! target = eliminateDeadCodeS target
+    //                        return Expr.PropertySet(target, pi, value, idx)
+    //                    else 
+    //                        let! value = withoutValueS value
+    //                        let! idx = idx |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+    //                        let! target = withoutValueS target
 
-//                            return Expr.Seq [
-//                                yield target
-//                                yield! idx
-//                                yield value
-//                            ]
+    //                        return Expr.Seq [
+    //                            yield target
+    //                            yield! idx
+    //                            yield value
+    //                        ]
 
-//                    // global side effects
-//                    | FieldSet(None, f, value) ->
-//                        let! value = eliminateDeadCodeS value
-//                        return Expr.FieldSet(f, value)
+    //                // global side effects
+    //                | FieldSet(None, f, value) ->
+    //                    let! value = eliminateDeadCodeS value
+    //                    return Expr.FieldSet(f, value)
 
-//                    | PropertySet(None, pi, idx, value) ->
-//                        let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-//                        let! value = eliminateDeadCodeS value
-//                        return Expr.PropertySet(pi, value, idx)
+    //                | PropertySet(None, pi, idx, value) ->
+    //                    let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+    //                    let! value = eliminateDeadCodeS value
+    //                    return Expr.PropertySet(pi, value, idx)
 
-//                    // unknown side effects
-//                    | FieldSet(Some t, f, value) ->
-//                        Log.warn "[FShade] found FieldSet on unknown expression: %A" t
-//                        let! value = eliminateDeadCodeS value
-//                        let! t = eliminateDeadCodeS t
-//                        return Expr.FieldSet(t, f, value)
+    //                // unknown side effects
+    //                | FieldSet(Some t, f, value) ->
+    //                    Log.warn "[FShade] found FieldSet on unknown expression: %A" t
+    //                    let! value = eliminateDeadCodeS value
+    //                    let! t = eliminateDeadCodeS t
+    //                    return Expr.FieldSet(t, f, value)
 
-//                    | PropertySet(Some t, pi, idx, value) ->
-//                        Log.warn "[FShade] found PropertySet on unknown expression: %A" t
-//                        let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-//                        let! value = eliminateDeadCodeS value
-//                        let! t = eliminateDeadCodeS t
-//                        return Expr.PropertySet(t, pi, value, idx)
+    //                | PropertySet(Some t, pi, idx, value) ->
+    //                    Log.warn "[FShade] found PropertySet on unknown expression: %A" t
+    //                    let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+    //                    let! value = eliminateDeadCodeS value
+    //                    let! t = eliminateDeadCodeS t
+    //                    return Expr.PropertySet(t, pi, value, idx)
 
 
-//                    // control-flow
-//                    | IfThenElse(cond, i, e) ->
-//                        let! elseState, e = State.withLocalState (eliminateDeadCodeS e)
-//                        let! ifState, i = State.withLocalState (eliminateDeadCodeS i)
-//                        do! State.put (EliminationState.merge ifState elseState)
+    //                // control-flow
+    //                | IfThenElse(cond, i, e) ->
+    //                    let! elseState, e = State.withLocalState (eliminateDeadCodeS e)
+    //                    let! ifState, i = State.withLocalState (eliminateDeadCodeS i)
+    //                    do! State.put (EliminationState.merge ifState elseState)
 
-//                        match i, e with
-//                            | Unit, Unit ->
-//                                return! withoutValueS cond
-//                            | _ ->
-//                                let! cond = eliminateDeadCodeS cond
-//                                return Expr.IfThenElse(cond, i, e)
+    //                    match i, e with
+    //                        | Unit, Unit ->
+    //                            return! withoutValueS cond
+    //                        | _ ->
+    //                            let! cond = eliminateDeadCodeS cond
+    //                            return Expr.IfThenElse(cond, i, e)
 
-//                    | ForEach(v, seq, body) ->
-//                        let iterate =
-//                            state {
-//                                let! body = eliminateDeadCodeS body
-//                                match body with
-//                                    | Unit ->
-//                                        return! withoutValueS seq
-//                                    | _ ->
-//                                        let! seq = eliminateDeadCodeS seq
-//                                        return Expr.ForEach(v, seq, body)
+    //                | ForEach(v, seq, body) ->
+    //                    let iterate =
+    //                        state {
+    //                            let! body = eliminateDeadCodeS body
+    //                            match body with
+    //                                | Unit ->
+    //                                    return! withoutValueS seq
+    //                                | _ ->
+    //                                    let! seq = eliminateDeadCodeS seq
+    //                                    return Expr.ForEach(v, seq, body)
                                     
-//                            }
-//                        return! EliminationState.fix iterate
+    //                        }
+    //                    return! EliminationState.fix iterate
 
-//                    | ForInteger(v, first, step, last, body) ->
-//                        let iterate =
-//                            state {
-//                                let! body = eliminateDeadCodeS body
-//                                match body with
-//                                    | Unit ->
-//                                        let! last = withoutValueS last
-//                                        let! step = withoutValueS step
-//                                        let! first = withoutValueS first
-//                                        return Expr.Seq [first; step; last]
-//                                    | _ ->
-//                                        let! last = eliminateDeadCodeS last
-//                                        let! step = eliminateDeadCodeS step
-//                                        let! first = eliminateDeadCodeS first
-//                                        return Expr.ForInteger(v, first, step, last, body)
+    //                | ForInteger(v, first, step, last, body) ->
+    //                    let iterate =
+    //                        state {
+    //                            let! body = eliminateDeadCodeS body
+    //                            match body with
+    //                                | Unit ->
+    //                                    let! last = withoutValueS last
+    //                                    let! step = withoutValueS step
+    //                                    let! first = withoutValueS first
+    //                                    return Expr.Seq [first; step; last]
+    //                                | _ ->
+    //                                    let! last = eliminateDeadCodeS last
+    //                                    let! step = eliminateDeadCodeS step
+    //                                    let! first = eliminateDeadCodeS first
+    //                                    return Expr.ForInteger(v, first, step, last, body)
                                     
-//                            }
+    //                        }
 
-//                        return! EliminationState.fix iterate
+    //                    return! EliminationState.fix iterate
 
-//                    | WhileLoop(guard, body) ->
-//                        let iterate =
-//                            state {
-//                                let! body = eliminateDeadCodeS body
-//                                match body with
-//                                    | Unit -> 
-//                                        let! guardState, guard = State.withLocalState (withoutValueS guard)
-//                                        match guard with
-//                                            | Unit ->
-//                                                do! State.put guardState
-//                                                return Expr.Unit
-//                                            | _ -> 
-//                                                let! guard = eliminateDeadCodeS guard
-//                                                return Expr.WhileLoop(guard, body)
-//                                    | _ ->
-//                                        let! guard = eliminateDeadCodeS guard
-//                                        return Expr.WhileLoop(guard, body)
-//                            }
+    //                | WhileLoop(guard, body) ->
+    //                    let iterate =
+    //                        state {
+    //                            let! body = eliminateDeadCodeS body
+    //                            match body with
+    //                                | Unit -> 
+    //                                    let! guardState, guard = State.withLocalState (withoutValueS guard)
+    //                                    match guard with
+    //                                        | Unit ->
+    //                                            do! State.put guardState
+    //                                            return Expr.Unit
+    //                                        | _ -> 
+    //                                            let! guard = eliminateDeadCodeS guard
+    //                                            return Expr.WhileLoop(guard, body)
+    //                                | _ ->
+    //                                    let! guard = eliminateDeadCodeS guard
+    //                                    return Expr.WhileLoop(guard, body)
+    //                        }
 
-//                        return! EliminationState.fix iterate
+    //                    return! EliminationState.fix iterate
 
 
-//                    | Ignore e ->
-//                        return! withoutValueS e
+    //                | Ignore e ->
+    //                    return! withoutValueS e
 
-//                    | AddressOf e ->
-//                        let! e = eliminateDeadCodeS e
-//                        return Expr.AddressOf(e)
+    //                | AddressOf e ->
+    //                    let! e = eliminateDeadCodeS e
+    //                    return Expr.AddressOf(e)
 
-//                    | AddressSet(e,v) ->
-//                        let! v = eliminateDeadCodeS v
-//                        let! e = eliminateDeadCodeS e
-//                        return Expr.AddressSet(e, v)
+    //                | AddressSet(e,v) ->
+    //                    let! v = eliminateDeadCodeS v
+    //                    let! e = eliminateDeadCodeS e
+    //                    return Expr.AddressSet(e, v)
 
-//                    | Application(l, a) ->
-//                        let! a = eliminateDeadCodeS a
-//                        let! l = eliminateDeadCodeS l
-//                        return Expr.Application(l, a)
+    //                | Application(l, a) ->
+    //                    let! a = eliminateDeadCodeS a
+    //                    let! l = eliminateDeadCodeS l
+    //                    return Expr.Application(l, a)
            
-//                    | CallFunction(utility, args) ->
-//                        // TODO: is the call needed???
-//                        let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-//                        let! s = State.get
+    //                | CallFunction(utility, args) ->
+    //                    // TODO: is the call needed???
+    //                    let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+    //                    let! s = State.get
 
-//                        let utility =
-//                            utility |> UtilityFunction.map (fun b ->
-//                                let innerState = ref { EliminationState.empty with isGlobalSideEffect = s.isGlobalSideEffect }
+    //                    let utility =
+    //                        utility |> UtilityFunction.map (fun b ->
+    //                            let innerState = ref { EliminationState.empty with isGlobalSideEffect = s.isGlobalSideEffect }
 
-//                                for (v, a) in List.zip args utility.functionArguments do
-//                                    let isMutable = a.IsMutable (* || a.Type.IsArr *) || a.Type.IsArray || a.Type.IsRef
-//                                    let isUsed =
-//                                        match v with
-//                                            | LExpr v 
-//                                            | RefOf (LExpr v) -> Set.contains v s.usedVariables
-//                                            | _ -> false
+    //                            for (v, a) in List.zip args utility.functionArguments do
+    //                                let isMutable = a.IsMutable (* || a.Type.IsArr *) || a.Type.IsArray || a.Type.IsRef
+    //                                let isUsed =
+    //                                    match v with
+    //                                        | LExpr v 
+    //                                        | RefOf (LExpr v) -> Set.contains v s.usedVariables
+    //                                        | _ -> false
 
-//                                    if isMutable && isUsed then
-//                                        innerState := { !innerState with usedVariables = Set.add a innerState.Value.usedVariables }
+    //                                if isMutable && isUsed then
+    //                                    innerState := { !innerState with usedVariables = Set.add a innerState.Value.usedVariables }
                                         
 
-//                                let res = eliminateDeadCodeS(b).Run(innerState)
-//                                res
-//                            )
+    //                            let res = eliminateDeadCodeS(b).Run(innerState)
+    //                            res
+    //                        )
 
-//                        let usedVariables = utility.functionBody.GetFreeVars() |> Set.ofSeq
-//                        let allArgsUsed = List.forall (fun v -> Set.contains v usedVariables) utility.functionArguments
+    //                    let usedVariables = utility.functionBody.GetFreeVars() |> Set.ofSeq
+    //                    let allArgsUsed = List.forall (fun v -> Set.contains v usedVariables) utility.functionArguments
 
-//                        if allArgsUsed then
-//                            return Expr.CallFunction(utility, args)
-//                        else
-//                            let args, values = 
-//                                List.zip utility.functionArguments args
-//                                    |> List.filter (fun (v,_) -> Set.contains v usedVariables)
-//                                    |> List.unzip
+    //                    if allArgsUsed then
+    //                        return Expr.CallFunction(utility, args)
+    //                    else
+    //                        let args, values = 
+    //                            List.zip utility.functionArguments args
+    //                                |> List.filter (fun (v,_) -> Set.contains v usedVariables)
+    //                                |> List.unzip
 
-//                            let utility =
-//                                { utility with
-//                                    functionArguments = args
-//                                    functionTag = null   
-//                                }
+    //                        let utility =
+    //                            { utility with
+    //                                functionArguments = args
+    //                                functionTag = null   
+    //                            }
 
-//                            return Expr.CallFunction(utility, values)
+    //                        return Expr.CallFunction(utility, values)
 
-//                    | SetArray(arr, idx, value) ->
-//                        let! s = State.get
-//                        let needed = 
-//                            match arr with
-//                                | Var v -> Set.contains v s.usedVariables
-//                                | ReadInput _ -> true
-//                                | _ -> false
+    //                | SetArray(arr, idx, value) ->
+    //                    let! s = State.get
+    //                    let needed = 
+    //                        match arr with
+    //                            | Var v -> Set.contains v s.usedVariables
+    //                            | ReadInput _ -> true
+    //                            | _ -> false
 
-//                        if needed then
-//                            let! value = eliminateDeadCodeS value
-//                            let! idx = eliminateDeadCodeS idx
-//                            let! arr = eliminateDeadCodeS arr
-//                            return Expr.ArraySet(arr, idx, value)
-//                        else
-//                            return Expr.Unit
+    //                    if needed then
+    //                        let! value = eliminateDeadCodeS value
+    //                        let! idx = eliminateDeadCodeS idx
+    //                        let! arr = eliminateDeadCodeS arr
+    //                        return Expr.ArraySet(arr, idx, value)
+    //                    else
+    //                        return Expr.Unit
 
-//                    | Call(t, mi, args) ->
-//                        let! needed = 
-//                            if e.Type <> typeof<unit> then State.value true
-//                            else callNeededS t mi args
+    //                | Call(t, mi, args) ->
+    //                    let! needed = 
+    //                        if e.Type <> typeof<unit> then State.value true
+    //                        else callNeededS t mi args
 
-//                        if needed then
-//                            let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-//                            let! t = t |> Option.mapS eliminateDeadCodeS
+    //                    if needed then
+    //                        let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+    //                        let! t = t |> Option.mapS eliminateDeadCodeS
 
-//                            match t with
-//                                | Some t -> return Expr.Call(t, mi, args)
-//                                | None -> return Expr.Call(mi, args)
-//                        else
-//                            return Expr.Unit
+    //                        match t with
+    //                            | Some t -> return Expr.Call(t, mi, args)
+    //                            | None -> return Expr.Call(mi, args)
+    //                    else
+    //                        return Expr.Unit
 
-//                    | Coerce(e,t) ->
-//                        let! e = eliminateDeadCodeS e
-//                        return Expr.Coerce(e, t)
+    //                | Coerce(e,t) ->
+    //                    let! e = eliminateDeadCodeS e
+    //                    return Expr.Coerce(e, t)
 
-//                    | DefaultValue t ->
-//                        return e
+    //                | DefaultValue t ->
+    //                    return e
 
-//                    | FieldGet(None, f) -> 
-//                        return e
+    //                | FieldGet(None, f) -> 
+    //                    return e
 
-//                    | FieldGet(Some t, f) ->
-//                        let! t = eliminateDeadCodeS t
-//                        return Expr.FieldGet(t, f)
+    //                | FieldGet(Some t, f) ->
+    //                    let! t = eliminateDeadCodeS t
+    //                    return Expr.FieldGet(t, f)
 
-//                    | Lambda(v, b) ->
-//                        let! b = eliminateDeadCodeS b
-//                        return Expr.Lambda(v, b)
+    //                | Lambda(v, b) ->
+    //                    let! b = eliminateDeadCodeS b
+    //                    return Expr.Lambda(v, b)
   
-//                    | LetRecursive _ ->
-//                        return failwith "recursive bindings not implemented"
+    //                | LetRecursive _ ->
+    //                    return failwith "recursive bindings not implemented"
                     
-//                    | Let(v,e,b) ->
-//                        let! b = eliminateDeadCodeS b
-//                        let! vUsed = EliminationState.isUsed v
-//                        if vUsed then
-//                            let! e = eliminateDeadCodeS e
-//                            return Expr.Let(v, e, b)
+    //                | Let(v,e,b) ->
+    //                    let! b = eliminateDeadCodeS b
+    //                    let! vUsed = EliminationState.isUsed v
+    //                    if vUsed then
+    //                        let! e = eliminateDeadCodeS e
+    //                        return Expr.Let(v, e, b)
 
-//                        else
-//                            let! e = withoutValueS e
-//                            match e with
-//                                | Unit -> return b
-//                                | _ -> return Expr.Sequential(e, b)
+    //                    else
+    //                        let! e = withoutValueS e
+    //                        match e with
+    //                            | Unit -> return b
+    //                            | _ -> return Expr.Sequential(e, b)
 
-//                    | NewArray(t, args) ->
-//                        let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-//                        return Expr.NewArray(t, args)
+    //                | NewArray(t, args) ->
+    //                    let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+    //                    return Expr.NewArray(t, args)
 
-//                    | NewDelegate(t, vars, e) ->
-//                        let! e = eliminateDeadCodeS e
-//                        return Expr.NewDelegate(t, vars, e)
+    //                | NewDelegate(t, vars, e) ->
+    //                    let! e = eliminateDeadCodeS e
+    //                    return Expr.NewDelegate(t, vars, e)
   
-//                    | NewObject(ctor, args) ->
-//                        let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-//                        return Expr.NewObject(ctor, args)
+    //                | NewObject(ctor, args) ->
+    //                    let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+    //                    return Expr.NewObject(ctor, args)
 
-//                    | NewRecord(t, args) ->
-//                        let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-//                        return Expr.NewRecord(t, args)
+    //                | NewRecord(t, args) ->
+    //                    let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+    //                    return Expr.NewRecord(t, args)
 
-//                    | NewTuple(args) ->
-//                        let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-//                        return Expr.NewTuple(args)
+    //                | NewTuple(args) ->
+    //                    let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+    //                    return Expr.NewTuple(args)
 
-//                    | NewUnionCase(ci, args) ->
-//                        let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-//                        return Expr.NewUnionCase(ci, args)
+    //                | NewUnionCase(ci, args) ->
+    //                    let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+    //                    return Expr.NewUnionCase(ci, args)
 
-//                    | PropertyGet(None, pi, idx) ->
-//                        let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-//                        return Expr.PropertyGet(pi, idx)
+    //                | PropertyGet(None, pi, idx) ->
+    //                    let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+    //                    return Expr.PropertyGet(pi, idx)
 
-//                    | PropertyGet(Some t, pi, idx) ->
-//                        let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-//                        let! t = eliminateDeadCodeS t
-//                        return Expr.PropertyGet(t, pi, idx)
+    //                | PropertyGet(Some t, pi, idx) ->
+    //                    let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+    //                    let! t = eliminateDeadCodeS t
+    //                    return Expr.PropertyGet(t, pi, idx)
                     
-//                    | QuoteRaw _ | QuoteTyped _ -> 
-//                        return failwith "not implemented"
+    //                | QuoteRaw _ | QuoteTyped _ -> 
+    //                    return failwith "not implemented"
 
-//                    | Sequential(l, r) ->
-//                        let! r = eliminateDeadCodeS r
-//                        let! l = eliminateDeadCodeS l
-//                        match l, r with
-//                            | Unit, r   -> return r
-//                            | l, Unit   -> return l
-//                            | l, r      -> return Expr.Sequential(l, r)
+    //                | Sequential(l, r) ->
+    //                    let! r = eliminateDeadCodeS r
+    //                    let! l = eliminateDeadCodeS l
+    //                    match l, r with
+    //                        | Unit, r   -> return r
+    //                        | l, Unit   -> return l
+    //                        | l, r      -> return Expr.Sequential(l, r)
 
-//                    | TryWith _ | TryFinally _ -> 
-//                        return failwith "not implemented"
+    //                | TryWith _ | TryFinally _ -> 
+    //                    return failwith "not implemented"
 
-//                    | TupleGet(t, i) ->
-//                        let! t = eliminateDeadCodeS t
-//                        return Expr.TupleGet(t, i)
+    //                | TupleGet(t, i) ->
+    //                    let! t = eliminateDeadCodeS t
+    //                    return Expr.TupleGet(t, i)
 
-//                    | TypeTest(e, t) ->
-//                        let! e = eliminateDeadCodeS e
-//                        return Expr.TypeTest(e, t)
+    //                | TypeTest(e, t) ->
+    //                    let! e = eliminateDeadCodeS e
+    //                    return Expr.TypeTest(e, t)
 
-//                    | UnionCaseTest(e, ci) ->
-//                        let! e = eliminateDeadCodeS e
-//                        return Expr.UnionCaseTest(e, ci)
+    //                | UnionCaseTest(e, ci) ->
+    //                    let! e = eliminateDeadCodeS e
+    //                    return Expr.UnionCaseTest(e, ci)
 
-//                    | Value _ ->
-//                        return e
+    //                | Value _ ->
+    //                    return e
 
 
-//                    | Var v ->
-//                        do! EliminationState.useVar v
-//                        return e
+    //                | Var v ->
+    //                    do! EliminationState.useVar v
+    //                    return e
 
-//                    | _ ->
-//                        return failwithf "[FShade] unexpected expression %A" e
-//            }
+    //                | _ ->
+    //                    return failwithf "[FShade] unexpected expression %A" e
+    //        }
 
-//        let withoutValue (e : Expr) =
-//            let run = withoutValueS e
-//            let state = ref EliminationState.empty
-//            run.Run(state)
+    //    let withoutValue (e : Expr) =
+    //        let run = withoutValueS e
+    //        let state = ref EliminationState.empty
+    //        run.Run(state)
 
-//        let eliminateDeadCode (e : Expr) =
-//            let run = eliminateDeadCodeS e
-//            let state = ref EliminationState.empty
-//            run.Run(state)
+    //    let eliminateDeadCode (e : Expr) =
+    //        let run = eliminateDeadCodeS e
+    //        let state = ref EliminationState.empty
+    //        run.Run(state)
 
-//        let withoutValue' (isSideEffect : MethodInfo -> bool) (e : Expr) =
-//            let run = withoutValueS e
-//            let state = ref { EliminationState.empty with isGlobalSideEffect = isSideEffect }
-//            run.Run(state)
+    //    let withoutValue' (isSideEffect : MethodInfo -> bool) (e : Expr) =
+    //        let run = withoutValueS e
+    //        let state = ref { EliminationState.empty with isGlobalSideEffect = isSideEffect }
+    //        run.Run(state)
 
-//        let eliminateDeadCode' (isSideEffect : MethodInfo -> bool)  (e : Expr) =
-//            let run = eliminateDeadCodeS e
-//            let state = ref { EliminationState.empty with isGlobalSideEffect = isSideEffect }
-//            run.Run(state)
+    //    let eliminateDeadCode' (isSideEffect : MethodInfo -> bool)  (e : Expr) =
+    //        let run = eliminateDeadCodeS e
+    //        let state = ref { EliminationState.empty with isGlobalSideEffect = isSideEffect }
+    //        run.Run(state)
 
-//    /// the constant folding pass tries to evaluate constant expressions throughout the tree.
-//    /// e.g. `let a = 10 * 2 + 3 in ...` translates to `let a = 23 in ...` and so on.
-//    /// NOTE: since some built-in F# functions cannot be invoked dynamically (using reflection) the
-//    ///       module contains a list of many functions but may print a warning in certain scenarios.
-//    module ConstantFolding =
+    ///// the constant folding pass tries to evaluate constant expressions throughout the tree.
+    ///// e.g. `let a = 10 * 2 + 3 in ...` translates to `let a = 23 in ...` and so on.
+    ///// NOTE: since some built-in F# functions cannot be invoked dynamically (using reflection) the
+    /////       module contains a list of many functions but may print a warning in certain scenarios.
+    //module ConstantFolding =
         
-//        type State = 
-//            {
-//                variableValues : Map<Var, obj>
-//                isGlobalSideEffect : MemberInfo -> bool
-//            }
+    //    type State = 
+    //        {
+    //            variableValues : Map<Var, obj>
+    //            isGlobalSideEffect : MemberInfo -> bool
+    //        }
 
-//        [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-//        module State =
-//            let empty = 
-//                { 
-//                    variableValues = Map.empty
-//                    isGlobalSideEffect = fun mi -> 
-//                        match mi with
-//                            | :? MethodInfo as mi -> mi.ReturnType = typeof<unit> || mi.ReturnType = typeof<System.Void>
-//                            | _ -> false
-//                }
+    //    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    //    module State =
+    //        let empty = 
+    //            { 
+    //                variableValues = Map.empty
+    //                isGlobalSideEffect = fun mi -> 
+    //                    match mi with
+    //                        | :? MethodInfo as mi -> mi.ReturnType = typeof<unit> || mi.ReturnType = typeof<System.Void>
+    //                        | _ -> false
+    //            }
 
-//            let needsCall (mi : MethodInfo) : State<State, bool> =
-//                State.get |> State.map (fun s -> 
-//                    (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.ReadInput) ||
-//                    (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.ReadInputIndexed) ||
-//                    (mi = MethodInfo.WriteOutputs) || 
-//                    (mi = MethodInfo.Unroll) ||
-//                    (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.NewRef) ||
-//                    (s.isGlobalSideEffect (mi :> MemberInfo))
-//                )
+    //        let needsCall (mi : MethodInfo) : State<State, bool> =
+    //            State.get |> State.map (fun s -> 
+    //                (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.ReadInput) ||
+    //                (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.ReadInputIndexed) ||
+    //                (mi = MethodInfo.WriteOutputs) || 
+    //                (mi = MethodInfo.Unroll) ||
+    //                (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.NewRef) ||
+    //                (s.isGlobalSideEffect (mi :> MemberInfo))
+    //            )
 
-//            let needsField (f : FieldInfo) : State<State, bool> =
-//                State.get |> State.map (fun s ->
-//                    s.isGlobalSideEffect (f :> MemberInfo)
-//                )
+    //        let needsField (f : FieldInfo) : State<State, bool> =
+    //            State.get |> State.map (fun s ->
+    //                s.isGlobalSideEffect (f :> MemberInfo)
+    //            )
 
-//            let needsProperty (p : PropertyInfo) : State<State, bool> =
-//                State.get |> State.map (fun s ->
-//                    s.isGlobalSideEffect (p :> MemberInfo)
-//                )
+    //        let needsProperty (p : PropertyInfo) : State<State, bool> =
+    //            State.get |> State.map (fun s ->
+    //                s.isGlobalSideEffect (p :> MemberInfo)
+    //            )
 
-//            let setVar (v : Var) (value : obj) =
-//                State.modify (fun s ->
-//                    { s with variableValues = Map.add v value s.variableValues }
-//                )
+    //        let setVar (v : Var) (value : obj) =
+    //            State.modify (fun s ->
+    //                { s with variableValues = Map.add v value s.variableValues }
+    //            )
 
-//            let getVar (v : Var) =
-//                State.get |> State.map (fun s ->
-//                    Map.tryFind v s.variableValues
-//                )
+    //        let getVar (v : Var) =
+    //            State.get |> State.map (fun s ->
+    //                Map.tryFind v s.variableValues
+    //            )
 
-//        let rec private (|AllConstant|_|) (e : list<Expr>) =
-//            match e with
-//                | [] -> Some []
-//                | h :: t ->
-//                    match h, t with
-//                        | Value(h,_), AllConstant t -> Some (h :: t)
-//                        | _ -> None
+    //    let rec private (|AllConstant|_|) (e : list<Expr>) =
+    //        match e with
+    //            | [] -> Some []
+    //            | h :: t ->
+    //                match h, t with
+    //                    | Value(h,_), AllConstant t -> Some (h :: t)
+    //                    | _ -> None
 
+    //    //open Fable.Core.JsInterop
+    //    //let functionTable (l : list<string * obj>) =
+    //    //    let table = Dict(Unchecked.hash, Unchecked.equals)
 
-//        let functionTable (l : list<string * obj>) =
-//            let table = Dict(Unchecked.hash, Unchecked.equals)
+    //    //    let rec getFunctionElements (t : Type) =
+    //    //        if t.Name.StartsWith "FSharpFunc" || t.BaseType.Name.StartsWith "FSharpFunc" then
+    //    //            let a, r = FSharpType.GetFunctionElements t
+    //    //            let args, ret = getFunctionElements r
+    //    //            a :: args, ret
+    //    //        else
+    //    //            [], t
 
-//            let rec getFunctionElements (t : Type) =
-//                if t.Name.StartsWith "FSharpFunc" || t.BaseType.Name.StartsWith "FSharpFunc" then
-//                    let a, r = FSharpType.GetFunctionElements t
-//                    let args, ret = getFunctionElements r
-//                    a :: args, ret
-//                else
-//                    [], t
+    //    //    for (name, f) in l do
+    //    //        //let fType = f.GetType()
+    //    //        //let invoke : MethodInfo = 
+    //    //        //    fType.GetMethods(BindingFlags.Public ||| BindingFlags.Instance) 
+    //    //        //        |> Array.filter (fun mi -> mi.Name = "Invoke") 
+    //    //        //        |> Array.maxBy (fun mi -> mi.GetParameters().Length)
 
-//            for (name, f) in l do
-//                let fType = f.GetType()
-//                let invoke : MethodInfo = 
-//                    fType.GetMethods(BindingFlags.Public ||| BindingFlags.Instance) 
-//                        |> Array.filter (fun mi -> mi.Name = "Invoke") 
-//                        |> Array.maxBy (fun mi -> mi.GetParameters().Length)
+    //    //        //let parameters =
+    //    //        //    invoke.GetParameters() |> Array.map (fun p -> p.ParameterType) |> Array.toList
 
-//                let parameters =
-//                    invoke.GetParameters() |> Array.map (fun p -> p.ParameterType) |> Array.toList
+    //    //        let run (args : list<obj>) : obj = 
+    //    //            f?apply(null, List.toArray args)
+    //    //            //invoke.Invoke(f, List.toArray args)
 
-//                let run (args : list<obj>) = invoke.Invoke(f, List.toArray args)
+    //    //        table.[(name, parameters)] <- run
 
-//                table.[(name, parameters)] <- run
+    //    //    table
 
-//            table
+    //    //let operators = 
+    //    //    functionTable [
+    //    //        "op_UnaryNegation", ((~-) : int8 -> int8) :> obj
+    //    //        "op_UnaryNegation", ((~-) : int16 -> int16) :> obj
+    //    //        "op_UnaryNegation", ((~-) : int32 -> int32) :> obj
+    //    //        "op_UnaryNegation", ((~-) : int64 -> int64) :> obj
+    //    //        "op_UnaryNegation", ((~-) : float32 -> float32) :> obj
+    //    //        "op_UnaryNegation", ((~-) : float -> float) :> obj
+    //    //        "op_UnaryNegation", ((~-) : decimal -> decimal) :> obj
 
-//        let operators = 
-//            functionTable [
-//                "op_UnaryNegation", ((~-) : int8 -> int8) :> obj
-//                "op_UnaryNegation", ((~-) : int16 -> int16) :> obj
-//                "op_UnaryNegation", ((~-) : int32 -> int32) :> obj
-//                "op_UnaryNegation", ((~-) : int64 -> int64) :> obj
-//                "op_UnaryNegation", ((~-) : float32 -> float32) :> obj
-//                "op_UnaryNegation", ((~-) : float -> float) :> obj
-//                "op_UnaryNegation", ((~-) : decimal -> decimal) :> obj
-
-//                "op_Addition", ((+) : int8 -> int8 -> int8) :> obj
-//                "op_Addition", ((+) : int16 -> int16 -> int16) :> obj
-//                "op_Addition", ((+) : int32 -> int32 -> int32) :> obj
-//                "op_Addition", ((+) : int64 -> int64 -> int64) :> obj
-//                "op_Addition", ((+) : uint8 -> uint8 -> uint8) :> obj
-//                "op_Addition", ((+) : uint16 -> uint16 -> uint16) :> obj
-//                "op_Addition", ((+) : uint32 -> uint32 -> uint32) :> obj
-//                "op_Addition", ((+) : uint64 -> uint64 -> uint64) :> obj
-//                "op_Addition", ((+) : float32 -> float32 -> float32) :> obj
-//                "op_Addition", ((+) : float -> float -> float) :> obj
-//                "op_Addition", ((+) : decimal -> decimal -> decimal) :> obj
-
-                
-//                "op_Subtraction", ((-) : int8 -> int8 -> int8) :> obj
-//                "op_Subtraction", ((-) : int16 -> int16 -> int16) :> obj
-//                "op_Subtraction", ((-) : int32 -> int32 -> int32) :> obj
-//                "op_Subtraction", ((-) : int64 -> int64 -> int64) :> obj
-//                "op_Subtraction", ((-) : uint8 -> uint8 -> uint8) :> obj
-//                "op_Subtraction", ((-) : uint16 -> uint16 -> uint16) :> obj
-//                "op_Subtraction", ((-) : uint32 -> uint32 -> uint32) :> obj
-//                "op_Subtraction", ((-) : uint64 -> uint64 -> uint64) :> obj
-//                "op_Subtraction", ((-) : float32 -> float32 -> float32) :> obj
-//                "op_Subtraction", ((-) : float -> float -> float) :> obj
-//                "op_Subtraction", ((-) : decimal -> decimal -> decimal) :> obj
+    //    //        "op_Addition", ((+) : int8 -> int8 -> int8) :> obj
+    //    //        "op_Addition", ((+) : int16 -> int16 -> int16) :> obj
+    //    //        "op_Addition", ((+) : int32 -> int32 -> int32) :> obj
+    //    //        "op_Addition", ((+) : int64 -> int64 -> int64) :> obj
+    //    //        "op_Addition", ((+) : uint8 -> uint8 -> uint8) :> obj
+    //    //        "op_Addition", ((+) : uint16 -> uint16 -> uint16) :> obj
+    //    //        "op_Addition", ((+) : uint32 -> uint32 -> uint32) :> obj
+    //    //        "op_Addition", ((+) : uint64 -> uint64 -> uint64) :> obj
+    //    //        "op_Addition", ((+) : float32 -> float32 -> float32) :> obj
+    //    //        "op_Addition", ((+) : float -> float -> float) :> obj
+    //    //        "op_Addition", ((+) : decimal -> decimal -> decimal) :> obj
 
                 
-//                "op_Multiply", ((*) : int8 -> int8 -> int8) :> obj
-//                "op_Multiply", ((*) : int16 -> int16 -> int16) :> obj
-//                "op_Multiply", ((*) : int32 -> int32 -> int32) :> obj
-//                "op_Multiply", ((*) : int64 -> int64 -> int64) :> obj
-//                "op_Multiply", ((*) : uint8 -> uint8 -> uint8) :> obj
-//                "op_Multiply", ((*) : uint16 -> uint16 -> uint16) :> obj
-//                "op_Multiply", ((*) : uint32 -> uint32 -> uint32) :> obj
-//                "op_Multiply", ((*) : uint64 -> uint64 -> uint64) :> obj
-//                "op_Multiply", ((*) : float32 -> float32 -> float32) :> obj
-//                "op_Multiply", ((*) : float -> float -> float) :> obj
-//                "op_Multiply", ((*) : decimal -> decimal -> decimal) :> obj
+    //    //        "op_Subtraction", ((-) : int8 -> int8 -> int8) :> obj
+    //    //        "op_Subtraction", ((-) : int16 -> int16 -> int16) :> obj
+    //    //        "op_Subtraction", ((-) : int32 -> int32 -> int32) :> obj
+    //    //        "op_Subtraction", ((-) : int64 -> int64 -> int64) :> obj
+    //    //        "op_Subtraction", ((-) : uint8 -> uint8 -> uint8) :> obj
+    //    //        "op_Subtraction", ((-) : uint16 -> uint16 -> uint16) :> obj
+    //    //        "op_Subtraction", ((-) : uint32 -> uint32 -> uint32) :> obj
+    //    //        "op_Subtraction", ((-) : uint64 -> uint64 -> uint64) :> obj
+    //    //        "op_Subtraction", ((-) : float32 -> float32 -> float32) :> obj
+    //    //        "op_Subtraction", ((-) : float -> float -> float) :> obj
+    //    //        "op_Subtraction", ((-) : decimal -> decimal -> decimal) :> obj
 
                 
-//                "op_Division", ((/) : int8 -> int8 -> int8) :> obj
-//                "op_Division", ((/) : int16 -> int16 -> int16) :> obj
-//                "op_Division", ((/) : int32 -> int32 -> int32) :> obj
-//                "op_Division", ((/) : int64 -> int64 -> int64) :> obj
-//                "op_Division", ((/) : uint8 -> uint8 -> uint8) :> obj
-//                "op_Division", ((/) : uint16 -> uint16 -> uint16) :> obj
-//                "op_Division", ((/) : uint32 -> uint32 -> uint32) :> obj
-//                "op_Division", ((/) : uint64 -> uint64 -> uint64) :> obj
-//                "op_Division", ((/) : float32 -> float32 -> float32) :> obj
-//                "op_Division", ((/) : float -> float -> float) :> obj
-//                "op_Division", ((/) : decimal -> decimal -> decimal) :> obj
+    //    //        "op_Multiply", ((*) : int8 -> int8 -> int8) :> obj
+    //    //        "op_Multiply", ((*) : int16 -> int16 -> int16) :> obj
+    //    //        "op_Multiply", ((*) : int32 -> int32 -> int32) :> obj
+    //    //        "op_Multiply", ((*) : int64 -> int64 -> int64) :> obj
+    //    //        "op_Multiply", ((*) : uint8 -> uint8 -> uint8) :> obj
+    //    //        "op_Multiply", ((*) : uint16 -> uint16 -> uint16) :> obj
+    //    //        "op_Multiply", ((*) : uint32 -> uint32 -> uint32) :> obj
+    //    //        "op_Multiply", ((*) : uint64 -> uint64 -> uint64) :> obj
+    //    //        "op_Multiply", ((*) : float32 -> float32 -> float32) :> obj
+    //    //        "op_Multiply", ((*) : float -> float -> float) :> obj
+    //    //        "op_Multiply", ((*) : decimal -> decimal -> decimal) :> obj
 
                 
-//                "op_Modulus", ((%) : int8 -> int8 -> int8) :> obj
-//                "op_Modulus", ((%) : int16 -> int16 -> int16) :> obj
-//                "op_Modulus", ((%) : int32 -> int32 -> int32) :> obj
-//                "op_Modulus", ((%) : int64 -> int64 -> int64) :> obj
-//                "op_Modulus", ((%) : uint8 -> uint8 -> uint8) :> obj
-//                "op_Modulus", ((%) : uint16 -> uint16 -> uint16) :> obj
-//                "op_Modulus", ((%) : uint32 -> uint32 -> uint32) :> obj
-//                "op_Modulus", ((%) : uint64 -> uint64 -> uint64) :> obj
-//                "op_Modulus", ((%) : float32 -> float32 -> float32) :> obj
-//                "op_Modulus", ((%) : float -> float -> float) :> obj
-//                "op_Modulus", ((%) : decimal -> decimal -> decimal) :> obj
+    //    //        "op_Division", ((/) : int8 -> int8 -> int8) :> obj
+    //    //        "op_Division", ((/) : int16 -> int16 -> int16) :> obj
+    //    //        "op_Division", ((/) : int32 -> int32 -> int32) :> obj
+    //    //        "op_Division", ((/) : int64 -> int64 -> int64) :> obj
+    //    //        "op_Division", ((/) : uint8 -> uint8 -> uint8) :> obj
+    //    //        "op_Division", ((/) : uint16 -> uint16 -> uint16) :> obj
+    //    //        "op_Division", ((/) : uint32 -> uint32 -> uint32) :> obj
+    //    //        "op_Division", ((/) : uint64 -> uint64 -> uint64) :> obj
+    //    //        "op_Division", ((/) : float32 -> float32 -> float32) :> obj
+    //    //        "op_Division", ((/) : float -> float -> float) :> obj
+    //    //        "op_Division", ((/) : decimal -> decimal -> decimal) :> obj
 
                 
-//                "op_BitwiseOr", ((|||) : int8 -> int8 -> int8) :> obj
-//                "op_BitwiseOr", ((|||) : int16 -> int16 -> int16) :> obj
-//                "op_BitwiseOr", ((|||) : int32 -> int32 -> int32) :> obj
-//                "op_BitwiseOr", ((|||) : int64 -> int64 -> int64) :> obj
-//                "op_BitwiseOr", ((|||) : uint8 -> uint8 -> uint8) :> obj
-//                "op_BitwiseOr", ((|||) : uint16 -> uint16 -> uint16) :> obj
-//                "op_BitwiseOr", ((|||) : uint32 -> uint32 -> uint32) :> obj
-//                "op_BitwiseOr", ((|||) : uint64 -> uint64 -> uint64) :> obj
+    //    //        "op_Modulus", ((%) : int8 -> int8 -> int8) :> obj
+    //    //        "op_Modulus", ((%) : int16 -> int16 -> int16) :> obj
+    //    //        "op_Modulus", ((%) : int32 -> int32 -> int32) :> obj
+    //    //        "op_Modulus", ((%) : int64 -> int64 -> int64) :> obj
+    //    //        "op_Modulus", ((%) : uint8 -> uint8 -> uint8) :> obj
+    //    //        "op_Modulus", ((%) : uint16 -> uint16 -> uint16) :> obj
+    //    //        "op_Modulus", ((%) : uint32 -> uint32 -> uint32) :> obj
+    //    //        "op_Modulus", ((%) : uint64 -> uint64 -> uint64) :> obj
+    //    //        "op_Modulus", ((%) : float32 -> float32 -> float32) :> obj
+    //    //        "op_Modulus", ((%) : float -> float -> float) :> obj
+    //    //        "op_Modulus", ((%) : decimal -> decimal -> decimal) :> obj
 
                 
-//                "op_BitwiseAnd", ((&&&) : int8 -> int8 -> int8) :> obj
-//                "op_BitwiseAnd", ((&&&) : int16 -> int16 -> int16) :> obj
-//                "op_BitwiseAnd", ((&&&) : int32 -> int32 -> int32) :> obj
-//                "op_BitwiseAnd", ((&&&) : int64 -> int64 -> int64) :> obj
-//                "op_BitwiseAnd", ((&&&) : uint8 -> uint8 -> uint8) :> obj
-//                "op_BitwiseAnd", ((&&&) : uint16 -> uint16 -> uint16) :> obj
-//                "op_BitwiseAnd", ((&&&) : uint32 -> uint32 -> uint32) :> obj
-//                "op_BitwiseAnd", ((&&&) : uint64 -> uint64 -> uint64) :> obj
+    //    //        "op_BitwiseOr", ((|||) : int8 -> int8 -> int8) :> obj
+    //    //        "op_BitwiseOr", ((|||) : int16 -> int16 -> int16) :> obj
+    //    //        "op_BitwiseOr", ((|||) : int32 -> int32 -> int32) :> obj
+    //    //        "op_BitwiseOr", ((|||) : int64 -> int64 -> int64) :> obj
+    //    //        "op_BitwiseOr", ((|||) : uint8 -> uint8 -> uint8) :> obj
+    //    //        "op_BitwiseOr", ((|||) : uint16 -> uint16 -> uint16) :> obj
+    //    //        "op_BitwiseOr", ((|||) : uint32 -> uint32 -> uint32) :> obj
+    //    //        "op_BitwiseOr", ((|||) : uint64 -> uint64 -> uint64) :> obj
 
                 
-//                "op_ExclusiveOr", ((^^^) : int8 -> int8 -> int8) :> obj
-//                "op_ExclusiveOr", ((^^^) : int16 -> int16 -> int16) :> obj
-//                "op_ExclusiveOr", ((^^^) : int32 -> int32 -> int32) :> obj
-//                "op_ExclusiveOr", ((^^^) : int64 -> int64 -> int64) :> obj
-//                "op_ExclusiveOr", ((^^^) : uint8 -> uint8 -> uint8) :> obj
-//                "op_ExclusiveOr", ((^^^) : uint16 -> uint16 -> uint16) :> obj
-//                "op_ExclusiveOr", ((^^^) : uint32 -> uint32 -> uint32) :> obj
-//                "op_ExclusiveOr", ((^^^) : uint64 -> uint64 -> uint64) :> obj
+    //    //        "op_BitwiseAnd", ((&&&) : int8 -> int8 -> int8) :> obj
+    //    //        "op_BitwiseAnd", ((&&&) : int16 -> int16 -> int16) :> obj
+    //    //        "op_BitwiseAnd", ((&&&) : int32 -> int32 -> int32) :> obj
+    //    //        "op_BitwiseAnd", ((&&&) : int64 -> int64 -> int64) :> obj
+    //    //        "op_BitwiseAnd", ((&&&) : uint8 -> uint8 -> uint8) :> obj
+    //    //        "op_BitwiseAnd", ((&&&) : uint16 -> uint16 -> uint16) :> obj
+    //    //        "op_BitwiseAnd", ((&&&) : uint32 -> uint32 -> uint32) :> obj
+    //    //        "op_BitwiseAnd", ((&&&) : uint64 -> uint64 -> uint64) :> obj
 
                 
-//                "op_LessThan", ((<) : int8 -> int8 -> bool) :> obj
-//                "op_LessThan", ((<) : int16 -> int16 -> bool) :> obj
-//                "op_LessThan", ((<) : int32 -> int32 -> bool) :> obj
-//                "op_LessThan", ((<) : int64 -> int64 -> bool) :> obj
-//                "op_LessThan", ((<) : uint8 -> uint8 -> bool) :> obj
-//                "op_LessThan", ((<) : uint16 -> uint16 -> bool) :> obj
-//                "op_LessThan", ((<) : uint32 -> uint32 -> bool) :> obj
-//                "op_LessThan", ((<) : uint64 -> uint64 -> bool) :> obj
-//                "op_LessThan", ((<) : float32 -> float32 -> bool) :> obj
-//                "op_LessThan", ((<) : float -> float -> bool) :> obj
-//                "op_LessThan", ((<) : decimal -> decimal -> bool) :> obj
+    //    //        "op_ExclusiveOr", ((^^^) : int8 -> int8 -> int8) :> obj
+    //    //        "op_ExclusiveOr", ((^^^) : int16 -> int16 -> int16) :> obj
+    //    //        "op_ExclusiveOr", ((^^^) : int32 -> int32 -> int32) :> obj
+    //    //        "op_ExclusiveOr", ((^^^) : int64 -> int64 -> int64) :> obj
+    //    //        "op_ExclusiveOr", ((^^^) : uint8 -> uint8 -> uint8) :> obj
+    //    //        "op_ExclusiveOr", ((^^^) : uint16 -> uint16 -> uint16) :> obj
+    //    //        "op_ExclusiveOr", ((^^^) : uint32 -> uint32 -> uint32) :> obj
+    //    //        "op_ExclusiveOr", ((^^^) : uint64 -> uint64 -> uint64) :> obj
 
                 
-//                "op_LessThanOrEqual", ((<=) : int8 -> int8 -> bool) :> obj
-//                "op_LessThanOrEqual", ((<=) : int16 -> int16 -> bool) :> obj
-//                "op_LessThanOrEqual", ((<=) : int32 -> int32 -> bool) :> obj
-//                "op_LessThanOrEqual", ((<=) : int64 -> int64 -> bool) :> obj
-//                "op_LessThanOrEqual", ((<=) : uint8 -> uint8 -> bool) :> obj
-//                "op_LessThanOrEqual", ((<=) : uint16 -> uint16 -> bool) :> obj
-//                "op_LessThanOrEqual", ((<=) : uint32 -> uint32 -> bool) :> obj
-//                "op_LessThanOrEqual", ((<=) : uint64 -> uint64 -> bool) :> obj
-//                "op_LessThanOrEqual", ((<=) : float32 -> float32 -> bool) :> obj
-//                "op_LessThanOrEqual", ((<=) : float -> float -> bool) :> obj
-//                "op_LessThanOrEqual", ((<=) : decimal -> decimal -> bool) :> obj
+    //    //        "op_LessThan", ((<) : int8 -> int8 -> bool) :> obj
+    //    //        "op_LessThan", ((<) : int16 -> int16 -> bool) :> obj
+    //    //        "op_LessThan", ((<) : int32 -> int32 -> bool) :> obj
+    //    //        "op_LessThan", ((<) : int64 -> int64 -> bool) :> obj
+    //    //        "op_LessThan", ((<) : uint8 -> uint8 -> bool) :> obj
+    //    //        "op_LessThan", ((<) : uint16 -> uint16 -> bool) :> obj
+    //    //        "op_LessThan", ((<) : uint32 -> uint32 -> bool) :> obj
+    //    //        "op_LessThan", ((<) : uint64 -> uint64 -> bool) :> obj
+    //    //        "op_LessThan", ((<) : float32 -> float32 -> bool) :> obj
+    //    //        "op_LessThan", ((<) : float -> float -> bool) :> obj
+    //    //        "op_LessThan", ((<) : decimal -> decimal -> bool) :> obj
 
                 
-//                "op_GreaterThan", ((>) : int8 -> int8 -> bool) :> obj
-//                "op_GreaterThan", ((>) : int16 -> int16 -> bool) :> obj
-//                "op_GreaterThan", ((>) : int32 -> int32 -> bool) :> obj
-//                "op_GreaterThan", ((>) : int64 -> int64 -> bool) :> obj
-//                "op_GreaterThan", ((>) : uint8 -> uint8 -> bool) :> obj
-//                "op_GreaterThan", ((>) : uint16 -> uint16 -> bool) :> obj
-//                "op_GreaterThan", ((>) : uint32 -> uint32 -> bool) :> obj
-//                "op_GreaterThan", ((>) : uint64 -> uint64 -> bool) :> obj
-//                "op_GreaterThan", ((>) : float32 -> float32 -> bool) :> obj
-//                "op_GreaterThan", ((>) : float -> float -> bool) :> obj
-//                "op_GreaterThan", ((>) : decimal -> decimal -> bool) :> obj
+    //    //        "op_LessThanOrEqual", ((<=) : int8 -> int8 -> bool) :> obj
+    //    //        "op_LessThanOrEqual", ((<=) : int16 -> int16 -> bool) :> obj
+    //    //        "op_LessThanOrEqual", ((<=) : int32 -> int32 -> bool) :> obj
+    //    //        "op_LessThanOrEqual", ((<=) : int64 -> int64 -> bool) :> obj
+    //    //        "op_LessThanOrEqual", ((<=) : uint8 -> uint8 -> bool) :> obj
+    //    //        "op_LessThanOrEqual", ((<=) : uint16 -> uint16 -> bool) :> obj
+    //    //        "op_LessThanOrEqual", ((<=) : uint32 -> uint32 -> bool) :> obj
+    //    //        "op_LessThanOrEqual", ((<=) : uint64 -> uint64 -> bool) :> obj
+    //    //        "op_LessThanOrEqual", ((<=) : float32 -> float32 -> bool) :> obj
+    //    //        "op_LessThanOrEqual", ((<=) : float -> float -> bool) :> obj
+    //    //        "op_LessThanOrEqual", ((<=) : decimal -> decimal -> bool) :> obj
 
                 
-//                "op_GreaterThanOrEqual", ((>=) : int8 -> int8 -> bool) :> obj
-//                "op_GreaterThanOrEqual", ((>=) : int16 -> int16 -> bool) :> obj
-//                "op_GreaterThanOrEqual", ((>=) : int32 -> int32 -> bool) :> obj
-//                "op_GreaterThanOrEqual", ((>=) : int64 -> int64 -> bool) :> obj
-//                "op_GreaterThanOrEqual", ((>=) : uint8 -> uint8 -> bool) :> obj
-//                "op_GreaterThanOrEqual", ((>=) : uint16 -> uint16 -> bool) :> obj
-//                "op_GreaterThanOrEqual", ((>=) : uint32 -> uint32 -> bool) :> obj
-//                "op_GreaterThanOrEqual", ((>=) : uint64 -> uint64 -> bool) :> obj
-//                "op_GreaterThanOrEqual", ((>=) : float32 -> float32 -> bool) :> obj
-//                "op_GreaterThanOrEqual", ((>=) : float -> float -> bool) :> obj
-//                "op_GreaterThanOrEqual", ((>=) : decimal -> decimal -> bool) :> obj
+    //    //        "op_GreaterThan", ((>) : int8 -> int8 -> bool) :> obj
+    //    //        "op_GreaterThan", ((>) : int16 -> int16 -> bool) :> obj
+    //    //        "op_GreaterThan", ((>) : int32 -> int32 -> bool) :> obj
+    //    //        "op_GreaterThan", ((>) : int64 -> int64 -> bool) :> obj
+    //    //        "op_GreaterThan", ((>) : uint8 -> uint8 -> bool) :> obj
+    //    //        "op_GreaterThan", ((>) : uint16 -> uint16 -> bool) :> obj
+    //    //        "op_GreaterThan", ((>) : uint32 -> uint32 -> bool) :> obj
+    //    //        "op_GreaterThan", ((>) : uint64 -> uint64 -> bool) :> obj
+    //    //        "op_GreaterThan", ((>) : float32 -> float32 -> bool) :> obj
+    //    //        "op_GreaterThan", ((>) : float -> float -> bool) :> obj
+    //    //        "op_GreaterThan", ((>) : decimal -> decimal -> bool) :> obj
 
                 
-//                "op_Equality", ((=) : int8 -> int8 -> bool) :> obj
-//                "op_Equality", ((=) : int16 -> int16 -> bool) :> obj
-//                "op_Equality", ((=) : int32 -> int32 -> bool) :> obj
-//                "op_Equality", ((=) : int64 -> int64 -> bool) :> obj
-//                "op_Equality", ((=) : uint8 -> uint8 -> bool) :> obj
-//                "op_Equality", ((=) : uint16 -> uint16 -> bool) :> obj
-//                "op_Equality", ((=) : uint32 -> uint32 -> bool) :> obj
-//                "op_Equality", ((=) : uint64 -> uint64 -> bool) :> obj
-//                "op_Equality", ((=) : float32 -> float32 -> bool) :> obj
-//                "op_Equality", ((=) : float -> float -> bool) :> obj
-//                "op_Equality", ((=) : decimal -> decimal -> bool) :> obj
+    //    //        "op_GreaterThanOrEqual", ((>=) : int8 -> int8 -> bool) :> obj
+    //    //        "op_GreaterThanOrEqual", ((>=) : int16 -> int16 -> bool) :> obj
+    //    //        "op_GreaterThanOrEqual", ((>=) : int32 -> int32 -> bool) :> obj
+    //    //        "op_GreaterThanOrEqual", ((>=) : int64 -> int64 -> bool) :> obj
+    //    //        "op_GreaterThanOrEqual", ((>=) : uint8 -> uint8 -> bool) :> obj
+    //    //        "op_GreaterThanOrEqual", ((>=) : uint16 -> uint16 -> bool) :> obj
+    //    //        "op_GreaterThanOrEqual", ((>=) : uint32 -> uint32 -> bool) :> obj
+    //    //        "op_GreaterThanOrEqual", ((>=) : uint64 -> uint64 -> bool) :> obj
+    //    //        "op_GreaterThanOrEqual", ((>=) : float32 -> float32 -> bool) :> obj
+    //    //        "op_GreaterThanOrEqual", ((>=) : float -> float -> bool) :> obj
+    //    //        "op_GreaterThanOrEqual", ((>=) : decimal -> decimal -> bool) :> obj
 
                 
-//                "op_Inequality", ((<>) : int8 -> int8 -> bool) :> obj
-//                "op_Inequality", ((<>) : int16 -> int16 -> bool) :> obj
-//                "op_Inequality", ((<>) : int32 -> int32 -> bool) :> obj
-//                "op_Inequality", ((<>) : int64 -> int64 -> bool) :> obj
-//                "op_Inequality", ((<>) : uint8 -> uint8 -> bool) :> obj
-//                "op_Inequality", ((<>) : uint16 -> uint16 -> bool) :> obj
-//                "op_Inequality", ((<>) : uint32 -> uint32 -> bool) :> obj
-//                "op_Inequality", ((<>) : uint64 -> uint64 -> bool) :> obj
-//                "op_Inequality", ((<>) : float32 -> float32 -> bool) :> obj
-//                "op_Inequality", ((<>) : float -> float -> bool) :> obj
-//                "op_Inequality", ((<>) : decimal -> decimal -> bool) :> obj
+    //    //        "op_Equality", ((=) : int8 -> int8 -> bool) :> obj
+    //    //        "op_Equality", ((=) : int16 -> int16 -> bool) :> obj
+    //    //        "op_Equality", ((=) : int32 -> int32 -> bool) :> obj
+    //    //        "op_Equality", ((=) : int64 -> int64 -> bool) :> obj
+    //    //        "op_Equality", ((=) : uint8 -> uint8 -> bool) :> obj
+    //    //        "op_Equality", ((=) : uint16 -> uint16 -> bool) :> obj
+    //    //        "op_Equality", ((=) : uint32 -> uint32 -> bool) :> obj
+    //    //        "op_Equality", ((=) : uint64 -> uint64 -> bool) :> obj
+    //    //        "op_Equality", ((=) : float32 -> float32 -> bool) :> obj
+    //    //        "op_Equality", ((=) : float -> float -> bool) :> obj
+    //    //        "op_Equality", ((=) : decimal -> decimal -> bool) :> obj
 
                 
-//                "ToSByte", (int8 : int8 -> _) :> obj
-//                "ToSByte", (int8 : int16 -> _) :> obj
-//                "ToSByte", (int8 : int32 -> _) :> obj
-//                "ToSByte", (int8 : int64 -> _) :> obj
-//                "ToSByte", (int8 : uint8 -> _) :> obj
-//                "ToSByte", (int8 : uint16 -> _) :> obj
-//                "ToSByte", (int8 : uint32 -> _) :> obj
-//                "ToSByte", (int8 : uint64 -> _) :> obj
-//                "ToSByte", (int8 : float32 -> _) :> obj
-//                "ToSByte", (int8 : float -> _) :> obj
-//                "ToSByte", (int8 : decimal -> _) :> obj
+    //    //        "op_Inequality", ((<>) : int8 -> int8 -> bool) :> obj
+    //    //        "op_Inequality", ((<>) : int16 -> int16 -> bool) :> obj
+    //    //        "op_Inequality", ((<>) : int32 -> int32 -> bool) :> obj
+    //    //        "op_Inequality", ((<>) : int64 -> int64 -> bool) :> obj
+    //    //        "op_Inequality", ((<>) : uint8 -> uint8 -> bool) :> obj
+    //    //        "op_Inequality", ((<>) : uint16 -> uint16 -> bool) :> obj
+    //    //        "op_Inequality", ((<>) : uint32 -> uint32 -> bool) :> obj
+    //    //        "op_Inequality", ((<>) : uint64 -> uint64 -> bool) :> obj
+    //    //        "op_Inequality", ((<>) : float32 -> float32 -> bool) :> obj
+    //    //        "op_Inequality", ((<>) : float -> float -> bool) :> obj
+    //    //        "op_Inequality", ((<>) : decimal -> decimal -> bool) :> obj
+
                 
-//                "ToByte", (uint8 : int8 -> _) :> obj
-//                "ToByte", (uint8 : int16 -> _) :> obj
-//                "ToByte", (uint8 : int32 -> _) :> obj
-//                "ToByte", (uint8 : int64 -> _) :> obj
-//                "ToByte", (uint8 : uint8 -> _) :> obj
-//                "ToByte", (uint8 : uint16 -> _) :> obj
-//                "ToByte", (uint8 : uint32 -> _) :> obj
-//                "ToByte", (uint8 : uint64 -> _) :> obj
-//                "ToByte", (uint8 : float32 -> _) :> obj
-//                "ToByte", (uint8 : float -> _) :> obj
-//                "ToByte", (uint8 : decimal -> _) :> obj
+    //    //        "ToSByte", (int8 : int8 -> _) :> obj
+    //    //        "ToSByte", (int8 : int16 -> _) :> obj
+    //    //        "ToSByte", (int8 : int32 -> _) :> obj
+    //    //        "ToSByte", (int8 : int64 -> _) :> obj
+    //    //        "ToSByte", (int8 : uint8 -> _) :> obj
+    //    //        "ToSByte", (int8 : uint16 -> _) :> obj
+    //    //        "ToSByte", (int8 : uint32 -> _) :> obj
+    //    //        "ToSByte", (int8 : uint64 -> _) :> obj
+    //    //        "ToSByte", (int8 : float32 -> _) :> obj
+    //    //        "ToSByte", (int8 : float -> _) :> obj
+    //    //        "ToSByte", (int8 : decimal -> _) :> obj
                 
-//                "ToInt16", (int16 : int8 -> _) :> obj
-//                "ToInt16", (int16 : int16 -> _) :> obj
-//                "ToInt16", (int16 : int32 -> _) :> obj
-//                "ToInt16", (int16 : int64 -> _) :> obj
-//                "ToInt16", (int16 : uint8 -> _) :> obj
-//                "ToInt16", (int16 : uint16 -> _) :> obj
-//                "ToInt16", (int16 : uint32 -> _) :> obj
-//                "ToInt16", (int16 : uint64 -> _) :> obj
-//                "ToInt16", (int16 : float32 -> _) :> obj
-//                "ToInt16", (int16 : float -> _) :> obj
-//                "ToInt16", (int16 : decimal -> _) :> obj
+    //    //        "ToByte", (uint8 : int8 -> _) :> obj
+    //    //        "ToByte", (uint8 : int16 -> _) :> obj
+    //    //        "ToByte", (uint8 : int32 -> _) :> obj
+    //    //        "ToByte", (uint8 : int64 -> _) :> obj
+    //    //        "ToByte", (uint8 : uint8 -> _) :> obj
+    //    //        "ToByte", (uint8 : uint16 -> _) :> obj
+    //    //        "ToByte", (uint8 : uint32 -> _) :> obj
+    //    //        "ToByte", (uint8 : uint64 -> _) :> obj
+    //    //        "ToByte", (uint8 : float32 -> _) :> obj
+    //    //        "ToByte", (uint8 : float -> _) :> obj
+    //    //        "ToByte", (uint8 : decimal -> _) :> obj
                 
-//                "ToUInt16", (uint16 : int8 -> _) :> obj
-//                "ToUInt16", (uint16 : int16 -> _) :> obj
-//                "ToUInt16", (uint16 : int32 -> _) :> obj
-//                "ToUInt16", (uint16 : int64 -> _) :> obj
-//                "ToUInt16", (uint16 : uint8 -> _) :> obj
-//                "ToUInt16", (uint16 : uint16 -> _) :> obj
-//                "ToUInt16", (uint16 : uint32 -> _) :> obj
-//                "ToUInt16", (uint16 : uint64 -> _) :> obj
-//                "ToUInt16", (uint16 : float32 -> _) :> obj
-//                "ToUInt16", (uint16 : float -> _) :> obj
-//                "ToUInt16", (uint16 : decimal -> _) :> obj
+    //    //        "ToInt16", (int16 : int8 -> _) :> obj
+    //    //        "ToInt16", (int16 : int16 -> _) :> obj
+    //    //        "ToInt16", (int16 : int32 -> _) :> obj
+    //    //        "ToInt16", (int16 : int64 -> _) :> obj
+    //    //        "ToInt16", (int16 : uint8 -> _) :> obj
+    //    //        "ToInt16", (int16 : uint16 -> _) :> obj
+    //    //        "ToInt16", (int16 : uint32 -> _) :> obj
+    //    //        "ToInt16", (int16 : uint64 -> _) :> obj
+    //    //        "ToInt16", (int16 : float32 -> _) :> obj
+    //    //        "ToInt16", (int16 : float -> _) :> obj
+    //    //        "ToInt16", (int16 : decimal -> _) :> obj
+                
+    //    //        "ToUInt16", (uint16 : int8 -> _) :> obj
+    //    //        "ToUInt16", (uint16 : int16 -> _) :> obj
+    //    //        "ToUInt16", (uint16 : int32 -> _) :> obj
+    //    //        "ToUInt16", (uint16 : int64 -> _) :> obj
+    //    //        "ToUInt16", (uint16 : uint8 -> _) :> obj
+    //    //        "ToUInt16", (uint16 : uint16 -> _) :> obj
+    //    //        "ToUInt16", (uint16 : uint32 -> _) :> obj
+    //    //        "ToUInt16", (uint16 : uint64 -> _) :> obj
+    //    //        "ToUInt16", (uint16 : float32 -> _) :> obj
+    //    //        "ToUInt16", (uint16 : float -> _) :> obj
+    //    //        "ToUInt16", (uint16 : decimal -> _) :> obj
                 
                 
-//                "ToInt", (int : int8 -> _) :> obj
-//                "ToInt", (int : int16 -> _) :> obj
-//                "ToInt", (int : int32 -> _) :> obj
-//                "ToInt", (int : int64 -> _) :> obj
-//                "ToInt", (int : uint8 -> _) :> obj
-//                "ToInt", (int : uint16 -> _) :> obj
-//                "ToInt", (int : uint32 -> _) :> obj
-//                "ToInt", (int : uint64 -> _) :> obj
-//                "ToInt", (int : float32 -> _) :> obj
-//                "ToInt", (int : float -> _) :> obj
-//                "ToInt", (int : decimal -> _) :> obj
+    //    //        "ToInt", (int : int8 -> _) :> obj
+    //    //        "ToInt", (int : int16 -> _) :> obj
+    //    //        "ToInt", (int : int32 -> _) :> obj
+    //    //        "ToInt", (int : int64 -> _) :> obj
+    //    //        "ToInt", (int : uint8 -> _) :> obj
+    //    //        "ToInt", (int : uint16 -> _) :> obj
+    //    //        "ToInt", (int : uint32 -> _) :> obj
+    //    //        "ToInt", (int : uint64 -> _) :> obj
+    //    //        "ToInt", (int : float32 -> _) :> obj
+    //    //        "ToInt", (int : float -> _) :> obj
+    //    //        "ToInt", (int : decimal -> _) :> obj
                 
-//                "ToUInt32", (uint32 : int8 -> _) :> obj
-//                "ToUInt32", (uint32 : int16 -> _) :> obj
-//                "ToUInt32", (uint32 : int32 -> _) :> obj
-//                "ToUInt32", (uint32 : int64 -> _) :> obj
-//                "ToUInt32", (uint32 : uint8 -> _) :> obj
-//                "ToUInt32", (uint32 : uint16 -> _) :> obj
-//                "ToUInt32", (uint32 : uint32 -> _) :> obj
-//                "ToUInt32", (uint32 : uint64 -> _) :> obj
-//                "ToUInt32", (uint32 : float32 -> _) :> obj
-//                "ToUInt32", (uint32 : float -> _) :> obj
-//                "ToUInt32", (uint32 : decimal -> _) :> obj
+    //    //        "ToUInt32", (uint32 : int8 -> _) :> obj
+    //    //        "ToUInt32", (uint32 : int16 -> _) :> obj
+    //    //        "ToUInt32", (uint32 : int32 -> _) :> obj
+    //    //        "ToUInt32", (uint32 : int64 -> _) :> obj
+    //    //        "ToUInt32", (uint32 : uint8 -> _) :> obj
+    //    //        "ToUInt32", (uint32 : uint16 -> _) :> obj
+    //    //        "ToUInt32", (uint32 : uint32 -> _) :> obj
+    //    //        "ToUInt32", (uint32 : uint64 -> _) :> obj
+    //    //        "ToUInt32", (uint32 : float32 -> _) :> obj
+    //    //        "ToUInt32", (uint32 : float -> _) :> obj
+    //    //        "ToUInt32", (uint32 : decimal -> _) :> obj
                 
-//                "ToInt64", (int64 : int8 -> _) :> obj
-//                "ToInt64", (int64 : int16 -> _) :> obj
-//                "ToInt64", (int64 : int32 -> _) :> obj
-//                "ToInt64", (int64 : int64 -> _) :> obj
-//                "ToInt64", (int64 : uint8 -> _) :> obj
-//                "ToInt64", (int64 : uint16 -> _) :> obj
-//                "ToInt64", (int64 : uint32 -> _) :> obj
-//                "ToInt64", (int64 : uint64 -> _) :> obj
-//                "ToInt64", (int64 : float32 -> _) :> obj
-//                "ToInt64", (int64 : float -> _) :> obj
-//                "ToInt64", (int64 : decimal -> _) :> obj
+    //    //        "ToInt64", (int64 : int8 -> _) :> obj
+    //    //        "ToInt64", (int64 : int16 -> _) :> obj
+    //    //        "ToInt64", (int64 : int32 -> _) :> obj
+    //    //        "ToInt64", (int64 : int64 -> _) :> obj
+    //    //        "ToInt64", (int64 : uint8 -> _) :> obj
+    //    //        "ToInt64", (int64 : uint16 -> _) :> obj
+    //    //        "ToInt64", (int64 : uint32 -> _) :> obj
+    //    //        "ToInt64", (int64 : uint64 -> _) :> obj
+    //    //        "ToInt64", (int64 : float32 -> _) :> obj
+    //    //        "ToInt64", (int64 : float -> _) :> obj
+    //    //        "ToInt64", (int64 : decimal -> _) :> obj
                 
-//                "ToUInt64", (uint64 : int8 -> _) :> obj
-//                "ToUInt64", (uint64 : int16 -> _) :> obj
-//                "ToUInt64", (uint64 : int32 -> _) :> obj
-//                "ToUInt64", (uint64 : int64 -> _) :> obj
-//                "ToUInt64", (uint64 : uint8 -> _) :> obj
-//                "ToUInt64", (uint64 : uint16 -> _) :> obj
-//                "ToUInt64", (uint64 : uint32 -> _) :> obj
-//                "ToUInt64", (uint64 : uint64 -> _) :> obj
-//                "ToUInt64", (uint64 : float32 -> _) :> obj
-//                "ToUInt64", (uint64 : float -> _) :> obj
-//                "ToUInt64", (uint64 : decimal -> _) :> obj
+    //    //        "ToUInt64", (uint64 : int8 -> _) :> obj
+    //    //        "ToUInt64", (uint64 : int16 -> _) :> obj
+    //    //        "ToUInt64", (uint64 : int32 -> _) :> obj
+    //    //        "ToUInt64", (uint64 : int64 -> _) :> obj
+    //    //        "ToUInt64", (uint64 : uint8 -> _) :> obj
+    //    //        "ToUInt64", (uint64 : uint16 -> _) :> obj
+    //    //        "ToUInt64", (uint64 : uint32 -> _) :> obj
+    //    //        "ToUInt64", (uint64 : uint64 -> _) :> obj
+    //    //        "ToUInt64", (uint64 : float32 -> _) :> obj
+    //    //        "ToUInt64", (uint64 : float -> _) :> obj
+    //    //        "ToUInt64", (uint64 : decimal -> _) :> obj
                 
-//                "ToSingle", (float32 : int8 -> _) :> obj
-//                "ToSingle", (float32 : int16 -> _) :> obj
-//                "ToSingle", (float32 : int32 -> _) :> obj
-//                "ToSingle", (float32 : int64 -> _) :> obj
-//                "ToSingle", (float32 : uint8 -> _) :> obj
-//                "ToSingle", (float32 : uint16 -> _) :> obj
-//                "ToSingle", (float32 : uint32 -> _) :> obj
-//                "ToSingle", (float32 : uint64 -> _) :> obj
-//                "ToSingle", (float32 : float32 -> _) :> obj
-//                "ToSingle", (float32 : float -> _) :> obj
-//                "ToSingle", (float32 : decimal -> _) :> obj
+    //    //        "ToSingle", (float32 : int8 -> _) :> obj
+    //    //        "ToSingle", (float32 : int16 -> _) :> obj
+    //    //        "ToSingle", (float32 : int32 -> _) :> obj
+    //    //        "ToSingle", (float32 : int64 -> _) :> obj
+    //    //        "ToSingle", (float32 : uint8 -> _) :> obj
+    //    //        "ToSingle", (float32 : uint16 -> _) :> obj
+    //    //        "ToSingle", (float32 : uint32 -> _) :> obj
+    //    //        "ToSingle", (float32 : uint64 -> _) :> obj
+    //    //        "ToSingle", (float32 : float32 -> _) :> obj
+    //    //        "ToSingle", (float32 : float -> _) :> obj
+    //    //        "ToSingle", (float32 : decimal -> _) :> obj
                 
-//                "ToDouble", (float : int8 -> _) :> obj
-//                "ToDouble", (float : int16 -> _) :> obj
-//                "ToDouble", (float : int32 -> _) :> obj
-//                "ToDouble", (float : int64 -> _) :> obj
-//                "ToDouble", (float : uint8 -> _) :> obj
-//                "ToDouble", (float : uint16 -> _) :> obj
-//                "ToDouble", (float : uint32 -> _) :> obj
-//                "ToDouble", (float : uint64 -> _) :> obj
-//                "ToDouble", (float : float32 -> _) :> obj
-//                "ToDouble", (float : float -> _) :> obj
-//                "ToDouble", (float : decimal -> _) :> obj
+    //    //        "ToDouble", (float : int8 -> _) :> obj
+    //    //        "ToDouble", (float : int16 -> _) :> obj
+    //    //        "ToDouble", (float : int32 -> _) :> obj
+    //    //        "ToDouble", (float : int64 -> _) :> obj
+    //    //        "ToDouble", (float : uint8 -> _) :> obj
+    //    //        "ToDouble", (float : uint16 -> _) :> obj
+    //    //        "ToDouble", (float : uint32 -> _) :> obj
+    //    //        "ToDouble", (float : uint64 -> _) :> obj
+    //    //        "ToDouble", (float : float32 -> _) :> obj
+    //    //        "ToDouble", (float : float -> _) :> obj
+    //    //        "ToDouble", (float : decimal -> _) :> obj
 
 
-//            ]
+    //    //    ]
 
 
-//        let rec (|SeqCons|_|) (e : Expr) =
-//            match e with
-//                | Unit ->
-//                    None
+    //    let rec (|SeqCons|_|) (e : Expr) =
+    //        match e with
+    //            | Unit ->
+    //                None
 
-//                | Sequential(SeqCons(head, tail), r) ->
-//                    let tail = 
-//                        match tail with
-//                            | Some t -> Expr.Sequential(t, r) |> Some
-//                            | None -> Some r
-//                    Some (head, tail)
+    //            | Sequential(SeqCons(head, tail), r) ->
+    //                let tail = 
+    //                    match tail with
+    //                        | Some t -> Expr.Sequential(t, r) |> Some
+    //                        | None -> Some r
+    //                Some (head, tail)
                     
 
-//                | e -> 
-//                    Some (e, None)
+    //            | e -> 
+    //                Some (e, None)
   
-//        let rec (|SeqCons2|_|) (e : Expr) =
-//            match e with
-//                | SeqCons(a, Some (SeqCons(b, c))) ->
-//                    Some (a,b,c)
-//                | _ ->
-//                    None
+    //    let rec (|SeqCons2|_|) (e : Expr) =
+    //        match e with
+    //            | SeqCons(a, Some (SeqCons(b, c))) ->
+    //                Some (a,b,c)
+    //            | _ ->
+    //                None
    
-//        let rec evaluateConstantsS (e : Expr) =
-//            state {
-//                match e with
-//                    | WriteOutputs values ->
-//                        let! values = 
-//                            values |> Map.mapS (fun _ (i, v) -> 
-//                                state {
-//                                    let! v = 
-//                                        match v with
-//                                            | Coerce(v, t) -> evaluateConstantsS v |> State.map (fun v -> Expr.Coerce(v, t))
-//                                            | v -> evaluateConstantsS v
+    //    let rec evaluateConstantsS (e : Expr) =
+    //        state {
+    //            match e with
+    //                | WriteOutputs values ->
+    //                    let! values = 
+    //                        values |> Map.mapS (fun _ (i, v) -> 
+    //                            state {
+    //                                let! v = 
+    //                                    match v with
+    //                                        | Coerce(v, t) -> evaluateConstantsS v |> State.map (fun v -> Expr.Coerce(v, t))
+    //                                        | v -> evaluateConstantsS v
 
-//                                    let! i = i |> Option.mapS evaluateConstantsS
-//                                    return i, v
-//                                }
+    //                                let! i = i |> Option.mapS evaluateConstantsS
+    //                                return i, v
+    //                            }
                                         
-//                            )
-//                        return Expr.WriteOutputs(values)
+    //                        )
+    //                    return Expr.WriteOutputs(values)
 
 
 
-//                    | AddressOf e ->
-//                        let! e = evaluateConstantsS e
-//                        return Expr.AddressOf(e)
+    //                | AddressOf e ->
+    //                    let! e = evaluateConstantsS e
+    //                    return Expr.AddressOf(e)
 
-//                    | AddressSet(v, e) ->
-//                        let! v = evaluateConstantsS v
-//                        let! e = evaluateConstantsS e
-//                        return Expr.AddressSet(v, e)
+    //                | AddressSet(v, e) ->
+    //                    let! v = evaluateConstantsS v
+    //                    let! e = evaluateConstantsS e
+    //                    return Expr.AddressSet(v, e)
                         
                  
 
-//                    | Application(lambda, arg) ->
-//                        let! lambda = evaluateConstantsS lambda
-//                        let! arg = evaluateConstantsS arg
-//                        match lambda, arg with
-//                            | Value(lambda, lt), Value(arg, at) ->
-//                                let mi = lt.GetMethod("Invoke", [|at|])
-//                                return Expr.Value(mi.Invoke(lambda, [|arg|]), e.Type)
-//                            | _ ->
-//                                return Expr.Application(lambda, arg)
+    //                //| Application(lambda, arg) ->
+    //                //    let! lambda = evaluateConstantsS lambda
+    //                //    let! arg = evaluateConstantsS arg
+    //                //    match lambda, arg with
+    //                //        | Value(lambda, lt), Value(arg, at) ->
+    //                //            let mi = lt.GetMethod("Invoke", [|at|])
+    //                //            return Expr.Value(mi.Invoke(lambda, [|arg|]), e.Type)
+    //                //        | _ ->
+    //                //            return Expr.Application(lambda, arg)
 
-//                    | SeqCons2((Unroll as u), ForInteger(v, first, step, last, body), rest) ->
-//                        let! first = evaluateConstantsS first
-//                        let! step = evaluateConstantsS step
-//                        let! last = evaluateConstantsS last
+    //                | SeqCons2((Unroll as u), ForInteger(v, first, step, last, body), rest) ->
+    //                    let! first = evaluateConstantsS first
+    //                    let! step = evaluateConstantsS step
+    //                    let! last = evaluateConstantsS last
                         
-//                        match first, step, last with
-//                            | Int32 f, Int32 s, Int32 l ->
-//                                let! unrolled = 
-//                                    [f .. s .. l] |> List.mapS (fun i -> 
-//                                        let value = Expr.Value(i)
-//                                        let body = body.Substitute(fun vi -> if vi = v then Some value else None)
-//                                        evaluateConstantsS body
-//                                    )
-//                                match rest with
-//                                    | Some rest -> 
-//                                        let! rest = evaluateConstantsS rest
-//                                        return Expr.Seq [Expr.Seq unrolled; rest]
-//                                    | None ->
-//                                        return Expr.Seq unrolled
-//                            | _ ->
-//                                let! body = evaluateConstantsS body
-//                                match rest with
-//                                    | Some rest -> 
-//                                        let! rest = evaluateConstantsS rest
-//                                        match body with
-//                                            | Value _ -> return rest
-//                                            | _ -> 
-//                                                return Expr.Seq [u; Expr.ForInteger(v, first, step, last, body); rest]
-//                                    | None ->
-//                                        return Expr.Seq [u; Expr.ForInteger(v, first, step, last, body)]
+    //                    match first, step, last with
+    //                        | Int32 f, Int32 s, Int32 l ->
+    //                            let! unrolled = 
+    //                                [f .. s .. l] |> List.mapS (fun i -> 
+    //                                    let value = Expr.Value(i)
+    //                                    let body = body.Substitute(fun vi -> if vi = v then Some value else None)
+    //                                    evaluateConstantsS body
+    //                                )
+    //                            match rest with
+    //                                | Some rest -> 
+    //                                    let! rest = evaluateConstantsS rest
+    //                                    return Expr.Seq [Expr.Seq unrolled; rest]
+    //                                | None ->
+    //                                    return Expr.Seq unrolled
+    //                        | _ ->
+    //                            let! body = evaluateConstantsS body
+    //                            match rest with
+    //                                | Some rest -> 
+    //                                    let! rest = evaluateConstantsS rest
+    //                                    match body with
+    //                                        | Value _ -> return rest
+    //                                        | _ -> 
+    //                                            return Expr.Seq [u; Expr.ForInteger(v, first, step, last, body); rest]
+    //                                | None ->
+    //                                    return Expr.Seq [u; Expr.ForInteger(v, first, step, last, body)]
 
 
                         
 
-//                    | ForInteger(v, first, step, last, body) ->
-//                        let! first = evaluateConstantsS first
-//                        let! step = evaluateConstantsS step
-//                        let! last = evaluateConstantsS last
-//                        let! body = evaluateConstantsS body
+    //                | ForInteger(v, first, step, last, body) ->
+    //                    let! first = evaluateConstantsS first
+    //                    let! step = evaluateConstantsS step
+    //                    let! last = evaluateConstantsS last
+    //                    let! body = evaluateConstantsS body
 
-//                        match first, step, last with
-//                            | Int32 f, Int32 s, Int32 l ->
-//                                if s > 0 && l < f then return Expr.Unit
-//                                elif s < 0 && l > f then return Expr.Unit
-//                                else return Expr.ForInteger(v, first, step, last, body)
-//                            | _ ->
+    //                    match first, step, last with
+    //                        | Int32 f, Int32 s, Int32 l ->
+    //                            if s > 0 && l < f then return Expr.Unit
+    //                            elif s < 0 && l > f then return Expr.Unit
+    //                            else return Expr.ForInteger(v, first, step, last, body)
+    //                        | _ ->
 
-//                                match body with
-//                                    | Value _ -> return Expr.Unit
-//                                    | _ -> return Expr.ForInteger(v, first, step, last, body)
+    //                            match body with
+    //                                | Value _ -> return Expr.Unit
+    //                                | _ -> return Expr.ForInteger(v, first, step, last, body)
                     
-//                    | ForEach(v, s, b) ->
-//                        let! s = evaluateConstantsS s
-//                        let! b = evaluateConstantsS b
-//                        match b with
-//                            | Unit -> return Expr.Unit
-//                            | _ -> return Expr.ForEach(v, s, b)
+    //                //| ForEach(v, s, b) ->
+    //                //    let! s = evaluateConstantsS s
+    //                //    let! b = evaluateConstantsS b
+    //                //    match b with
+    //                //        | Unit -> return Expr.Unit
+    //                //        | _ -> return Expr.ForEach(v, s, b)
 
-//                    | CallFunction(utility, args) ->
-//                        let! args = args |> List.mapS evaluateConstantsS
-//                        let! s = State.get
-//                        let utility =
-//                            utility |> UtilityFunction.map (fun e ->
-//                                let innerState = ref { State.empty with isGlobalSideEffect = s.isGlobalSideEffect }
-//                                evaluateConstantsS(e).Run(innerState)
-//                            )
+    //                | CallFunction(utility, args) ->
+    //                    let! args = args |> List.mapS evaluateConstantsS
+    //                    let! s = State.get
+    //                    let utility =
+    //                        utility |> UtilityFunction.map (fun e ->
+    //                            let innerState = ref { State.empty with isGlobalSideEffect = s.isGlobalSideEffect }
+    //                            evaluateConstantsS(e).Run(innerState)
+    //                        )
 
-//                        return Expr.CallFunction(utility, args)
+    //                    return Expr.CallFunction(utility, args)
                         
 
-//                    | Call(None, mi, [v]) when mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped" ->
-//                        let! v = evaluateConstantsS v
-//                        match v with
-//                            | ExprValue ve -> 
-//                                let! ve = evaluateConstantsS ve
-//                                return ve
-//                            | _ -> 
-//                                return Expr.Call(mi, [v])
+    //                | Call(None, mi, [v]) when mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped" ->
+    //                    let! v = evaluateConstantsS v
+    //                    match v with
+    //                        | ExprValue ve -> 
+    //                            let! ve = evaluateConstantsS ve
+    //                            return ve
+    //                        | _ -> 
+    //                            return Expr.Call(mi, [v])
        
-//                    | Call(None, mi, args) ->
-//                        let! needed = State.needsCall mi
-//                        let! args = args |> List.mapS evaluateConstantsS
+    //                | Call(None, mi, args) ->
+    //                    let! needed = State.needsCall mi
+    //                    let! args = args |> List.mapS evaluateConstantsS
                         
-//                        if needed then
-//                            return Expr.Call(mi, args)
-//                        else
-//                            match args with
-//                                | AllConstant values ->
-//                                    let key = mi.Name, args |> List.map (fun v -> v.Type)
-//                                    match operators.TryGetValue key with
-//                                        | Some f -> 
-//                                            return Expr.Value(f values, e.Type)
-//                                        | _ -> 
-//                                            let value = 
-//                                                try mi.Invoke(null, values |> List.toArray) |> Some
-//                                                with 
-//                                                    | ShaderOnlyExn _ -> None
-//                                                    | _ -> 
-//                                                        Log.warn "[FShade] could not evaluate: %A" mi
-//                                                        None
+    //                    if needed then
+    //                        return Expr.Call(mi, args)
+    //                    else
+    //                        match args with
+    //                            | AllConstant values ->
+    //                                //let key = mi.Name, args |> List.map (fun v -> v.Type)
+    //                                //match operators.TryGetValue key with
+    //                                //    | Some f -> 
+    //                                //        return Expr.Value(f values, e.Type)
+    //                                //    | _ -> 
+    //                                let value = 
+    //                                    try mi.Invoke(null, values |> List.toArray) |> Some
+    //                                    with 
+    //                                        | ShaderOnlyExn _ -> None
+    //                                        | _ -> 
+    //                                            Log.warn "[FShade] could not evaluate: %A" mi
+    //                                            None
 
-//                                            match value with
-//                                                | Some v -> return Expr.Value(v, e.Type)
-//                                                | None -> return Expr.Call(mi, args)
-//                                | _ ->
-//                                    return Expr.Call(mi, args) 
+    //                                match value with
+    //                                    | Some v -> return Expr.Value(v, e.Type)
+    //                                    | None -> return Expr.Call(mi, args)
+    //                            | _ ->
+    //                                return Expr.Call(mi, args) 
 
-//                    | Call(Some t, mi, args) ->
-//                        let! needed = State.needsCall mi
-//                        let! t = evaluateConstantsS t
-//                        let! args = args |> List.mapS evaluateConstantsS
+    //                | Call(Some t, mi, args) ->
+    //                    let! needed = State.needsCall mi
+    //                    let! t = evaluateConstantsS t
+    //                    let! args = args |> List.mapS evaluateConstantsS
                         
-//                        if needed then
-//                            return Expr.Call(t, mi, args)
-//                        else
-//                            match t, args with
-//                                | Value(tv,_), AllConstant values -> 
+    //                    if needed then
+    //                        return Expr.Call(t, mi, args)
+    //                    else
+    //                        match t, args with
+    //                            | Value(tv,_), AllConstant values -> 
                                     
-//                                    let value = 
-//                                        try mi.Invoke(tv, values |> List.toArray) |> Some
-//                                        with 
-//                                            | ShaderOnlyExn _ -> None
-//                                            | _ -> 
-//                                                Log.warn "[FShade] could not evaluate: %A" mi
-//                                                None
-//                                    match value with    
-//                                        | Some v -> return Expr.Value(v, e.Type)
-//                                        | None -> return Expr.Call(t, mi, args)
-//                                | _ ->
-//                                    return Expr.Call(t, mi, args)
+    //                                let value = 
+    //                                    try mi.Invoke(tv, values |> List.toArray) |> Some
+    //                                    with 
+    //                                        | ShaderOnlyExn _ -> None
+    //                                        | _ -> 
+    //                                            Log.warn "[FShade] could not evaluate: %A" mi
+    //                                            None
+    //                                match value with    
+    //                                    | Some v -> return Expr.Value(v, e.Type)
+    //                                    | None -> return Expr.Call(t, mi, args)
+    //                            | _ ->
+    //                                return Expr.Call(t, mi, args)
 
-//                    | Coerce(e, t) ->
-//                        let! e = evaluateConstantsS e
-//                        match e with
-//                            | Value(e,_) -> return Expr.Value(e, t)
-//                            | _ -> return Expr.Coerce(e, t)
+    //                | Coerce(e, t) ->
+    //                    let! e = evaluateConstantsS e
+    //                    match e with
+    //                        | Value(e,_) -> return Expr.Value(e, t)
+    //                        | _ -> return Expr.Coerce(e, t)
 
-//                    | DefaultValue t ->
-//                        return Expr.DefaultValue t
+    //                | DefaultValue t ->
+    //                    return Expr.DefaultValue t
 
-//                    | FieldGet(None, f) ->
-//                        let! n = State.needsField f
-//                        if n then return e
-//                        else return Expr.Value(f.GetValue null, e.Type)
+    //                | FieldGet(None, f) ->
+    //                    let! n = State.needsField f
+    //                    if n then return e
+    //                    else return Expr.Value(f.GetValue null, e.Type)
 
-//                    | FieldGet(Some t, f) ->
-//                        let! t = evaluateConstantsS t
-//                        let! n = State.needsField f
-//                        match t with
-//                            | Value(t,_) when not n && not (isNull t) ->  return Expr.Value(f.GetValue t, e.Type)
-//                            | _ -> return Expr.FieldGet(t, f)
+    //                | FieldGet(Some t, f) ->
+    //                    let! t = evaluateConstantsS t
+    //                    let! n = State.needsField f
+    //                    match t with
+    //                        | Value(t,_) when not n && not (isNull t) ->  return Expr.Value(f.GetValue t, e.Type)
+    //                        | _ -> return Expr.FieldGet(t, f)
 
-//                    | FieldSet(None, f, value) ->
-//                        let! value = evaluateConstantsS value
-//                        return Expr.FieldSet(f, value)
+    //                //| FieldSet(None, f, value) ->
+    //                //    let! value = evaluateConstantsS value
+    //                //    return Expr.FieldSet(f, value)
 
-//                    | FieldSet(Some t, f, value) ->
-//                        let! t = evaluateConstantsS t
-//                        let! value = evaluateConstantsS value
-//                        return Expr.FieldSet(t, f, value)
+    //                //| FieldSet(Some t, f, value) ->
+    //                //    let! t = evaluateConstantsS t
+    //                //    let! value = evaluateConstantsS value
+    //                //    return Expr.FieldSet(t, f, value)
 
-//                    | IfThenElse(cond, i, e) ->
-//                        let! cond = evaluateConstantsS cond
-//                        match cond with
-//                            | Bool true -> 
-//                                return! evaluateConstantsS i
+    //                | IfThenElse(cond, i, e) ->
+    //                    let! cond = evaluateConstantsS cond
+    //                    match cond with
+    //                        | Bool true -> 
+    //                            return! evaluateConstantsS i
 
-//                            | Bool false -> 
-//                                return! evaluateConstantsS e
+    //                        | Bool false -> 
+    //                            return! evaluateConstantsS e
 
-//                            | _ ->
-//                                let! i = evaluateConstantsS i
-//                                let! e = evaluateConstantsS e
-//                                return Expr.IfThenElse(cond, i, e)
+    //                        | _ ->
+    //                            let! i = evaluateConstantsS i
+    //                            let! e = evaluateConstantsS e
+    //                            return Expr.IfThenElse(cond, i, e)
 
-//                    | Lambda(v, b) ->
-//                        let! b = evaluateConstantsS b
-//                        return Expr.Lambda(v, b)
+    //                | Lambda(v, b) ->
+    //                    let! b = evaluateConstantsS b
+    //                    return Expr.Lambda(v, b)
 
-//                    | Let(v, e, b) ->
-//                        let! e = evaluateConstantsS e
-//                        match e with
-//                            | Value(value,_) when not v.IsMutable ->
-//                                do! State.setVar v value
-//                                return! evaluateConstantsS b
-//                            | _ ->
-//                                let! b = evaluateConstantsS b
-//                                return Expr.Let(v, e, b)
+    //                | Let(v, e, b) ->
+    //                    let! e = evaluateConstantsS e
+    //                    match e with
+    //                        | Value(value,_) when not v.IsMutable ->
+    //                            do! State.setVar v value
+    //                            return! evaluateConstantsS b
+    //                        | _ ->
+    //                            let! b = evaluateConstantsS b
+    //                            return Expr.Let(v, e, b)
 
-//                    | NewArray(t, args) ->
-//                        let! args = args |> List.mapS evaluateConstantsS
-//                        match args with
-//                            | AllConstant args ->
-//                                let value = 
-//                                    let arr = Array.CreateInstance(t, List.length args)
-//                                    let mutable i = 0
-//                                    for a in args do
-//                                        arr.SetValue(a, i)
-//                                        i <- i + 1
-//                                    arr
+    //                | NewArray(t, args) ->
+    //                    let! args = args |> List.mapS evaluateConstantsS
+    //                    return Expr.NewArray(t, args)
 
-//                                return Expr.Value(value, e.Type)
-//                            | _ ->
-//                                return Expr.NewArray(t, args)
+    //                | NewDelegate(t, vars, body) ->
+    //                    let! body = evaluateConstantsS body
+    //                    return Expr.NewDelegate(t, vars, body)
 
-//                    | NewDelegate(t, vars, body) ->
-//                        let! body = evaluateConstantsS body
-//                        return Expr.NewDelegate(t, vars, body)
-
-//                    | NewObject(ctor, args) ->
-//                        let! args = args |> List.mapS evaluateConstantsS
-//                        match args with
-//                            | AllConstant args ->
-//                                return Expr.Value(ctor.Invoke(List.toArray args), e.Type)
-//                            | _ ->
-//                                return Expr.NewObject(ctor, args)
+    //                | NewObject(ctor, args) ->
+    //                    let! args = args |> List.mapS evaluateConstantsS
+    //                    match args with
+    //                        | AllConstant args ->
+    //                            return Expr.Value(ctor.Invoke(List.toArray args), e.Type)
+    //                        | _ ->
+    //                            return Expr.NewObject(ctor, args)
                         
-//                    | NewRecord(t, args) ->
-//                        let! args = args |> List.mapS evaluateConstantsS
-//                        match args with
-//                            | AllConstant args ->
-//                                return Expr.Value(FSharpValue.MakeRecord(t, List.toArray args, true), e.Type)
-//                            | _ ->
-//                                return Expr.NewRecord(t, args)
+    //                | NewRecord(t, args) ->
+    //                    let! args = args |> List.mapS evaluateConstantsS
+    //                    match args with
+    //                        | AllConstant args ->
+    //                            return Expr.Value(FSharpValue.MakeRecord(t, List.toArray args, true), e.Type)
+    //                        | _ ->
+    //                            return Expr.NewRecord(t, args)
 
-//                    | NewTuple(args) ->
-//                        let! args = args |> List.mapS evaluateConstantsS
-//                        match args with
-//                            | AllConstant args ->
-//                                return Expr.Value(FSharpValue.MakeTuple(List.toArray args, e.Type), e.Type)
-//                            | _ ->
-//                                return Expr.NewTuple(args)
+    //                | NewTuple(args) ->
+    //                    let! args = args |> List.mapS evaluateConstantsS
+    //                    match args with
+    //                        | AllConstant args ->
+    //                            return Expr.Value(FSharpValue.MakeTuple(List.toArray args, e.Type), e.Type)
+    //                        | _ ->
+    //                            return Expr.NewTuple(args)
                         
-//                    | NewUnionCase(ci, args) ->
-//                        let! args = args |> List.mapS evaluateConstantsS
-//                        match args with
-//                            | AllConstant args ->
-//                                return Expr.Value(FSharpValue.MakeUnion(ci, List.toArray args, true), e.Type)
-//                            | _ ->
-//                                return Expr.NewUnionCase(ci, args)
+    //                | NewUnionCase(ci, args) ->
+    //                    let! args = args |> List.mapS evaluateConstantsS
+    //                    match args with
+    //                        | AllConstant args ->
+    //                            return Expr.Value(FSharpValue.MakeUnion(ci, List.toArray args, true), e.Type)
+    //                        | _ ->
+    //                            return Expr.NewUnionCase(ci, args)
                         
-//                    | PropertyGet(None, pi, indices) ->
-//                        let! indices = indices |> List.mapS evaluateConstantsS
-//                        let! n = State.needsProperty pi
-//                        match indices with
-//                            | AllConstant indexValues when not n ->
-//                                let value = 
-//                                    try pi.GetValue(null, List.toArray indexValues) |> Some
-//                                    with 
-//                                        | ShaderOnlyExn _ -> None
-//                                        | _ -> 
-//                                            Log.warn "[FShade] could not evaluate: %A" pi
-//                                            None
-//                                match value with
-//                                    | Some value -> return Expr.Value(value, e.Type)
-//                                    | None -> return Expr.PropertyGet(pi, indices)
+    //                | PropertyGet(None, pi, indices) ->
+    //                    let! indices = indices |> List.mapS evaluateConstantsS
+    //                    let! n = State.needsProperty pi
+    //                    match indices with
+    //                        | AllConstant indexValues when not n ->
+    //                            let value = 
+    //                                try pi.GetValue(null, List.toArray indexValues) |> Some
+    //                                with 
+    //                                    | ShaderOnlyExn _ -> None
+    //                                    | _ -> 
+    //                                        Log.warn "[FShade] could not evaluate: %A" pi
+    //                                        None
+    //                            match value with
+    //                                | Some value -> return Expr.Value(value, e.Type)
+    //                                | None -> return Expr.PropertyGet(pi, indices)
 
-//                            | _ ->
-//                                return Expr.PropertyGet(pi, indices)
+    //                        | _ ->
+    //                            return Expr.PropertyGet(pi, indices)
 
-//                    | PropertyGet(Some t, pi, indices) ->
-//                        let! t = evaluateConstantsS t
-//                        let! indices = indices |> List.mapS evaluateConstantsS
-//                        let! n = State.needsProperty pi
-//                        match t, indices with
-//                            | Value(tv,_), AllConstant indexValues when not n && not (isNull tv)->
-//                                let value = 
-//                                    try pi.GetValue(tv, List.toArray indexValues) |> Some
-//                                    with 
-//                                        | ShaderOnlyExn _ -> None
-//                                        | _ -> 
-//                                            Log.warn "[FShade] could not evaluate: %A" pi
-//                                            None
+    //                | PropertyGet(Some t, pi, indices) ->
+    //                    let! t = evaluateConstantsS t
+    //                    let! indices = indices |> List.mapS evaluateConstantsS
+    //                    let! n = State.needsProperty pi
+    //                    match t, indices with
+    //                        | Value(tv,_), AllConstant indexValues when not n && not (isNull tv)->
+    //                            let value = 
+    //                                try pi.GetValue(tv, List.toArray indexValues) |> Some
+    //                                with 
+    //                                    | ShaderOnlyExn _ -> None
+    //                                    | _ -> 
+    //                                        Log.warn "[FShade] could not evaluate: %A" pi
+    //                                        None
 
-//                                match value with
-//                                    | Some value -> return Expr.Value(value, e.Type)
-//                                    | None -> return Expr.PropertyGet(t, pi, indices)
-//                            | _ ->
-//                                return Expr.PropertyGet(t, pi, indices)
+    //                            match value with
+    //                                | Some value -> return Expr.Value(value, e.Type)
+    //                                | None -> return Expr.PropertyGet(t, pi, indices)
+    //                        | _ ->
+    //                            return Expr.PropertyGet(t, pi, indices)
 
-//                    | PropertySet(None, pi, indices, value) ->
-//                        let! indices = indices |> List.mapS evaluateConstantsS
-//                        let! value = evaluateConstantsS value
-//                        return Expr.PropertySet(pi, value, indices)
+    //                | PropertySet(None, pi, indices, value) ->
+    //                    let! indices = indices |> List.mapS evaluateConstantsS
+    //                    let! value = evaluateConstantsS value
+    //                    return Expr.PropertySet(pi, value, indices)
 
-//                    | PropertySet(Some t, pi, indices, value) ->
-//                        let! t = evaluateConstantsS t
-//                        let! indices = indices |> List.mapS evaluateConstantsS
-//                        let! value = evaluateConstantsS value
-//                        return Expr.PropertySet(t, pi, value, indices)
+    //                | PropertySet(Some t, pi, indices, value) ->
+    //                    let! t = evaluateConstantsS t
+    //                    let! indices = indices |> List.mapS evaluateConstantsS
+    //                    let! value = evaluateConstantsS value
+    //                    return Expr.PropertySet(t, pi, value, indices)
                         
-//                    | QuoteRaw e ->
-//                        //let! e = evaluateConstantsS e
-//                        return Expr.Value(e)
+    //                | QuoteRaw e ->
+    //                    //let! e = evaluateConstantsS e
+    //                    return Expr.Value(e)
                         
-//                    | QuoteTyped te ->
-//                        let! te = evaluateConstantsS te
-//                        let mi = typeof<Expr>.GetMethod("Cast")
-//                        let mi = mi.MakeGenericMethod [| te.Type |]
-//                        let v = mi.Invoke(null, [|te :> obj|])
+    //                | QuoteTyped te ->
+    //                    //let! te = evaluateConstantsS te
+    //                    //let mi = typeof<Expr>.GetMethod("Cast")
+    //                    //let mi = mi.MakeGenericMethod [| te.Type |]
+    //                    //let v = mi.Invoke(null, [|te :> obj|])
                         
-//                        return Expr.Value(v, e.Type)
+    //                    return failwith "bad" //Expr.Value(v, e.Type)
 
-//                    | Sequential(l, r) ->
-//                        let! l = evaluateConstantsS l
-//                        let! r = evaluateConstantsS r
-//                        match l with
-//                            | Unit -> return r
-//                            | _ -> return Expr.Sequential(l, r)
+    //                | Sequential(l, r) ->
+    //                    let! l = evaluateConstantsS l
+    //                    let! r = evaluateConstantsS r
+    //                    match l with
+    //                        | Unit -> return r
+    //                        | _ -> return Expr.Sequential(l, r)
 
-//                    | TryFinally(t,f) ->
-//                        let! t = evaluateConstantsS t
-//                        let! f = evaluateConstantsS f
-//                        return Expr.TryFinally(t, f)
+    //                | TryFinally(t,f) ->
+    //                    let! t = evaluateConstantsS t
+    //                    let! f = evaluateConstantsS f
+    //                    return Expr.TryFinally(t, f)
 
-//                    | TryWith(a, b, c, d, e) ->
-//                        let! a = evaluateConstantsS a
-//                        let! c = evaluateConstantsS c
-//                        let! e = evaluateConstantsS e
-//                        return Expr.TryWith(a, b, c, d, e)
+    //                | TryWith(a, b, c, d, e) ->
+    //                    let! a = evaluateConstantsS a
+    //                    let! c = evaluateConstantsS c
+    //                    let! e = evaluateConstantsS e
+    //                    return Expr.TryWith(a, b, c, d, e)
 
-//                    | TupleGet(t, i) ->
-//                        let! t = evaluateConstantsS t
-//                        match t with
-//                            | Value(t,_) -> return Expr.Value(FSharpValue.GetTupleField(t, i), e.Type)
-//                            | _ -> return Expr.TupleGet(t, i)
+    //                | TupleGet(t, i) ->
+    //                    let! t = evaluateConstantsS t
+    //                    match t with
+    //                        | Value(t,_) -> return Expr.Value(FSharpValue.GetTupleField(t, i), e.Type)
+    //                        | _ -> return Expr.TupleGet(t, i)
 
-//                    | TypeTest(v, t) ->
-//                        let! v = evaluateConstantsS v
-//                        match v with
-//                            | Value(v,_) ->
-//                                return Expr.Value(t.IsAssignableFrom(v.GetType()))
-//                            | _ ->
-//                                return Expr.TypeTest(v, t)
+    //                | TypeTest(v, t) ->
+    //                    let! v = evaluateConstantsS v
+    //                    return Expr.TypeTest(v, t)
 
-//                    | UnionCaseTest(e, ci) ->
-//                        let! e = evaluateConstantsS e
-//                        // TODO: could be avoided
-//                        return Expr.UnionCaseTest(e, ci)
+    //                | UnionCaseTest(e, ci) ->
+    //                    let! e = evaluateConstantsS e
+    //                    // TODO: could be avoided
+    //                    return Expr.UnionCaseTest(e, ci)
 
-//                    | Value _ ->
-//                        return e
+    //                | Value _ ->
+    //                    return e
 
-//                    | VarSet (v, e) ->
-//                        let! e = evaluateConstantsS e
-//                        return Expr.VarSet (v, e)
+    //                | VarSet (v, e) ->
+    //                    let! e = evaluateConstantsS e
+    //                    return Expr.VarSet (v, e)
 
-//                    | Var v ->
-//                        let! value = State.getVar v
-//                        match value with
-//                            | Some v -> return Expr.Value(v, e.Type)
-//                            | _ -> return e
+    //                | Var v ->
+    //                    let! value = State.getVar v
+    //                    match value with
+    //                        | Some v -> return Expr.Value(v, e.Type)
+    //                        | _ -> return e
 
-//                    | WhileLoop(guard, body) ->
-//                        let! guard = evaluateConstantsS guard
-//                        let! body = evaluateConstantsS body
-//                        match guard, body with
-//                            | Bool false, _ -> return Expr.Unit
-//                            | _, Unit -> return Expr.Unit
-//                            | g, b -> return Expr.WhileLoop(g, b)
+    //                | WhileLoop(guard, body) ->
+    //                    let! guard = evaluateConstantsS guard
+    //                    let! body = evaluateConstantsS body
+    //                    match guard, body with
+    //                        | Bool false, _ -> return Expr.Unit
+    //                        | _, Unit -> return Expr.Unit
+    //                        | g, b -> return Expr.WhileLoop(g, b)
 
-//                    | _ ->
-//                        return failwithf "[FShade] unexpected expression %A" e
-//            }
+    //                | _ ->
+    //                    return failwithf "[FShade] unexpected expression %A" e
+    //        }
 
-//        let evaluateConstants (e : Expr) =
-//            let run = evaluateConstantsS e
-//            let state = ref State.empty
-//            run.Run(state)
+    //    let evaluateConstants (e : Expr) =
+    //        let run = evaluateConstantsS e
+    //        let state = ref State.empty
+    //        run.Run(state)
 
-//        let evaluateConstants' (isSideEffect : MethodInfo -> bool) (e : Expr) =
-//            let run = evaluateConstantsS e
+    //    let evaluateConstants' (isSideEffect : MethodInfo -> bool) (e : Expr) =
+    //        let run = evaluateConstantsS e
 
-//            let isSideEffect (m : MemberInfo) =
-//                match m with    
-//                    | :? MethodInfo as mi -> isSideEffect mi
-//                    | _ -> false
+    //        let isSideEffect (m : MemberInfo) =
+    //            match m with    
+    //                | :? MethodInfo as mi -> isSideEffect mi
+    //                | _ -> false
 
-//            let state = ref { State.empty with isGlobalSideEffect = isSideEffect }
-//            run.Run(state)
+    //        let state = ref { State.empty with isGlobalSideEffect = isSideEffect }
+    //        run.Run(state)
 
-//        let evaluateConstants'' (isSideEffect : MemberInfo -> bool) (e : Expr) =
-//            let run = evaluateConstantsS e
-//            let state = ref { State.empty with isGlobalSideEffect = isSideEffect }
-//            run.Run(state)
+    //    let evaluateConstants'' (isSideEffect : MemberInfo -> bool) (e : Expr) =
+    //        let run = evaluateConstantsS e
+    //        let state = ref { State.empty with isGlobalSideEffect = isSideEffect }
+    //        run.Run(state)
        
-//    module InputLifting =
-//        type State =
-//            {
-//                usedInputs : Map<string, ParameterDescription>
-//            }
+    //module InputLifting =
+    //    type State =
+    //        {
+    //            usedInputs : Map<string, ParameterDescription>
+    //        }
                  
-//        [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-//        module State =
-//            let empty = 
-//                { 
-//                    usedInputs = Map.empty
-//                }
+    //    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    //    module State =
+    //        let empty = 
+    //            { 
+    //                usedInputs = Map.empty
+    //            }
 
         
-//        let rec liftInputsS (e : Expr) : State<State, Expr> =
-//            state {
-//                match e with
+    //    let rec liftInputsS (e : Expr) : State<State, Expr> =
+    //        state {
+    //            match e with
 
-//                    | ReadInput(ParameterKind.Input, name, idx) ->
-//                        do! State.modify (fun s ->
-//                            if Map.containsKey name s.usedInputs then
-//                                s
-//                            else
-//                                let typ =
-//                                    match idx with
-//                                        | Some _ -> e.Type.MakeArrayType()
-//                                        | _ -> e.Type
-//                                { s with usedInputs = Map.add name (ParameterDescription.ofType typ) s.usedInputs }
-//                        )
-//                        return e
+    //                | ReadInput(ParameterKind.Input, name, idx) ->
+    //                    do! State.modify (fun s ->
+    //                        if Map.containsKey name s.usedInputs then
+    //                            s
+    //                        else
+    //                            let typ =
+    //                                match idx with
+    //                                    | Some _ -> e.Type.MakeArrayType()
+    //                                    | _ -> e.Type
+    //                            { s with usedInputs = Map.add name (ParameterDescription.ofType typ) s.usedInputs }
+    //                    )
+    //                    return e
 
-//                    | ReadInput(kind, name, idx) ->
-//                        match idx with
-//                            | Some idx ->
-//                                let! idx = liftInputsS idx
-//                                return Expr.ReadInput(kind, e.Type, name, idx)
-//                            | None ->
-//                                return Expr.ReadInput(kind, e.Type, name)
+    //                | ReadInput(kind, name, idx) ->
+    //                    match idx with
+    //                        | Some idx ->
+    //                            let! idx = liftInputsS idx
+    //                            return Expr.ReadInput(kind, e.Type, name, idx)
+    //                        | None ->
+    //                            return Expr.ReadInput(kind, e.Type, name)
                                 
-//                    | WriteOutputs outputs -> 
-//                        let! outputs = 
-//                            outputs |> Map.mapS (fun name (idx, value) ->
-//                                state {
-//                                    let! idx = Option.mapS liftInputsS idx
-//                                    let! value = liftInputsS value
-//                                    return (idx, value)
-//                                }
-//                            )
-//                        return Expr.WriteOutputs outputs
+    //                | WriteOutputs outputs -> 
+    //                    let! outputs = 
+    //                        outputs |> Map.mapS (fun name (idx, value) ->
+    //                            state {
+    //                                let! idx = Option.mapS liftInputsS idx
+    //                                let! value = liftInputsS value
+    //                                return (idx, value)
+    //                            }
+    //                        )
+    //                    return Expr.WriteOutputs outputs
 
-//                    | AddressOf e ->
-//                        let! e = liftInputsS e
-//                        return Expr.AddressOf e
+    //                | AddressOf e ->
+    //                    let! e = liftInputsS e
+    //                    return Expr.AddressOf e
 
-//                    | AddressSet(v, e) ->
-//                        let! v = liftInputsS v
-//                        let! e = liftInputsS e
-//                        return Expr.AddressSet(v,e)
+    //                | AddressSet(v, e) ->
+    //                    let! v = liftInputsS v
+    //                    let! e = liftInputsS e
+    //                    return Expr.AddressSet(v,e)
 
-//                    | Application(lambda, arg) ->
-//                        let! lambda = liftInputsS lambda
-//                        let! arg = liftInputsS arg
-//                        return Expr.Application(lambda, arg)
+    //                | Application(lambda, arg) ->
+    //                    let! lambda = liftInputsS lambda
+    //                    let! arg = liftInputsS arg
+    //                    return Expr.Application(lambda, arg)
 
-//                    | ForInteger(v, first, step, last, body) ->
-//                        let! first = liftInputsS first
-//                        let! step = liftInputsS step
-//                        let! last = liftInputsS last
-//                        let! body = liftInputsS body
-//                        return Expr.ForInteger(v, first, step, last, body)
+    //                | ForInteger(v, first, step, last, body) ->
+    //                    let! first = liftInputsS first
+    //                    let! step = liftInputsS step
+    //                    let! last = liftInputsS last
+    //                    let! body = liftInputsS body
+    //                    return Expr.ForInteger(v, first, step, last, body)
 
-//                    | ForEach(v, s, b) ->
-//                        let! s = liftInputsS s
-//                        let! b = liftInputsS b
-//                        return Expr.ForEach(v, s, b)
+    //                | ForEach(v, s, b) ->
+    //                    let! s = liftInputsS s
+    //                    let! b = liftInputsS b
+    //                    return Expr.ForEach(v, s, b)
 
-//                    | CallFunction(utility, args) ->
+    //                | CallFunction(utility, args) ->
                         
-//                        let usedInputs = ref Map.empty
-//                        let newBody = liftFunctionInputsS(utility.functionBody).Run(usedInputs)
+    //                    let usedInputs = ref Map.empty
+    //                    let newBody = liftFunctionInputsS(utility.functionBody).Run(usedInputs)
 
-//                        let (vars, values) = !usedInputs |> Map.toList |> List.map snd |> List.unzip
+    //                    let (vars, values) = !usedInputs |> Map.toList |> List.map snd |> List.unzip
 
-//                        let utility =
-//                            { utility with
-//                                functionArguments = utility.functionArguments @ vars
-//                                functionBody = newBody
-//                                functionId = Guid.NewGuid() |> string
-//                                functionTag = null
-//                            }
+    //                    let utility =
+    //                        { utility with
+    //                            functionArguments = utility.functionArguments @ vars
+    //                            functionBody = newBody
+    //                            functionId = Guid.NewGuid() |> string
+    //                            functionTag = null
+    //                        }
 
 
-//                        let! values = values |> List.mapS liftInputsS
-//                        return Expr.CallFunction(utility, args @ values)
+    //                    let! values = values |> List.mapS liftInputsS
+    //                    return Expr.CallFunction(utility, args @ values)
                         
        
-//                    | Call(None, mi, args) ->
-//                        let! args = args |> List.mapS liftInputsS
-//                        return Expr.Call(mi, args)
+    //                | Call(None, mi, args) ->
+    //                    let! args = args |> List.mapS liftInputsS
+    //                    return Expr.Call(mi, args)
 
-//                    | Call(Some t, mi, args) ->
-//                        let! t = liftInputsS t
-//                        let! args = args |> List.mapS liftInputsS
-//                        return Expr.Call(t, mi, args)
+    //                | Call(Some t, mi, args) ->
+    //                    let! t = liftInputsS t
+    //                    let! args = args |> List.mapS liftInputsS
+    //                    return Expr.Call(t, mi, args)
                         
-//                    | Coerce(e, t) ->
-//                        let! e = liftInputsS e
-//                        return Expr.Coerce(e, t)
+    //                | Coerce(e, t) ->
+    //                    let! e = liftInputsS e
+    //                    return Expr.Coerce(e, t)
 
-//                    | DefaultValue t ->
-//                        return e
+    //                | DefaultValue t ->
+    //                    return e
 
-//                    | FieldGet(None, f) ->
-//                        return e
+    //                | FieldGet(None, f) ->
+    //                    return e
 
-//                    | FieldGet(Some t, f) ->
-//                        let! t = liftInputsS t
-//                        return Expr.FieldGet(t, f)
+    //                | FieldGet(Some t, f) ->
+    //                    let! t = liftInputsS t
+    //                    return Expr.FieldGet(t, f)
 
-//                    | FieldSet(None, f, value) ->
-//                        let! value = liftInputsS value
-//                        return Expr.FieldSet(f, value)
+    //                | FieldSet(None, f, value) ->
+    //                    let! value = liftInputsS value
+    //                    return Expr.FieldSet(f, value)
 
-//                    | FieldSet(Some t, f, value) ->
-//                        let! t = liftInputsS t
-//                        let! value = liftInputsS value
-//                        return Expr.FieldSet(t, f, value)
+    //                | FieldSet(Some t, f, value) ->
+    //                    let! t = liftInputsS t
+    //                    let! value = liftInputsS value
+    //                    return Expr.FieldSet(t, f, value)
 
-//                    | IfThenElse(cond, i, e) ->
-//                        let! cond = liftInputsS cond
-//                        let! i = liftInputsS i
-//                        let! e = liftInputsS e
-//                        return Expr.IfThenElse(cond, i, e)
+    //                | IfThenElse(cond, i, e) ->
+    //                    let! cond = liftInputsS cond
+    //                    let! i = liftInputsS i
+    //                    let! e = liftInputsS e
+    //                    return Expr.IfThenElse(cond, i, e)
 
-//                    | Lambda(v,b) ->
-//                        let! b = liftInputsS b
-//                        return Expr.Lambda(v,b)
+    //                | Lambda(v,b) ->
+    //                    let! b = liftInputsS b
+    //                    return Expr.Lambda(v,b)
 
-//                    | Let(v, e, b) ->
-//                        let! e = liftInputsS e
-//                        let! b = liftInputsS b
-//                        return Expr.Let(v,e,b)
+    //                | Let(v, e, b) ->
+    //                    let! e = liftInputsS e
+    //                    let! b = liftInputsS b
+    //                    return Expr.Let(v,e,b)
 
-//                    | NewTuple(args) ->
-//                        let! args = args |> List.mapS liftInputsS
-//                        return Expr.NewTuple args
+    //                | NewTuple(args) ->
+    //                    let! args = args |> List.mapS liftInputsS
+    //                    return Expr.NewTuple args
 
-//                    | NewArray(t, args) ->
-//                        let! args = args |> List.mapS liftInputsS
-//                        return Expr.NewArray(t, args)
+    //                | NewArray(t, args) ->
+    //                    let! args = args |> List.mapS liftInputsS
+    //                    return Expr.NewArray(t, args)
 
-//                    | NewDelegate(t, vars, body) ->
-//                        let! body = liftInputsS body
-//                        return Expr.NewDelegate(t, vars, body)
+    //                | NewDelegate(t, vars, body) ->
+    //                    let! body = liftInputsS body
+    //                    return Expr.NewDelegate(t, vars, body)
 
-//                    | NewObject(ctor, args) ->
-//                        let! args = args |> List.mapS liftInputsS
-//                        return Expr.NewObject(ctor, args)
+    //                | NewObject(ctor, args) ->
+    //                    let! args = args |> List.mapS liftInputsS
+    //                    return Expr.NewObject(ctor, args)
 
-//                    | NewRecord(t, args) ->
-//                        let! args = args |> List.mapS liftInputsS
-//                        return Expr.NewRecord(t, args)
+    //                | NewRecord(t, args) ->
+    //                    let! args = args |> List.mapS liftInputsS
+    //                    return Expr.NewRecord(t, args)
 
-//                    | NewUnionCase(ci, args) ->
-//                        let! args = args |> List.mapS liftInputsS
-//                        return Expr.NewUnionCase(ci, args)
+    //                | NewUnionCase(ci, args) ->
+    //                    let! args = args |> List.mapS liftInputsS
+    //                    return Expr.NewUnionCase(ci, args)
 
-//                    | PropertyGet(None, pi, indices) ->
-//                        let! indices = indices |> List.mapS liftInputsS
-//                        return Expr.PropertyGet(pi, indices)
+    //                | PropertyGet(None, pi, indices) ->
+    //                    let! indices = indices |> List.mapS liftInputsS
+    //                    return Expr.PropertyGet(pi, indices)
 
-//                    | PropertyGet(Some t, pi, indices) ->
-//                        let! t = liftInputsS t
-//                        let! indices = indices |> List.mapS liftInputsS
-//                        return Expr.PropertyGet(t, pi, indices)
+    //                | PropertyGet(Some t, pi, indices) ->
+    //                    let! t = liftInputsS t
+    //                    let! indices = indices |> List.mapS liftInputsS
+    //                    return Expr.PropertyGet(t, pi, indices)
                         
-//                    | PropertySet(None, pi, indices, value) ->
-//                        let! value = liftInputsS value
-//                        let! indices = indices |> List.mapS liftInputsS
-//                        return Expr.PropertySet(pi, value, indices)
+    //                | PropertySet(None, pi, indices, value) ->
+    //                    let! value = liftInputsS value
+    //                    let! indices = indices |> List.mapS liftInputsS
+    //                    return Expr.PropertySet(pi, value, indices)
 
-//                    | PropertySet(Some t, pi, indices, value) ->
-//                        let! t = liftInputsS t
-//                        let! value = liftInputsS value
-//                        let! indices = indices |> List.mapS liftInputsS
-//                        return Expr.PropertySet(t, pi, value, indices)
+    //                | PropertySet(Some t, pi, indices, value) ->
+    //                    let! t = liftInputsS t
+    //                    let! value = liftInputsS value
+    //                    let! indices = indices |> List.mapS liftInputsS
+    //                    return Expr.PropertySet(t, pi, value, indices)
                         
-//                    | QuoteRaw e ->
-//                        let! e = liftInputsS e
-//                        return Expr.QuoteRaw e
+    //                | QuoteRaw e ->
+    //                    let! e = liftInputsS e
+    //                    return Expr.QuoteRaw e
 
-//                    | QuoteTyped e ->
-//                        let! e = liftInputsS e
-//                        return Expr.QuoteTyped e
+    //                | QuoteTyped e ->
+    //                    let! e = liftInputsS e
+    //                    return Expr.QuoteTyped e
 
-//                    | Sequential(l,r) ->
-//                        let! l = liftInputsS l
-//                        let! r = liftInputsS r
-//                        return Expr.Sequential(l,r)
+    //                | Sequential(l,r) ->
+    //                    let! l = liftInputsS l
+    //                    let! r = liftInputsS r
+    //                    return Expr.Sequential(l,r)
 
-//                    | TryFinally(t, f) ->
-//                        let! t = liftInputsS t
-//                        let! f = liftInputsS f
-//                        return Expr.TryFinally(t, f)
+    //                | TryFinally(t, f) ->
+    //                    let! t = liftInputsS t
+    //                    let! f = liftInputsS f
+    //                    return Expr.TryFinally(t, f)
 
-//                    | TryWith(a, b, c, d, e) ->
-//                        let! a = liftInputsS a
-//                        let! c = liftInputsS c
-//                        let! e = liftInputsS e
-//                        return Expr.TryWith(a, b, c, d, e)
+    //                | TryWith(a, b, c, d, e) ->
+    //                    let! a = liftInputsS a
+    //                    let! c = liftInputsS c
+    //                    let! e = liftInputsS e
+    //                    return Expr.TryWith(a, b, c, d, e)
 
-//                    | TupleGet(t, i) ->
-//                        let! t = liftInputsS t
-//                        return Expr.TupleGet(t, i)
+    //                | TupleGet(t, i) ->
+    //                    let! t = liftInputsS t
+    //                    return Expr.TupleGet(t, i)
 
-//                    | TypeTest(t, i) ->
-//                        let! t = liftInputsS t
-//                        return Expr.TypeTest(t,i)
+    //                | TypeTest(t, i) ->
+    //                    let! t = liftInputsS t
+    //                    return Expr.TypeTest(t,i)
 
-//                    | UnionCaseTest(e, ci) ->
-//                        let! e = liftInputsS e
-//                        return Expr.UnionCaseTest(e, ci)
+    //                | UnionCaseTest(e, ci) ->
+    //                    let! e = liftInputsS e
+    //                    return Expr.UnionCaseTest(e, ci)
 
-//                    | Value _ ->
-//                        return e
+    //                | Value _ ->
+    //                    return e
 
-//                    | VarSet(v, e) ->
-//                        let! e = liftInputsS e
-//                        return Expr.VarSet(v,e)
+    //                | VarSet(v, e) ->
+    //                    let! e = liftInputsS e
+    //                    return Expr.VarSet(v,e)
 
-//                    | Var v ->
-//                        return e
+    //                | Var v ->
+    //                    return e
 
-//                    | WhileLoop(guard, body) ->
-//                        let! guard = liftInputsS guard
-//                        let! body = liftInputsS body
-//                        return Expr.WhileLoop(guard, body)
-
-
-//                    | _ ->
-//                        return failwithf "[FShade] unexpected expression %A" e
-//            }
-
-//        and liftFunctionInputsS (e : Expr) : State<Map<_,_>, Expr> =
-//            state {
-//                match e with
-//                    | ReadInput(ParameterKind.Input, name, idx) ->
-//                        let! (s : Map<string, Var * Expr>) = State.get
-
-//                        let idxHash = idx |> Option.map string |> Option.defaultValue ""
-//                        let key = name + idxHash
-
-//                        match Map.tryFind key s with
-//                            | Some (v,_) -> 
-//                                return Expr.Var v
-//                            | None ->
-//                                let v = Var(name, e.Type)
-//                                do! State.put (Map.add key (v,e) s)
-//                                return Expr.Var v
-
-//                    | ReadInput(kind, name, idx) ->
-//                        match idx with
-//                            | Some idx ->
-//                                let! idx = liftFunctionInputsS idx
-//                                return Expr.ReadInput(kind, e.Type, name, idx)
-//                            | None ->
-//                                return Expr.ReadInput(kind, e.Type, name)
-
-//                    | CallFunction(utility, args) ->
-//                        let! args = args |> List.mapS liftFunctionInputsS
-//                        let usedInputs = ref Map.empty
-//                        let newBody = liftFunctionInputsS(utility.functionBody).Run(usedInputs)
-
-//                        let (vars, values) = !usedInputs |> Map.toList |> List.map snd |> List.unzip
-
-//                        let utility =
-//                            { utility with
-//                                functionArguments = utility.functionArguments @ vars
-//                                functionBody = newBody
-//                                functionId = Guid.NewGuid() |> string
-//                                functionTag = null
-//                            }
+    //                | WhileLoop(guard, body) ->
+    //                    let! guard = liftInputsS guard
+    //                    let! body = liftInputsS body
+    //                    return Expr.WhileLoop(guard, body)
 
 
-//                        let! values = values |> List.mapS liftFunctionInputsS
-//                        return Expr.CallFunction(utility, args @ values)
+    //                | _ ->
+    //                    return failwithf "[FShade] unexpected expression %A" e
+    //        }
+
+    //    and liftFunctionInputsS (e : Expr) : State<Map<_,_>, Expr> =
+    //        state {
+    //            match e with
+    //                | ReadInput(ParameterKind.Input, name, idx) ->
+    //                    let! (s : Map<string, Var * Expr>) = State.get
+
+    //                    let idxHash = idx |> Option.map string |> Option.defaultValue ""
+    //                    let key = name + idxHash
+
+    //                    match Map.tryFind key s with
+    //                        | Some (v,_) -> 
+    //                            return Expr.Var v
+    //                        | None ->
+    //                            let v = Var(name, e.Type)
+    //                            do! State.put (Map.add key (v,e) s)
+    //                            return Expr.Var v
+
+    //                | ReadInput(kind, name, idx) ->
+    //                    match idx with
+    //                        | Some idx ->
+    //                            let! idx = liftFunctionInputsS idx
+    //                            return Expr.ReadInput(kind, e.Type, name, idx)
+    //                        | None ->
+    //                            return Expr.ReadInput(kind, e.Type, name)
+
+    //                | CallFunction(utility, args) ->
+    //                    let! args = args |> List.mapS liftFunctionInputsS
+    //                    let usedInputs = ref Map.empty
+    //                    let newBody = liftFunctionInputsS(utility.functionBody).Run(usedInputs)
+
+    //                    let (vars, values) = !usedInputs |> Map.toList |> List.map snd |> List.unzip
+
+    //                    let utility =
+    //                        { utility with
+    //                            functionArguments = utility.functionArguments @ vars
+    //                            functionBody = newBody
+    //                            functionId = Guid.NewGuid() |> string
+    //                            functionTag = null
+    //                        }
+
+
+    //                    let! values = values |> List.mapS liftFunctionInputsS
+    //                    return Expr.CallFunction(utility, args @ values)
 
                         
-//                    | ShapeVar v -> 
-//                        return Expr.Var v
+    //                | ShapeVar v -> 
+    //                    return Expr.Var v
 
-//                    | ShapeLambda(v, b) ->
-//                        let! b = liftFunctionInputsS b
-//                        return Expr.Lambda(v, b)
+    //                | ShapeLambda(v, b) ->
+    //                    let! b = liftFunctionInputsS b
+    //                    return Expr.Lambda(v, b)
 
-//                    | ShapeCombination(o, args) -> 
-//                        let! args = args |> List.mapS liftFunctionInputsS
-//                        return RebuildShapeCombination(o, args)
-//            }
+    //                | ShapeCombination(o, args) -> 
+    //                    let! args = args |> List.mapS liftFunctionInputsS
+    //                    return RebuildShapeCombination(o, args)
+    //        }
 
-//        let liftInputs (e : Expr) =
-//            let run = liftInputsS(e)
-//            let state = ref State.empty
-//            let res = run.Run(state)
-//            res
+    //    let liftInputs (e : Expr) =
+    //        let run = liftInputsS(e)
+    //        let state = ref State.empty
+    //        let res = run.Run(state)
+    //        res
 
 //    module Inlining =
 //        type State =
@@ -2450,273 +2436,273 @@
 //            let state = ref { State.empty isSideEffect with functions = functions }
 //            run.Run(state)
 
-//    module StatementHoisting =
+    //module StatementHoisting =
         
-//        type Hoisting =
-//            {
-//                finalize : Option<Expr -> Expr>
-//            }
+    //    type Hoisting =
+    //        {
+    //            finalize : Option<Expr -> Expr>
+    //        }
 
-//            static member Zero = { finalize = None }
+    //        static member Zero = { finalize = None }
 
-//            static member (+) (l : Hoisting, r : Hoisting) =
-//                match l.finalize, r.finalize with
-//                    | Some lf, Some rf -> { finalize = Some (lf >> rf) }
-//                    | Some _, None -> l
-//                    | None, Some _ -> r
-//                    | None, None -> l
+    //        static member (+) (l : Hoisting, r : Hoisting) =
+    //            match l.finalize, r.finalize with
+    //                | Some lf, Some rf -> { finalize = Some (lf >> rf) }
+    //                | Some _, None -> l
+    //                | None, Some _ -> r
+    //                | None, None -> l
 
-//            static member Sequential (e : Expr) =
-//                { finalize = Some (fun f -> Expr.Seq [e; f]) }
+    //        static member Sequential (e : Expr) =
+    //            { finalize = Some (fun f -> Expr.Seq [e; f]) }
 
-//        let rec processExpression (expr : Expr) : Expr * Hoisting =
-//            match expr with
-//                | WriteOutputs _
-//                | AddressSet _ 
-//                | ForInteger _ 
-//                | ForEach _ 
-//                | FieldSet _
-//                | PropertySet _ 
-//                | VarSet _
-//                | WhileLoop _ ->
-//                    let expr = processStatement expr
-//                    Expr.Unit, Hoisting.Sequential expr
+    //    let rec processExpression (expr : Expr) : Expr * Hoisting =
+    //        match expr with
+    //            | WriteOutputs _
+    //            | AddressSet _ 
+    //            | ForInteger _ 
+    //            | ForEach _ 
+    //            | FieldSet _
+    //            | PropertySet _ 
+    //            | VarSet _
+    //            | WhileLoop _ ->
+    //                let expr = processStatement expr
+    //                Expr.Unit, Hoisting.Sequential expr
 
-//                | IfThenElse _ when expr.Type = typeof<unit> ->
-//                    let expr = processStatement expr
-//                    Expr.Unit, Hoisting.Sequential expr
+    //            | IfThenElse _ when expr.Type = typeof<unit> ->
+    //                let expr = processStatement expr
+    //                Expr.Unit, Hoisting.Sequential expr
                     
                     
-//                | Sequential(a, Sequential(b,c)) ->
-//                    Expr.Sequential(Expr.Sequential(a,b), c) |> processExpression
+    //            | Sequential(a, Sequential(b,c)) ->
+    //                Expr.Sequential(Expr.Sequential(a,b), c) |> processExpression
 
-//                | Sequential(l,r) ->
-//                    let l = processStatement l
-//                    let r, rh = processExpression r
-//                    r, rh + Hoisting.Sequential l
-
-
-//                | Let(v,e,b) ->
-//                    let b, bh = processExpression b
-//                    let e, eh = processExpression e
-//                    b, bh + { finalize = Some (fun f -> Expr.Let(v, e, f)) } + eh
+    //            | Sequential(l,r) ->
+    //                let l = processStatement l
+    //                let r, rh = processExpression r
+    //                r, rh + Hoisting.Sequential l
 
 
-//                | TryFinally _ -> failwith ""
-//                | TryWith _ -> failwith ""
+    //            | Let(v,e,b) ->
+    //                let b, bh = processExpression b
+    //                let e, eh = processExpression e
+    //                b, bh + { finalize = Some (fun f -> Expr.Let(v, e, f)) } + eh
+
+
+    //            | TryFinally _ -> failwith ""
+    //            | TryWith _ -> failwith ""
                 
-//                | AddressOf e ->
-//                    let e, eh = processExpression e
-//                    Expr.AddressOf(e), eh
+    //            | AddressOf e ->
+    //                let e, eh = processExpression e
+    //                Expr.AddressOf(e), eh
 
-//                | Application(l,a) ->
-//                    let l, lh = processExpression l
-//                    let a, ah = processExpression a
-//                    Expr.Application(l,a), lh + ah
+    //            | Application(l,a) ->
+    //                let l, lh = processExpression l
+    //                let a, ah = processExpression a
+    //                Expr.Application(l,a), lh + ah
 
-//                | CallFunction(utility, args) ->
-//                    let args, ah = processManyExpresions args
-//                    let utility = utility |> UtilityFunction.map processStatement
-//                    Expr.CallFunction(utility, args), ah
+    //            | CallFunction(utility, args) ->
+    //                let args, ah = processManyExpresions args
+    //                let utility = utility |> UtilityFunction.map processStatement
+    //                Expr.CallFunction(utility, args), ah
                     
-//                | Call(None, mi, args) ->
-//                    let args, ah = processManyExpresions args
-//                    Expr.Call(mi, args), ah
+    //            | Call(None, mi, args) ->
+    //                let args, ah = processManyExpresions args
+    //                Expr.Call(mi, args), ah
                     
-//                | Call(Some t, mi, args) ->
-//                    let t, th = processExpression t
-//                    let args, ah = processManyExpresions args
-//                    Expr.Call(t, mi, args), th + ah
+    //            | Call(Some t, mi, args) ->
+    //                let t, th = processExpression t
+    //                let args, ah = processManyExpresions args
+    //                Expr.Call(t, mi, args), th + ah
 
                     
-//                | Coerce(e, t) ->
-//                    let e, eh = processExpression e
-//                    Expr.Coerce(e, t), eh
+    //            | Coerce(e, t) ->
+    //                let e, eh = processExpression e
+    //                Expr.Coerce(e, t), eh
 
-//                | DefaultValue t ->
-//                    Expr.DefaultValue t, Hoisting.Zero
+    //            | DefaultValue t ->
+    //                Expr.DefaultValue t, Hoisting.Zero
 
-//                | FieldGet(None, f) ->
-//                    Expr.FieldGet(f), Hoisting.Zero
+    //            | FieldGet(None, f) ->
+    //                Expr.FieldGet(f), Hoisting.Zero
 
-//                | FieldGet(Some t, f) ->
-//                    let t, th = processExpression t
-//                    Expr.FieldGet(t, f), th
+    //            | FieldGet(Some t, f) ->
+    //                let t, th = processExpression t
+    //                Expr.FieldGet(t, f), th
 
-//                | IfThenElse(c, i, e) ->
-//                    let c, ch = processExpression c
-//                    Expr.IfThenElse(c, i, e), ch
+    //            | IfThenElse(c, i, e) ->
+    //                let c, ch = processExpression c
+    //                Expr.IfThenElse(c, i, e), ch
 
-//                | Lambda(v,b) ->
-//                    Expr.Lambda(v, processStatement b), Hoisting.Zero
+    //            | Lambda(v,b) ->
+    //                Expr.Lambda(v, processStatement b), Hoisting.Zero
 
-//                | NewArray(t, args) ->
-//                    let args, ah = processManyExpresions args
-//                    Expr.NewArray(t, args), ah
+    //            | NewArray(t, args) ->
+    //                let args, ah = processManyExpresions args
+    //                Expr.NewArray(t, args), ah
 
-//                | NewDelegate(t, vars, body) ->
-//                    Expr.NewDelegate(t, vars, processStatement body), Hoisting.Zero
+    //            | NewDelegate(t, vars, body) ->
+    //                Expr.NewDelegate(t, vars, processStatement body), Hoisting.Zero
 
-//                | NewObject(ctor, args) ->
-//                    let args, ah = processManyExpresions args
-//                    Expr.NewObject(ctor, args), ah
+    //            | NewObject(ctor, args) ->
+    //                let args, ah = processManyExpresions args
+    //                Expr.NewObject(ctor, args), ah
 
-//                | NewRecord(t, args) ->
-//                    let args, ah = processManyExpresions args
-//                    Expr.NewRecord(t, args), ah
+    //            | NewRecord(t, args) ->
+    //                let args, ah = processManyExpresions args
+    //                Expr.NewRecord(t, args), ah
 
-//                | NewTuple(args) ->
-//                    let args, ah = processManyExpresions args
-//                    Expr.NewTuple(args), ah
+    //            | NewTuple(args) ->
+    //                let args, ah = processManyExpresions args
+    //                Expr.NewTuple(args), ah
 
-//                | NewUnionCase(ci, args) ->
-//                    let args, ah = processManyExpresions args
-//                    Expr.NewUnionCase(ci, args), ah
+    //            | NewUnionCase(ci, args) ->
+    //                let args, ah = processManyExpresions args
+    //                Expr.NewUnionCase(ci, args), ah
 
-//                | PropertyGet(None, pi, ii) ->
-//                    let ii, ih = processManyExpresions ii
-//                    Expr.PropertyGet(pi, ii), ih
+    //            | PropertyGet(None, pi, ii) ->
+    //                let ii, ih = processManyExpresions ii
+    //                Expr.PropertyGet(pi, ii), ih
 
-//                | PropertyGet(Some t, pi, ii) ->
-//                    let t, th = processExpression t
-//                    let ii, ih = processManyExpresions ii
-//                    Expr.PropertyGet(t, pi, ii), th + ih
+    //            | PropertyGet(Some t, pi, ii) ->
+    //                let t, th = processExpression t
+    //                let ii, ih = processManyExpresions ii
+    //                Expr.PropertyGet(t, pi, ii), th + ih
 
-//                | QuoteRaw e ->
-//                    Expr.QuoteRaw e, Hoisting.Zero
+    //            | QuoteRaw e ->
+    //                Expr.QuoteRaw e, Hoisting.Zero
                     
-//                | QuoteTyped e -> 
-//                    Expr.QuoteTyped e, Hoisting.Zero
+    //            | QuoteTyped e -> 
+    //                Expr.QuoteTyped e, Hoisting.Zero
 
 
-//                | TupleGet(v, i) ->
-//                    let v, vh = processExpression v
-//                    Expr.TupleGet(v, i), vh
+    //            | TupleGet(v, i) ->
+    //                let v, vh = processExpression v
+    //                Expr.TupleGet(v, i), vh
 
-//                | TypeTest(v,t) ->
-//                    let v, vh = processExpression v
-//                    Expr.TypeTest(v, t), vh
+    //            | TypeTest(v,t) ->
+    //                let v, vh = processExpression v
+    //                Expr.TypeTest(v, t), vh
 
-//                | UnionCaseTest(v, ci) ->
-//                    let v, vh = processExpression v
-//                    Expr.UnionCaseTest(v,ci), vh
+    //            | UnionCaseTest(v, ci) ->
+    //                let v, vh = processExpression v
+    //                Expr.UnionCaseTest(v,ci), vh
 
-//                | Value _ ->
-//                    expr, Hoisting.Zero
+    //            | Value _ ->
+    //                expr, Hoisting.Zero
 
-//                | Var _ ->
-//                    expr, Hoisting.Zero
+    //            | Var _ ->
+    //                expr, Hoisting.Zero
 
 
-//                | _ -> failwithf "[FShade] unexpected expression %A" expr
+    //            | _ -> failwithf "[FShade] unexpected expression %A" expr
 
-//        and processManyExpresions (l : list<Expr>) =
-//            List.foldBack (fun a (r, rh) ->
-//                let a, ah = processExpression a
-//                (a :: r, ah + rh)
-//            ) l ([], Hoisting.Zero)
+    //    and processManyExpresions (l : list<Expr>) =
+    //        List.foldBack (fun a (r, rh) ->
+    //            let a, ah = processExpression a
+    //            (a :: r, ah + rh)
+    //        ) l ([], Hoisting.Zero)
 
-//        and processStatement (expr : Expr) : Expr =
-//            let inline apply (h : Hoisting) (e : Expr) =
-//                match h.finalize with
-//                    | Some f -> e |> f |> processStatement
-//                    | None -> e
+    //    and processStatement (expr : Expr) : Expr =
+    //        let inline apply (h : Hoisting) (e : Expr) =
+    //            match h.finalize with
+    //                | Some f -> e |> f |> processStatement
+    //                | None -> e
 
-//            match expr with 
-//                | WriteOutputs outputs -> 
-//                    let mutable res = Map.empty
-//                    let mutable hoist = Hoisting.Zero
-//                    for (name, (idx,value)) in Map.toSeq outputs do
-//                        match idx with
-//                            | Some idx ->
-//                                let idx, ih = processExpression idx
-//                                let v, vh = processExpression value
-//                                res <- Map.add name (Some idx, v) res
-//                                hoist <- hoist + ih + vh
-//                            | None ->
-//                                let v, vh = processExpression value
-//                                res <- Map.add name (None, v) res
-//                                hoist <- hoist + vh
+    //        match expr with 
+    //            | WriteOutputs outputs -> 
+    //                let mutable res = Map.empty
+    //                let mutable hoist = Hoisting.Zero
+    //                for (name, (idx,value)) in Map.toSeq outputs do
+    //                    match idx with
+    //                        | Some idx ->
+    //                            let idx, ih = processExpression idx
+    //                            let v, vh = processExpression value
+    //                            res <- Map.add name (Some idx, v) res
+    //                            hoist <- hoist + ih + vh
+    //                        | None ->
+    //                            let v, vh = processExpression value
+    //                            res <- Map.add name (None, v) res
+    //                            hoist <- hoist + vh
                           
                           
-//                    Expr.WriteOutputs(res) |> apply hoist 
+    //                Expr.WriteOutputs(res) |> apply hoist 
 
-//                | AddressSet(v,e) ->
-//                    let v, vh = processExpression v
-//                    let e, eh = processExpression e 
-//                    Expr.AddressSet(v,e) |> apply (vh + eh)
+    //            | AddressSet(v,e) ->
+    //                let v, vh = processExpression v
+    //                let e, eh = processExpression e 
+    //                Expr.AddressSet(v,e) |> apply (vh + eh)
 
-//                | ForInteger(v, start, step, stop, body) ->
-//                    let body = processStatement body
+    //            | ForInteger(v, start, step, stop, body) ->
+    //                let body = processStatement body
                     
-//                    let start, h0 = processExpression start
-//                    let step, h1 = processExpression step
-//                    let stop, h2 = processExpression stop
+    //                let start, h0 = processExpression start
+    //                let step, h1 = processExpression step
+    //                let stop, h2 = processExpression stop
 
-//                    Expr.ForInteger(v, start, step, stop, body) |> apply (h0 + h1 + h2)
+    //                Expr.ForInteger(v, start, step, stop, body) |> apply (h0 + h1 + h2)
 
                      
-//                | ForEach(v,s,body) ->
-//                    let body = processStatement body
-//                    let s, sh = processExpression s
+    //            | ForEach(v,s,body) ->
+    //                let body = processStatement body
+    //                let s, sh = processExpression s
 
-//                    Expr.ForEach(v, s, body) |> apply sh
+    //                Expr.ForEach(v, s, body) |> apply sh
 
 
-//                | FieldSet(None, f, value) ->
-//                    let value, vh = processExpression value
-//                    Expr.FieldSet(f, value) |> apply vh
+    //            | FieldSet(None, f, value) ->
+    //                let value, vh = processExpression value
+    //                Expr.FieldSet(f, value) |> apply vh
 
-//                | FieldSet(Some t, f, value) ->
-//                    let t, th = processExpression t
-//                    let value, vh = processExpression value
-//                    Expr.FieldSet(t, f, value) |> apply (th + vh)
+    //            | FieldSet(Some t, f, value) ->
+    //                let t, th = processExpression t
+    //                let value, vh = processExpression value
+    //                Expr.FieldSet(t, f, value) |> apply (th + vh)
 
-//                | PropertySet(None, pi, index, value) ->
-//                    let index, ih = processManyExpresions index
-//                    let value, vh = processExpression value
-//                    Expr.PropertySet(pi, value, index) |> apply (ih + vh)
+    //            | PropertySet(None, pi, index, value) ->
+    //                let index, ih = processManyExpresions index
+    //                let value, vh = processExpression value
+    //                Expr.PropertySet(pi, value, index) |> apply (ih + vh)
 
-//                | PropertySet(Some t, pi, index, value) ->
-//                    let t, th = processExpression t 
-//                    let index, ih = processManyExpresions index
-//                    let value, vh = processExpression value
-//                    Expr.PropertySet(t, pi, value, index) |> apply (th + ih + vh)
+    //            | PropertySet(Some t, pi, index, value) ->
+    //                let t, th = processExpression t 
+    //                let index, ih = processManyExpresions index
+    //                let value, vh = processExpression value
+    //                Expr.PropertySet(t, pi, value, index) |> apply (th + ih + vh)
                      
-//                | WhileLoop (guard, body) ->
-//                    let guard, gh = processExpression guard
-//                    let body = processStatement body
-//                    Expr.WhileLoop(guard, body) |> apply gh
+    //            | WhileLoop (guard, body) ->
+    //                let guard, gh = processExpression guard
+    //                let body = processStatement body
+    //                Expr.WhileLoop(guard, body) |> apply gh
 
-//                | Sequential(l,r) ->
-//                    let l = processStatement l
-//                    let r = processStatement r
-//                    Expr.Sequential(l,r)
+    //            | Sequential(l,r) ->
+    //                let l = processStatement l
+    //                let r = processStatement r
+    //                Expr.Sequential(l,r)
 
 
-//                | Let(v,e,b) ->
-//                    let b = processStatement b
-//                    let e, eh = processExpression e
-//                    Expr.Let(v,e,b) |> apply eh
+    //            | Let(v,e,b) ->
+    //                let b = processStatement b
+    //                let e, eh = processExpression e
+    //                Expr.Let(v,e,b) |> apply eh
 
-//                | VarSet(v,e) ->
-//                    let e, eh = processExpression e
-//                    Expr.VarSet(v,e) |> apply eh
+    //            | VarSet(v,e) ->
+    //                let e, eh = processExpression e
+    //                Expr.VarSet(v,e) |> apply eh
 
-//                | IfThenElse(c,i,e) when e.Type = typeof<unit> ->
-//                    let c, ch = processExpression c
-//                    let i = processStatement i
-//                    let e = processStatement e
-//                    Expr.IfThenElse(c,i,e) |> apply ch
+    //            | IfThenElse(c,i,e) when e.Type = typeof<unit> ->
+    //                let c, ch = processExpression c
+    //                let i = processStatement i
+    //                let e = processStatement e
+    //                Expr.IfThenElse(c,i,e) |> apply ch
 
-//                | e ->
-//                    let e, eh = processExpression e
-//                    match eh.finalize with
-//                        | Some f -> f e
-//                        | None -> e
+    //            | e ->
+    //                let e, eh = processExpression e
+    //                match eh.finalize with
+    //                    | Some f -> f e
+    //                    | None -> e
 
-//        let hoistImperative (e : Expr) =
-//            processStatement e
+    //    let hoistImperative (e : Expr) =
+    //        processStatement e
 
 
 //    module CSE =
@@ -2903,50 +2889,50 @@
 
 
 
-//    /// creates a new expression only containing e's visible side-effects.
-//    /// NOTE: all methods are assumed to be pure (except for the ones returning void/unit)
-//    let withoutValue (e : Expr) =
-//        DeadCodeElimination.withoutValue e
+    /// creates a new expression only containing e's visible side-effects.
+    /// NOTE: all methods are assumed to be pure (except for the ones returning void/unit)
+    let withoutValue (e : Expr) =
+        DeadCodeElimination.withoutValue e
         
-//    /// creates a new expression by removing all unused variables/calls.
-//    /// NOTE: all methods are assumed to be pure (except for the ones returning void/unit)
-//    let eliminateDeadCode (e : Expr) =
-//        DeadCodeElimination.eliminateDeadCode e
+    /// creates a new expression by removing all unused variables/calls.
+    /// NOTE: all methods are assumed to be pure (except for the ones returning void/unit)
+    let eliminateDeadCode (e : Expr) =
+        DeadCodeElimination.eliminateDeadCode e
         
-//    /// creates a new expression by evaluating all constant-subexpressions where possible.
-//    /// NOTE: all methods are assumed to be pure (except for the ones returning void/unit)
-//    let evaluateConstants (e : Expr) =
-//        ConstantFolding.evaluateConstants e
+    /// creates a new expression by evaluating all constant-subexpressions where possible.
+    /// NOTE: all methods are assumed to be pure (except for the ones returning void/unit)
+    let evaluateConstants (e : Expr) =
+        ConstantFolding.evaluateConstants e
         
-//    /// creates a new expression only containing e's visible side-effects.
-//    /// NOTE: isSideEffect needs to determine whether a Method has non-local side-effects.
-//    let withoutValue' (isSideEffect : MethodInfo -> bool) (e : Expr) =
-//        DeadCodeElimination.withoutValue' isSideEffect e
+    /// creates a new expression only containing e's visible side-effects.
+    /// NOTE: isSideEffect needs to determine whether a Method has non-local side-effects.
+    let withoutValue' (isSideEffect : MethodInfo -> bool) (e : Expr) =
+        DeadCodeElimination.withoutValue' isSideEffect e
         
-//    /// creates a new expression by removing all unused variables/calls.
-//    /// NOTE: isSideEffect needs to determine whether a Method has non-local side-effects.
-//    let eliminateDeadCode' (isSideEffect : MethodInfo -> bool)  (e : Expr) =
-//        DeadCodeElimination.eliminateDeadCode' isSideEffect e
+    /// creates a new expression by removing all unused variables/calls.
+    /// NOTE: isSideEffect needs to determine whether a Method has non-local side-effects.
+    let eliminateDeadCode' (isSideEffect : MethodInfo -> bool)  (e : Expr) =
+        DeadCodeElimination.eliminateDeadCode' isSideEffect e
         
-//    /// creates a new expression by evaluating all constant-subexpressions where possible.
-//    /// NOTE: isSideEffect needs to determine whether a Method has non-local side-effects.
-//    let evaluateConstants' (isSideEffect : MethodInfo -> bool)  (e : Expr) =
-//        ConstantFolding.evaluateConstants' isSideEffect e
+    /// creates a new expression by evaluating all constant-subexpressions where possible.
+    /// NOTE: isSideEffect needs to determine whether a Method has non-local side-effects.
+    let evaluateConstants' (isSideEffect : MethodInfo -> bool)  (e : Expr) =
+        ConstantFolding.evaluateConstants' isSideEffect e
 
-//    /// creates a new expression by lifting all shader inputs to function-arguments until they can be read. (in the shader's main entry)
-//    let liftInputs (e : Expr) =
-//        InputLifting.liftInputs e
+    /// creates a new expression by lifting all shader inputs to function-arguments until they can be read. (in the shader's main entry)
+    let liftInputs (e : Expr) =
+        InputLifting.liftInputs e
         
-//    /// inlines copy variables, trivial expressions, input-reads and functions annotated with the [<Inline>] attribute
-//    let inlining (isSideEffect : MethodInfo -> bool) (e : Expr) =
-//        Inlining.inlining isSideEffect e
+    ///// inlines copy variables, trivial expressions, input-reads and functions annotated with the [<Inline>] attribute
+    //let inlining (isSideEffect : MethodInfo -> bool) (e : Expr) =
+    //    Inlining.inlining isSideEffect e
         
-//    /// inlines copy variables, trivial expressions, input-reads and functions annotated with the [<Inline>] attribute.
-//    /// Function inlining can be forced using the given callback.
-//    let inlining' (isSideEffect : MethodInfo -> bool) (f : UtilityFunction -> bool) (e : Expr) =
-//        Inlining.inlining' isSideEffect f e
+    ///// inlines copy variables, trivial expressions, input-reads and functions annotated with the [<Inline>] attribute.
+    ///// Function inlining can be forced using the given callback.
+    //let inlining' (isSideEffect : MethodInfo -> bool) (f : UtilityFunction -> bool) (e : Expr) =
+    //    Inlining.inlining' isSideEffect f e
 
-//    /// hoists imperative constructs. For example `let a = let b = 10 in b * 199` translates to `let b = 10 in let a = b * 199`.
-//    /// this ensures that most imperative constructs occur on statement-level and can easily be compiled to C like languages.
-//    let hoistImperativeConstructs (e : Expr) =
-//        StatementHoisting.processStatement e
+    /// hoists imperative constructs. For example `let a = let b = 10 in b * 199` translates to `let b = 10 in let a = b * 199`.
+    /// this ensures that most imperative constructs occur on statement-level and can easily be compiled to C like languages.
+    let hoistImperativeConstructs (e : Expr) =
+        StatementHoisting.processStatement e

@@ -57,9 +57,9 @@ module internal Operators =
         else mi
 
 module internal String =
-    let private lineBreak = System.Text.RegularExpressions.Regex("\n")
+    //let private lineBreak = System.Text.RegularExpressions.Regex("\n")
 
     let indent (str : string) =
-        let lines = lineBreak.Split str
+        let lines = str.Split '\n'
         let prefix = "    "
         lines |> Seq.map (fun l -> if l.Length > 0 then prefix + l else l) |> String.concat "\n"

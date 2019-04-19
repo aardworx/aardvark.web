@@ -13,6 +13,11 @@
     <Compile Include="Reflection.fs" />
     <Compile Include="Intrinsics.fs" />
     <Compile Include="Frontend.fs" />
+    <Compile Include="Optimizer\OptimizerTools.fs" />
+    <Compile Include="Optimizer\StatementHoisting.fs" />
+    <Compile Include="Optimizer\DeadCodeElimination.fs" />
+    <Compile Include="Optimizer\ConstantFolding.fs" />
+    <Compile Include="Optimizer\InputLifting.fs" />
     <Compile Include="Optimizer.fs" />
     <Compile Include="Shader.fs" />
     <Compile Include="EffectInputLayout.fs" />
