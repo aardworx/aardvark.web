@@ -606,7 +606,7 @@ module FShadeTest =
     let trafo (v : Vertex) =
         vertex {
             let wp = uniform.ModelTrafo * v.pos
-            return { v with pos = uniform.ViewProjTrafo * wp; wp = (0.5 + 0.5) * wp }
+            return { v with pos = uniform.ViewProjTrafo * wp; wp = wp }
         }
 
     let diffuseTexture (v : Vertex) =
@@ -616,29 +616,11 @@ module FShadeTest =
                 let n = Vec.normalize v.n
                 Vec.dot n dir
             let col = Tex.Sample(v.tc)
-            return V4d(d * col.XYZ, 1.0)
+            let ambient = 0.15
+            return V4d((ambient + (1.0 - ambient) * d) * col.XYZ, 1.0)
         }
 
 
-    let run(ctx : Context) =
-        let testy = 
-            Effect.compose [
-                Effect.ofFunction trafo
-                Effect.ofFunction diffuseTexture
-            ]
-
-        let m = 
-            testy 
-                |> Effect.toModule { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0)] }
-
-
-
-        let shader = 
-            if ctx.GL.IsGL2 then m |> ModuleCompiler.compileGLES300
-            else m |> ModuleCompiler.compileGLES100
-
-        Log.warn "%s" shader.code
-        shader.code
 
 [<EntryPoint>]
 let main argv =
@@ -865,7 +847,7 @@ let main argv =
 
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
-                |> Sg.uniform "Tex" (Mod.constant (FileTexture "cliffs_color.jpg" :> ITexture))
+                |> Sg.uniform "DiffuseColorTexture" (Mod.constant (FileTexture "cliffs_color.jpg" :> ITexture))
                 
             let sphere2 =
                 Sg.sphere 4
@@ -873,7 +855,7 @@ let main argv =
 
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
-                |> Sg.uniform "Tex" (Mod.constant (FileTexture "pattern.jpg" :> ITexture))
+                |> Sg.uniform "DiffuseColorTexture" (Mod.constant (FileTexture "pattern.jpg" :> ITexture))
                     
             let box =
                 Sg.box Box3d.Unit
@@ -881,7 +863,7 @@ let main argv =
 
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
-                |> Sg.uniform "Tex" (Mod.constant (FileTexture "test.jpg" :> ITexture))
+                |> Sg.uniform "DiffuseColorTexture" (Mod.constant (FileTexture "test.jpg" :> ITexture))
                 
             let rand = System.Random()
             let sett =
@@ -909,11 +891,12 @@ let main argv =
                                 yield s
                 ]
 
-            let shader = FShadeTest.run control.Context
-
             let sg =
                 Sg.set sett
-                |> Sg.shader shader
+                |> Sg.effect [
+                    FShade.Effect.ofFunction FShadeTest.trafo
+                    FShade.Effect.ofFunction FShadeTest.diffuseTexture
+                ]
             let objects = sg.RenderObjects()
 
             //let test = <@ (1 + 2) * 3 @>

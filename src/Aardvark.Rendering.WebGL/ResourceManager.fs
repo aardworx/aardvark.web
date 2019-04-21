@@ -226,18 +226,18 @@ type BufferResource(token : IResourceToken, target : float, data : IMod<IBuffer>
     override x.DestroyRes b =
         b.Release()
 
-type TextureResource(token : IResourceToken, data : IMod<ITexture>) =
+type TextureResource(token : IResourceToken, tex : IMod<ITexture>, sammy : FShade.SamplerState) =
     inherit AbstractResource<Texture>(token)
 
-    override x.ResourceKind = "Buffer"
+    override x.ResourceKind = "Texture"
 
     override x.CreateRes(t) =
-        let data = data.GetValue t
-        token.Context.CreateTexture(data)
+        let data = tex.GetValue t
+        token.Context.CreateTexture(data, sammy)
 
     override x.UpdateRes(t, b) =
-        let data = data.GetValue t
-        let n = token.Context.CreateTexture(data)
+        let data = tex.GetValue t
+        let n = token.Context.CreateTexture(data, sammy)
         b.Release()
         n
 
@@ -392,9 +392,11 @@ type ResourceManager(ctx : Context) =
             BufferResource(token, ctx.GL.ARRAY_BUFFER, data)
         )
            
-    member x.CreateTexture(data : IMod<ITexture>) =
-        textureCache.GetOrCreate([data], fun token ->
-            TextureResource(token, data)
+    member x.CreateTexture(data : IMod<ITexture>, sam : FShade.SamplerState) =
+        let a = data
+        let b = sam
+        textureCache.GetOrCreate([data; sam], fun token ->
+            TextureResource(token, a, b)
         )
                   
     member x.CreateIndexBuffer(data : IMod<IBuffer>) =

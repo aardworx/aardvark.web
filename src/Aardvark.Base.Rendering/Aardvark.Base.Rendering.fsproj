@@ -16,6 +16,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />
+    <ProjectReference Include="..\FShade\FShade.Core\FShade.Core.fsproj" />
+    <ProjectReference Include="..\FShade\FShade.Imperative\FShade.Imperative.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

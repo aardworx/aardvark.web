@@ -6,7 +6,7 @@ open FSharp.Collections
 
 type PipelineState =
     {
-        shader          : string
+        shader          : FShade.Effect
         depthMode       : IMod<DepthTestMode>
         uniforms        : string -> Option<IMod>
     }

@@ -7,7 +7,7 @@ open Aardvark.Base.Incremental
 
 type TraversalState =
     {
-        shader              : string
+        shader              : FShade.Effect
         trafos              : list<IMod<Trafo3d>>
         viewTrafo           : IMod<Trafo3d>
         projTrafo           : IMod<Trafo3d>
@@ -182,7 +182,7 @@ module Sg =
         override x.RenderObjects (state : TraversalState) =
             sg.RenderObjects { state with projTrafo = trafo }
             
-    type ShaderApplicator(shader : string, sg : ISg) =
+    type EffectApplicator(shader : FShade.Effect, sg : ISg) =
         inherit ASg()
         override x.RenderObjects (state : TraversalState) =
             sg.RenderObjects { state with shader = shader }
@@ -207,7 +207,7 @@ module Sg =
     let trafo (t : IMod<Trafo3d>) (sg : ISg) = TrafoApplicator(t, sg) :> ISg
     let viewTrafo (t : IMod<Trafo3d>) (sg : ISg) = ViewTrafoApplicator(t, sg) :> ISg
     let projTrafo (t : IMod<Trafo3d>) (sg : ISg) = ProjTrafoApplicator(t, sg) :> ISg
-    let shader (code : string) (sg : ISg) = ShaderApplicator(code, sg) :> ISg
+    let effect (effect : list<FShade.Effect>) (sg : ISg) = EffectApplicator(FShade.Effect.compose effect, sg) :> ISg
     let set (sg : aset<ISg>) = Set(sg) :> ISg
     let ofSeq (sg : seq<ISg>) = sg |> ASet.ofSeq |> set
     let ofList (sg : list<ISg>) = sg |> ASet.ofList |> set
@@ -220,7 +220,7 @@ module SgExtensions =
     module TraversalState =
         let empty =
             {
-                shader = ""
+                shader = FShade.Effect.empty
                 trafos = []
                 depthMode = Mod.constant DepthTestMode.LessOrEqual
                 viewTrafo = Mod.constant Trafo3d.Identity

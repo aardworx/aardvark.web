@@ -177,11 +177,59 @@ module Resources =
                 failwithf "[GL] bad attribute type: %A" t
 
 
+    module ShaderCompiler =
+        open FShade
+        open FShade.GLSL
+
+        let private cache = Dict<string * bool * FramebufferSignature, GLSLShader>(Unchecked.hash, Unchecked.equals)
+
+        let compile (glsl300 : bool) (signature : FramebufferSignature) (effect : Effect) =
+            let key = effect.Id, glsl300, signature
+            cache.GetOrCreate(key, fun _ ->
+                let attachments =
+                    signature.Colors |> Map.toSeq |> Seq.map (fun (slot, name) ->
+                        name, (typeof<V4d>, slot)
+                    )
+                    |> Map.ofSeq
+
+                //let attachments = 
+                //    if signature.Depth then
+                //        attachments |> Map.add DefaultSemantic.Depth (typeof<float>, -1)
+                //    else
+                //        attachments
+
+                let cfg = 
+                    {
+                        depthRange = V2d(-1.0, 1.0)
+                        flipHandedness = false
+                        outputs = attachments
+                        lastStage = ShaderStage.Fragment
+                    }
+                let module_ =
+                    effect
+                    |> Effect.toModule cfg
+
+                let glsl = 
+                    if glsl300 then ModuleCompiler.compileGLES300 module_
+                    else ModuleCompiler.compileGLES100 module_
+                    
+                Log.line "%s" glsl.code
+
+                glsl
+            )
+
+        
+
+
     type ResourceManager with
         member x.Prepare(signature : FramebufferSignature, o : RenderObject) =
             let gl = x.Context.GL
 
-            let program = x.CreateProgram(signature, o.pipeline.shader)
+            let shader = ShaderCompiler.compile gl.IsGL2 signature o.pipeline.shader
+
+
+            let program = x.CreateProgram(signature, shader.code)
+
 
             let uniformBuffers = 
                 program.Interface.uniformBlocks |> Map.map (fun index block ->
@@ -203,9 +251,17 @@ module Resources =
 
             let samplers =
                 program.Interface.samplers |> Map.toSeq |> Seq.choose (fun (name, location) ->
-                    match o.pipeline.uniforms name with
+                    let semantic, samplerState = 
+                        match MapExt.tryFind name shader.iface.samplers with
+                        | Some sam -> 
+                            match sam.samplerTextures with
+                            | [(name, state)] -> name, state
+                            | _ -> failwith "[GL] texture arrays not implemented"
+                        | None ->
+                            name, FShade.SamplerState.empty
+                    match o.pipeline.uniforms semantic with
                     | Some m ->
-                        let tex = x.CreateTexture(unbox m)
+                        let tex = x.CreateTexture(unbox m, samplerState)
                         Some (location, tex)
                     | None ->
                         None
