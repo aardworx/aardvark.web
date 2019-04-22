@@ -18,6 +18,17 @@ type Texture(ctx : Context, handle : WebGLTexture) =
 
     override x.ToString() = string handle
 
+type Sampler(ctx : Context, handle : WebGLSampler) =
+    inherit Resource(ctx)
+    
+    member x.Handle = handle
+
+    override x.Destroy() =
+        ctx.GL.deleteSampler handle
+
+    override x.ToString() = string handle
+
+
 [<AutoOpen>]  
 module TextureImpl = 
     
@@ -84,8 +95,92 @@ module TextureImpl =
         x <- x ||| (x >>> 16)
         x + 1
 
+    [<AutoOpen>]
+    module FShadeConversions =
+        open FShade
+
+        module Filter = 
+            let toMinMag (gl : WebGL2RenderingContext) (f : Option<FShade.Filter>) =
+                match f with
+                | Some Filter.Anisotropic -> (gl.LINEAR_MIPMAP_LINEAR, gl.LINEAR, true, true)
+                | Some Filter.MinLinearMagMipPoint -> (gl.LINEAR_MIPMAP_NEAREST, gl.NEAREST, false, true)
+                | Some Filter.MinLinearMagPointMipLinear -> (gl.LINEAR_MIPMAP_LINEAR, gl.NEAREST, false, true)
+                | Some Filter.MinMagLinearMipPoint -> (gl.LINEAR_MIPMAP_NEAREST, gl.LINEAR, false, true)
+                | Some Filter.MinMagMipLinear -> (gl.LINEAR_MIPMAP_LINEAR, gl.LINEAR, false, true)
+                | Some Filter.MinMagMipPoint -> (gl.NEAREST_MIPMAP_NEAREST, gl.NEAREST, false, true)
+                | Some Filter.MinMagPointMipLinear -> (gl.NEAREST_MIPMAP_LINEAR, gl.NEAREST, false, true)
+                | Some Filter.MinPointMagLinearMipPoint -> (gl.NEAREST_MIPMAP_NEAREST, gl.LINEAR, false, true)
+                | Some Filter.MinPointMagMipLinear -> (gl.NEAREST_MIPMAP_LINEAR, gl.LINEAR, false, true)
+                | Some Filter.MinMagPoint -> (gl.NEAREST, gl.NEAREST, false, false)
+                | Some Filter.MinMagLinear -> (gl.LINEAR, gl.LINEAR, false, false)
+                | Some Filter.MinPointMagLinear -> (gl.NEAREST, gl.LINEAR, false, false)
+                | Some Filter.MinLinearMagPoint -> (gl.LINEAR, gl.NEAREST, false, false)
+                | _ -> (gl.LINEAR_MIPMAP_LINEAR, gl.LINEAR, false, true)
+
+        module WrapMode =
+            let toRepeatMode (gl : WebGL2RenderingContext) (f : Option<WrapMode>) =
+                match f with
+                | Some WrapMode.Clamp -> gl.CLAMP_TO_EDGE
+                | Some WrapMode.Wrap -> gl.REPEAT
+                | Some WrapMode.Mirror -> gl.MIRRORED_REPEAT
+                | Some WrapMode.MirrorOnce -> gl.MIRRORED_REPEAT
+                | Some WrapMode.Border -> gl.CLAMP_TO_EDGE
+                | _ -> gl.REPEAT
+
+        module ComparisonFunction =
+            let toGL (gl : WebGL2RenderingContext) (f : Option<ComparisonFunction>) =
+                match f with
+                | Some f ->
+                    match f with
+                    | ComparisonFunction.Always -> Some gl.ALWAYS
+                    | ComparisonFunction.Equal -> Some gl.EQUAL
+                    | ComparisonFunction.Greater -> Some gl.GREATER
+                    | ComparisonFunction.GreaterOrEqual -> Some gl.GEQUAL
+                    | ComparisonFunction.Less -> Some gl.LESS
+                    | ComparisonFunction.LessOrEqual -> Some gl.LEQUAL
+                    | ComparisonFunction.Never -> Some gl.NEVER
+                    | ComparisonFunction.NotEqual -> Some gl.NOTEQUAL
+                    | _ -> None
+                | None ->
+                    None
+
     type Context with
-        member x.CreateTexture(t : ITexture, sam : FShade.SamplerState) =
+
+        member x.CreateSampler(sam : FShade.SamplerState) =
+            let gl = x.GL
+            let handle = gl.createSampler()
+            
+            let fMin, fMag, anisotropy, mipMap = Filter.toMinMag gl sam.Filter
+            gl.samplerParameteri(handle, gl.TEXTURE_MIN_FILTER, fMin)
+            gl.samplerParameteri(handle, gl.TEXTURE_MAG_FILTER, fMag)
+            
+            let ext = gl.getExtension("EXT_texture_filter_anisotropic") |> unbox<EXT_texture_filter_anisotropic>
+            if anisotropy && unbox ext then
+                let v = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) |> unbox<float>
+                let a = min v (match sam.MaxAnisotropy with | Some v -> float v | None -> 1024.0)
+                gl.samplerParameteri(handle, ext.TEXTURE_MAX_ANISOTROPY_EXT, a)
+
+            match ComparisonFunction.toGL gl sam.Comparison with
+            | Some f ->
+                gl.samplerParameteri(handle, gl.TEXTURE_COMPARE_FUNC, f)
+                gl.samplerParameteri(handle, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE)
+            | None ->
+                ()
+
+            match sam.MinLod with
+            | Some min -> gl.samplerParameteri(handle, gl.TEXTURE_MIN_LOD, min) 
+            | None -> ()
+
+            match sam.MaxLod with
+            | Some max -> gl.samplerParameteri(handle, gl.TEXTURE_MAX_LOD, max)
+            | None -> ()
+
+            if not mipMap then
+                gl.samplerParameteri(handle, gl.TEXTURE_MAX_LEVEL, 0.0)
+
+            Sampler(x, handle)
+
+        member x.CreateTexture(t : ITexture, sam : Option<FShade.SamplerState>) =
             match t with
             | :? FileTexture as t ->
                 loadTexture(t.Url).``then``(fun bmp ->
@@ -107,47 +202,48 @@ module TextureImpl =
                         gl.texImage2D(gl.TEXTURE_2D, 0.0, gl.RGBA, float bmp.width, float bmp.height, 0.0, gl.RGBA, gl.UNSIGNED_BYTE, bmp :> obj)
                     else
                         gl.texImage2D(gl.TEXTURE_2D, 0.0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bmp)
-                    let fMin, fMag, anisotropy = 
-                        match sam.Filter with
-                        | Some FShade.Filter.Anisotropic -> (gl.LINEAR_MIPMAP_LINEAR, gl.LINEAR, 1)
-                        | Some FShade.Filter.MinLinearMagMipPoint -> (gl.LINEAR_MIPMAP_NEAREST, gl.NEAREST, 0)
-                        | Some FShade.Filter.MinLinearMagPointMipLinear -> (gl.LINEAR_MIPMAP_LINEAR, gl.NEAREST, 0)
-                        | Some FShade.Filter.MinMagLinearMipPoint -> (gl.LINEAR_MIPMAP_NEAREST, gl.LINEAR, 0)
-                        | Some FShade.Filter.MinMagMipLinear -> (gl.LINEAR_MIPMAP_LINEAR, gl.LINEAR, 0)
-                        | Some FShade.Filter.MinMagMipPoint -> (gl.NEAREST_MIPMAP_NEAREST, gl.NEAREST, 0)
-                        | Some FShade.Filter.MinMagPointMipLinear -> (gl.NEAREST_MIPMAP_LINEAR, gl.NEAREST, 0)
-                        | Some FShade.Filter.MinPointMagLinearMipPoint -> (gl.NEAREST_MIPMAP_NEAREST, gl.LINEAR, 0)
-                        | Some FShade.Filter.MinPointMagMipLinear -> (gl.NEAREST_MIPMAP_LINEAR, gl.LINEAR, 0)
-                        | Some FShade.Filter.MinMagPoint -> (gl.NEAREST, gl.NEAREST, 0)
-                        | Some FShade.Filter.MinMagLinear -> (gl.LINEAR, gl.LINEAR, 0)
-                        | Some FShade.Filter.MinPointMagLinear -> (gl.NEAREST, gl.LINEAR, 0)
-                        | Some FShade.Filter.MinLinearMagPoint -> (gl.LINEAR, gl.NEAREST, 0)
-                        | _ -> (gl.LINEAR_MIPMAP_LINEAR, gl.LINEAR, 0)
 
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, fMag)
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, fMin)
-                    if anisotropy > 0 && unbox ext then
-                        let v = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) |> unbox<float>
-                        let a = min v (match sam.MaxAnisotropy with | Some v -> float v | None -> 1024.0)
-                        gl.texParameteri(gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, a)
+                    match sam with
+                    | Some sam -> 
+                        let fMin, fMag, anisotropy, mipMap = Filter.toMinMag gl sam.Filter
 
-                    let addressU =
-                        match sam.AddressU with
-                        | Some FShade.WrapMode.Wrap -> gl.REPEAT
-                        | Some FShade.WrapMode.Clamp -> gl.CLAMP_TO_EDGE
-                        | Some FShade.WrapMode.Mirror -> gl.MIRRORED_REPEAT
-                        | _ -> gl.REPEAT
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, fMag)
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, fMin)
+                        if anisotropy && unbox ext then
+                            let v = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) |> unbox<float>
+                            let a = min v (match sam.MaxAnisotropy with | Some v -> float v | None -> 1024.0)
+                            gl.texParameteri(gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, a)
+
+                        let addressU = WrapMode.toRepeatMode gl sam.AddressU
+                        let addressV = WrapMode.toRepeatMode gl sam.AddressU
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, addressU)
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, addressV)
+
+                        if gl.IsGL2 then
+                            match ComparisonFunction.toGL gl sam.Comparison with
+                            | Some f ->
+                                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, f)
+                                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE)
+                            | None ->
+                                ()
+
+                            match sam.MinLod with
+                            | Some min -> gl.texParameterf(gl.TEXTURE_2D, gl.TEXTURE_MIN_LOD, min) 
+                            | None -> ()
+
+                            match sam.MaxLod with
+                            | Some max -> gl.texParameterf(gl.TEXTURE_2D, gl.TEXTURE_MAX_LOD, max)
+                            | None -> ()
+
+                            if not mipMap then
+                                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, 0.0)
                         
-                    let addressV =
-                        match sam.AddressV with
-                        | Some FShade.WrapMode.Wrap -> gl.REPEAT
-                        | Some FShade.WrapMode.Clamp -> gl.CLAMP_TO_EDGE
-                        | Some FShade.WrapMode.Mirror -> gl.MIRRORED_REPEAT
-                        | _ -> gl.REPEAT
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, addressU)
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, addressV)
-                        
-                    gl.generateMipmap(gl.TEXTURE_2D)
+                        if mipMap then
+                            gl.generateMipmap(gl.TEXTURE_2D)
+
+                    | None ->
+                        gl.generateMipmap(gl.TEXTURE_2D)
+
                     
                     
                     

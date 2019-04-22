@@ -34,7 +34,7 @@ type PreparedRenderObject =
         program             : Program
         uniformBuffers      : Map<int, IResource<UniformBuffer>>
         vertexBuffers       : Map<int, IResource<Buffer> * list<VertexAttrib>>
-        samplers            : Map<int, WebGLUniformLocation * IResource<Texture>>
+        samplers            : Map<int, WebGLUniformLocation * IResource<Texture> * Option<IResource<Sampler>>>
         uniforms            : hmap<WebGLUniformLocation, PrimitiveType * IResource<UniformLocation>>
         indexBuffer         : Option<IResource<Buffer> * IndexInfo>
         mode                : float
@@ -61,7 +61,7 @@ module PreparedRenderObject =
             yield! o.uniformBuffers |> Map.toSeq |> Seq.map (fun (_,b) -> b :> IResource)
             yield! o.uniforms |> Seq.map (fun (_,(_,l)) -> l :> IResource)
             yield! o.vertexBuffers |> Map.toSeq |> Seq.map (fun (_,(b,_)) -> b :> IResource)
-            yield! o.samplers |> Map.toSeq |> Seq.map (fun (_,(_,b)) -> b :> IResource)
+            yield! o.samplers |> Map.toSeq |> Seq.collect (fun (_,(_,b,s)) -> (b :> IResource) :: [match s with | Some s -> yield s | _ -> ()])
             match o.indexBuffer with
             | Some(ib,_) -> yield ib :> IResource
             | None -> ()
@@ -77,7 +77,7 @@ module PreparedRenderObject =
                 yield! o.uniformBuffers |> Map.toSeq |> Seq.map (fun (_,b) -> b.Update t)
                 yield! o.uniforms |> HMap.toSeq |> Seq.map (fun (_,(_,b)) -> b.Update t)
                 yield! o.vertexBuffers  |> Map.toSeq |> Seq.map (fun (_,(b,_)) -> b.Update t)
-                yield! o.samplers  |> Map.toSeq |> Seq.map (fun (_,(_,b)) -> b.Update t)
+                yield! o.samplers  |> Map.toSeq |> Seq.collect (fun (_,(_,b, s)) -> b.Update(t) :: [match s with | Some s -> yield s.Update t | _ -> ()])
                 match o.indexBuffer with
                 | Some(ib,_) -> yield ib.Update(t)
                 | None -> ()
@@ -92,7 +92,7 @@ module PreparedRenderObject =
         o.uniformBuffers |> Map.iter (fun _ b -> b.Acquire())
         o.uniforms |> HMap.iter (fun _ (_,b) -> b.Acquire())
         o.vertexBuffers |> Map.iter (fun _ (b,_) -> b.Acquire())
-        o.samplers |> Map.iter (fun _ (_,b) -> b.Acquire())
+        o.samplers |> Map.iter (fun _ (_,b, s) -> b.Acquire(); match s with | Some s -> s.Acquire() | _ -> ())
         o.indexBuffer |> FSharp.Core.Option.iter (fun (b,_) -> b.Acquire())
         o.call.Acquire()
         o.depthMode.Acquire()
@@ -102,7 +102,7 @@ module PreparedRenderObject =
         o.uniformBuffers |> Map.iter (fun _ b -> b.Release())
         o.uniforms |> HMap.iter (fun _ (_,b) -> b.Release())
         o.vertexBuffers |> Map.iter (fun _ (b,_) -> b.Release())
-        o.samplers |> Map.iter (fun _ (_,b) -> b.Release())
+        o.samplers |> Map.iter (fun _ (_,b, s) -> b.Release(); match s with | Some s -> s.Release() | _ -> ())
         o.indexBuffer |> FSharp.Core.Option.iter (fun (b,_) -> b.Release())
         o.call.Release()
         o.depthMode.Release()
@@ -261,8 +261,13 @@ module Resources =
                             name, FShade.SamplerState.empty
                     match o.pipeline.uniforms semantic with
                     | Some m ->
-                        let tex = x.CreateTexture(unbox m, samplerState)
-                        Some (location, tex)
+                        if x.IsGL2 then
+                            let tex = x.CreateTexture(unbox m)
+                            let sam = x.CreateSampler(Mod.constant samplerState)
+                            Some (location, tex, Some sam)
+                        else
+                            let tex = x.CreateSampledTexture(unbox m, samplerState)
+                            Some (location, tex, None)
                     | None ->
                         None
                 )

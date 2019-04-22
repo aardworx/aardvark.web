@@ -12,6 +12,9 @@ type WebGLVertexArrayObject =
 type WebGLSync =
     interface end
 
+type WebGLSampler =
+    interface end
+
 type WebGL2RenderingContext =
     inherit WebGLRenderingContext
     abstract member SRGB_EXT : float
@@ -36,7 +39,23 @@ type WebGL2RenderingContext =
     abstract member UNIFORM_MATRIX_STRIDE : float
     abstract member UNIFORM_IS_ROW_MAJOR : float
 
+    abstract member TEXTURE_COMPARE_FUNC : float
+    abstract member TEXTURE_BASE_LEVEL : float
+    abstract member TEXTURE_COMPARE_MODE : float
+    abstract member TEXTURE_MAX_LEVEL : float
+    abstract member TEXTURE_MAX_LOD : float
+    abstract member TEXTURE_MIN_LOD : float
+    abstract member TEXTURE_WRAP_R : float
+    abstract member COMPARE_REF_TO_TEXTURE : float
 
+
+    abstract member createSampler : unit -> WebGLSampler
+    abstract member deleteSampler : WebGLSampler -> unit
+    abstract member isSampler : WebGLSampler -> bool
+    abstract member bindSampler : unit : float * sampler : WebGLSampler -> unit
+    abstract member getSamplerParameter : WebGLSampler * float -> obj
+    abstract member samplerParameteri : WebGLSampler * float * float -> unit
+    abstract member samplerParameterf : WebGLSampler * float * float -> unit
 
     abstract member bindBufferRange : target : float * index : float * buffer : WebGLBuffer * offset : float * size : float -> unit
     abstract member bindBufferBase : target : float * index : float * buffer : WebGLBuffer -> unit

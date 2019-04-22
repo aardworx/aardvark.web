@@ -226,18 +226,54 @@ type BufferResource(token : IResourceToken, target : float, data : IMod<IBuffer>
     override x.DestroyRes b =
         b.Release()
 
-type TextureResource(token : IResourceToken, tex : IMod<ITexture>, sammy : FShade.SamplerState) =
+type TextureResource(token : IResourceToken, tex : IMod<ITexture>) =
     inherit AbstractResource<Texture>(token)
 
     override x.ResourceKind = "Texture"
 
     override x.CreateRes(t) =
         let data = tex.GetValue t
-        token.Context.CreateTexture(data, sammy)
+        token.Context.CreateTexture(data, None)
 
     override x.UpdateRes(t, b) =
         let data = tex.GetValue t
-        let n = token.Context.CreateTexture(data, sammy)
+        let n = token.Context.CreateTexture(data, None)
+        b.Release()
+        n
+
+    override x.DestroyRes b =
+        b.Release()
+
+type SamplerResource(token : IResourceToken, tex : IMod<FShade.SamplerState>) =
+    inherit AbstractResource<Sampler>(token)
+
+    override x.ResourceKind = "Sampler"
+
+    override x.CreateRes(t) =
+        let data = tex.GetValue t
+        token.Context.CreateSampler(data) |> Prom.value
+
+    override x.UpdateRes(t, b) =
+        let data = tex.GetValue t
+        let n = token.Context.CreateSampler(data)
+        b.Release()
+        n |> Prom.value
+
+    override x.DestroyRes b =
+        b.Release()
+
+type SampledTextureResource(token : IResourceToken, tex : IMod<ITexture>, sammy : FShade.SamplerState) =
+    inherit AbstractResource<Texture>(token)
+
+    override x.ResourceKind = "Texture"
+
+    override x.CreateRes(t) =
+        let data = tex.GetValue t
+        token.Context.CreateTexture(data, Some sammy)
+
+    override x.UpdateRes(t, b) =
+        let data = tex.GetValue t
+        let n = token.Context.CreateTexture(data, Some sammy)
         b.Release()
         n
 
@@ -342,7 +378,8 @@ type UniformLocationResource(token : IResourceToken, typ : PrimitiveType, value 
         b.Destroy()
 
 type ResourceManager(ctx : Context) =
-       
+    let isGL2 = ctx.GL.IsGL2
+
     let noToken =
         { new IResourceToken with
             member x.Dispose() = ()
@@ -351,6 +388,8 @@ type ResourceManager(ctx : Context) =
 
     let bufferCache = ResourceCache(ctx)
     let textureCache = ResourceCache(ctx)
+    let samplerCache = ResourceCache(ctx)
+    let sampledTextureCache = ResourceCache(ctx)
     let indexBufferCache = ResourceCache(ctx)
     let uniformBufferCache = ResourceCache(ctx)
     let uniformBufferSlotCache = ResourceCache(ctx)
@@ -360,6 +399,7 @@ type ResourceManager(ctx : Context) =
 
     let ubManagers = Dict<UniformBlockInfo, UniformBufferManager>(Unchecked.hash, Unchecked.equals)
 
+    member x.IsGL2 = isGL2
     member x.Context = ctx
 
     member x.CreateUniformBufferSlot(block : UniformBlockInfo, tryGetUniform : string -> Option<IMod>) =
@@ -392,11 +432,23 @@ type ResourceManager(ctx : Context) =
             BufferResource(token, ctx.GL.ARRAY_BUFFER, data)
         )
            
-    member x.CreateTexture(data : IMod<ITexture>, sam : FShade.SamplerState) =
+    member x.CreateSampledTexture(data : IMod<ITexture>, sam : FShade.SamplerState) =
         let a = data
         let b = sam
-        textureCache.GetOrCreate([data; sam], fun token ->
-            TextureResource(token, a, b)
+        sampledTextureCache.GetOrCreate([data; sam], fun token ->
+            SampledTextureResource(token, a, b)
+        )
+
+    member x.CreateTexture(data : IMod<ITexture>) =
+        let a = data
+        textureCache.GetOrCreate([data], fun token ->
+            TextureResource(token, a)
+        )
+        
+    member x.CreateSampler(data : IMod<FShade.SamplerState>) =
+        let a = data
+        textureCache.GetOrCreate([data], fun token ->
+            SamplerResource(token, a)
         )
                   
     member x.CreateIndexBuffer(data : IMod<IBuffer>) =

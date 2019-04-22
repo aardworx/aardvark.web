@@ -276,12 +276,21 @@ module Compiler =
                         mid <- mid + 1
                     gl.bindBuffer(gl.ARRAY_BUFFER, null)
 
-            for (id, (loc, tex)) in Map.toSeq o.samplers do
+            for (id, (loc, tex, sam)) in Map.toSeq o.samplers do
                 let r = tex.Handle
-                yield fun () ->
-                    gl.activeTexture(gl.TEXTURE0 + float id)
-                    gl.uniform1i(loc, float id)
-                    gl.bindTexture(gl.TEXTURE_2D, r.Value.Handle)
+                match sam with
+                | Some sam ->
+                    yield fun () ->
+                        gl.activeTexture(gl.TEXTURE0 + float id)
+                        gl.uniform1i(loc, float id)
+                        gl.bindTexture(gl.TEXTURE_2D, r.Value.Handle)
+                        gl.bindSampler(float id, sam.Handle.Value.Handle)
+
+                | None -> 
+                    yield fun () ->
+                        gl.activeTexture(gl.TEXTURE0 + float id)
+                        gl.uniform1i(loc, float id)
+                        gl.bindTexture(gl.TEXTURE_2D, r.Value.Handle)
 
             for (loc, (typ,r)) in o.uniforms do
                 yield setUniform gl typ loc r.Handle
@@ -352,16 +361,31 @@ module Compiler =
 
 
             
-            for (id, (loc, tex)) in Map.toSeq o.samplers do
+            let eq (l : Option<IResource<Sampler>>) (r : Option<IResource<Sampler>>) =
+                match l, r with
+                | Some l, Some r -> l.Handle = r.Handle
+                | None, None -> true
+                | _ -> false
+
+            for (id, (loc, tex, sam)) in Map.toSeq o.samplers do
                 match Map.tryFind id prev.samplers with
-                | Some (ol,ot) when ol = loc && ot.Handle = tex.Handle ->
+                | Some (ol,ot,os) when ol = loc && ot.Handle = tex.Handle && eq os sam ->
                     ()
                 | _ -> 
                     let r = tex.Handle
-                    yield fun () ->
-                        gl.activeTexture(gl.TEXTURE0 + float id)
-                        gl.uniform1i(loc, float id)
-                        gl.bindTexture(gl.TEXTURE_2D, r.Value.Handle)
+                    match sam with
+                    | Some sam ->
+                        yield fun () ->
+                            gl.activeTexture(gl.TEXTURE0 + float id)
+                            gl.uniform1i(loc, float id)
+                            gl.bindTexture(gl.TEXTURE_2D, r.Value.Handle)
+                            gl.bindSampler(float id, sam.Handle.Value.Handle)
+
+                    | None -> 
+                        yield fun () ->
+                            gl.activeTexture(gl.TEXTURE0 + float id)
+                            gl.uniform1i(loc, float id)
+                            gl.bindTexture(gl.TEXTURE_2D, r.Value.Handle)
                         
             for (loc, (typ,r)) in o.uniforms do
                 match HMap.tryFind loc prev.uniforms with
