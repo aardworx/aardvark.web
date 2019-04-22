@@ -183,6 +183,58 @@ module Resources =
 
         let private cache = Dict<string * bool * FramebufferSignature, GLSLShader>(Unchecked.hash, Unchecked.equals)
 
+        open Fable.Core.JsInterop
+
+        let printShader (s : GLSLShader) =
+            let newObj (kv : list<string * obj>) =
+                let o = obj()
+                for (k,v) in kv do o?(k) <- v
+                o
+
+            console.group "code"
+            console.log s.code
+            console.groupEnd()
+
+            console.groupCollapsed "interface"
+            console.group "inputs"
+            for i in s.iface.inputs do
+                console.log (newObj ["location", i.paramLocation :> obj; "name", i.paramName :> obj; "semantic", i.paramSemantic :> obj])
+            console.groupEnd()
+
+            
+            console.group "uniforms"
+            //console.warn s.iface.uniformBuffers
+            for (name, buf) in MapExt.toArray s.iface.uniformBuffers do
+                //console.warn el
+                //let  (name, buf) = el
+                console.group (sprintf "buffer %s (%d)" name buf.ubSize)
+                for f in buf.ubFields do
+                    console.log (newObj ["name", f.ufName :> obj; "type", string f.ufType :> obj; "offset", f.ufOffset :> obj])
+                console.groupEnd()
+
+            for (name, sam) in MapExt.toArray s.iface.samplers do
+                let tex = 
+                    match sam.samplerTextures with
+                    | [name,_] -> name
+                    | _ -> List.map fst sam.samplerTextures |> FSharp.Core.String.concat ", " |> sprintf "[%s]"
+
+                console.groupCollapsed (sprintf "sampler %s (%s)" name tex)
+
+
+
+                console.log (newObj ["name", name :> obj; "textures", tex :> obj ])
+                //conosle.sam.samplerType
+                console.groupEnd()
+
+
+            console.groupEnd()
+
+            console.group "outputs"
+            for i in s.iface.outputs do
+                console.log (newObj ["location", i.paramLocation :> obj; "name", i.paramName :> obj; "semantic", i.paramSemantic :> obj])
+            console.groupEnd()
+            console.groupEnd()
+
         let compile (glsl300 : bool) (signature : FramebufferSignature) (effect : Effect) =
             let key = effect.Id, glsl300, signature
             cache.GetOrCreate(key, fun _ ->
@@ -213,7 +265,13 @@ module Resources =
                     if glsl300 then ModuleCompiler.compileGLES300 module_
                     else ModuleCompiler.compileGLES100 module_
                     
-                Log.line "%s" glsl.code
+
+
+                let str = if glsl300 then "GLES300" else "GLES100"
+                Log.startCollapsed "compiled %s (%d)" str glsl.code.Length
+                printShader glsl
+                //Log.line "%s" glsl.code
+                Log.stop()
 
                 glsl
             )
@@ -224,6 +282,7 @@ module Resources =
     type ResourceManager with
         member x.Prepare(signature : FramebufferSignature, o : RenderObject) =
             let gl = x.Context.GL
+            let mutable failed = false
 
             let shader = ShaderCompiler.compile gl.IsGL2 signature o.pipeline.shader
 
@@ -237,16 +296,17 @@ module Resources =
                 )
 
             let vertexBuffers =
-                program.Interface.attributes |> Map.map (fun index p ->
+                program.Interface.attributes |> Map.choose (fun index p ->
                     match Map.tryFind p.name o.vertexBuffers with
                     | Some b ->
                         let buffer = x.CreateBuffer(b.buffer)
                         let atts = VertexAttrib.ofType gl b.typ |> List.map (fun a -> { a with offset = a.offset + b.offset })
 
-                        buffer, atts
+                        Some (buffer, atts)
 
                     | None ->
-                        failwithf "[GL] could not get vertex attribute %s" p.name
+                        Log.error "[GL] could not get vertex attribute %s" p.name
+                        None
                 )
 
             let samplers =
@@ -256,15 +316,23 @@ module Resources =
                         | Some sam -> 
                             match sam.samplerTextures with
                             | [(name, state)] -> name, state
-                            | _ -> failwith "[GL] texture arrays not implemented"
+                            | _ -> 
+                                Log.error "[GL] texture arrays not implemented"
+                                name, FShade.SamplerState.empty
                         | None ->
                             name, FShade.SamplerState.empty
                     match o.pipeline.uniforms semantic with
                     | Some m ->
                         if x.IsGL2 then
-                            let tex = x.CreateTexture(unbox m)
-                            let sam = x.CreateSampler(Mod.constant samplerState)
-                            Some (location, tex, Some sam)
+                            let anisotropic = match samplerState.MaxAnisotropy with | Some a -> a > 1 | None -> false
+                            if anisotropic then
+                                Log.warn "cannot use anisotropic filtering with samplers: https://github.com/KhronosGroup/WebGL/issues/2006"
+                                let tex = x.CreateSampledTexture(unbox m, samplerState)
+                                Some (location, tex, None)
+                            else
+                                let tex = x.CreateTexture(unbox m)
+                                let sam = x.CreateSampler(Mod.constant samplerState)
+                                Some (location, tex, Some sam)
                         else
                             let tex = x.CreateSampledTexture(unbox m, samplerState)
                             Some (location, tex, None)
@@ -295,7 +363,10 @@ module Resources =
                         | Int(_, 32) -> { offset = view.offset; size = 4; typ = gl.UNSIGNED_INT }
                         | Int(_, 16) -> { offset = view.offset; size = 2; typ = gl.UNSIGNED_SHORT }
                         | Int(_, 8) -> { offset = view.offset; size = 1; typ = gl.UNSIGNED_BYTE }
-                        | t -> failwithf "[GL] bad index type: %A" t
+                        | t ->
+                            Log.error "[GL] bad index type: %A" t
+                            failed <- true
+                            { offset = view.offset; size = 0; typ = gl.UNSIGNED_INT }
                     Some (b,info)
                 | None ->
                     None
@@ -311,16 +382,19 @@ module Resources =
 
             let depthMode = x.CreateDepthMode(o.pipeline.depthMode)
 
-            {
-                id                  = newId()
-                program             = program
-                uniformBuffers      = uniformBuffers
-                uniforms            = uniforms
-                indexBuffer         = indexBuffer
-                samplers            = samplers
-                vertexBuffers       = vertexBuffers
-                mode                = mode
-                depthMode           = depthMode
-                call                = x.CreateDrawCall(o.call)
-            }
+            if not failed then
+                Some {
+                    id                  = newId()
+                    program             = program
+                    uniformBuffers      = uniformBuffers
+                    uniforms            = uniforms
+                    indexBuffer         = indexBuffer
+                    samplers            = samplers
+                    vertexBuffers       = vertexBuffers
+                    mode                = mode
+                    depthMode           = depthMode
+                    call                = x.CreateDrawCall(o.call)
+                }
+            else
+                None
 

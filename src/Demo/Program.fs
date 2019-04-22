@@ -494,7 +494,7 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
             o.id :> obj
         ]
 
-    let preparedObjects = objects |> ASet.map (fun o -> manager.Prepare(signature, o))
+    let preparedObjects = objects |> ASet.choose (fun o -> manager.Prepare(signature, o))
     let reader = preparedObjects.GetReader()
     let allResources = Dict<IResource, int>(Unchecked.hash, Unchecked.equals)
 
@@ -619,12 +619,13 @@ module FShadeTest =
         member x.ModelTrafo : M44d = uniform?PerModel?ModelTrafo
         member x.ViewProjTrafo : M44d = uniform?PerView?ViewProjTrafo
 
-    let Tex =
+    let sammy =
         sampler2d {
             texture uniform?DiffuseColorTexture
             addressU WrapMode.Wrap
             addressV WrapMode.Wrap
-            filter Filter.Anisotropic
+            filter Filter.MinMagMipLinear
+            //maxAnisotropy 16
         }
 
     let trafo (v : Vertex) =
@@ -639,7 +640,7 @@ module FShadeTest =
                 let dir = Vec.normalize (uniform.CameraLocation - v.wp.XYZ)
                 let n = Vec.normalize v.n
                 Vec.dot n dir
-            let col = Tex.Sample(v.tc)
+            let col = sammy.Sample(v.tc)
             let ambient = 0.15
             return V4d((ambient + (1.0 - ambient) * d) * col.XYZ, 1.0)
         }

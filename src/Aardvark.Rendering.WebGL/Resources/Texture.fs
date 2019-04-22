@@ -155,11 +155,14 @@ module TextureImpl =
             gl.samplerParameteri(handle, gl.TEXTURE_MAG_FILTER, fMag)
             
             let ext = gl.getExtension("EXT_texture_filter_anisotropic") |> unbox<EXT_texture_filter_anisotropic>
-            if anisotropy && unbox ext then
-                let v = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) |> unbox<float>
-                let a = min v (match sam.MaxAnisotropy with | Some v -> float v | None -> 1024.0)
-                gl.samplerParameteri(handle, ext.TEXTURE_MAX_ANISOTROPY_EXT, a)
-
+            if anisotropy then
+                if unbox ext then
+                    let v = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) |> unbox<float>
+                    let a = min v (match sam.MaxAnisotropy with | Some v -> float v | None -> 1024.0)
+                    gl.samplerParameterf(handle, ext.TEXTURE_MAX_ANISOTROPY_EXT, a)
+                    //Log.warn "[GL] max anisotropy: %.0f" a
+                else
+                    Log.warn "[GL] anisotropic filtering not supported"
             match ComparisonFunction.toGL gl sam.Comparison with
             | Some f ->
                 gl.samplerParameteri(handle, gl.TEXTURE_COMPARE_FUNC, f)
@@ -209,6 +212,7 @@ module TextureImpl =
 
                         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, fMag)
                         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, fMin)
+                        
                         if anisotropy && unbox ext then
                             let v = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) |> unbox<float>
                             let a = min v (match sam.MaxAnisotropy with | Some v -> float v | None -> 1024.0)
@@ -242,6 +246,15 @@ module TextureImpl =
                             gl.generateMipmap(gl.TEXTURE_2D)
 
                     | None ->
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+
+                        if  unbox ext then
+                            let v = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) |> unbox<float>
+                            gl.texParameteri(gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, v)
+
                         gl.generateMipmap(gl.TEXTURE_2D)
 
                     

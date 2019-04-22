@@ -70,6 +70,17 @@ module ``Predefined Lenses`` =
     
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]        
     module Map =
+
+        let choose (f : 'k -> 'v -> Option<'b>) (m : Map<'k, 'v>) =
+            let mutable res = Map.empty
+            for (k,v) in Map.toSeq m do
+                match f k v with
+                | Some r ->
+                    res <- Map.add k r res
+                | None ->
+                    ()
+            res
+
         module Lens =
             let item (key : 'k) : Lens<Map<'k, 'v>, Option<'v>> =
                 { new Lens<_, _>() with

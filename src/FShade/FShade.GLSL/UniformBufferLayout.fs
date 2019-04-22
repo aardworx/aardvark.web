@@ -653,7 +653,7 @@ module LayoutStd140 =
         let inline layout a = let (t,_,_) = layout a in t
         { iface with
             storageBuffers = iface.storageBuffers |> MapExt.map (fun _ s -> { s with ssbType = layout s.ssbType })
-            uniformBuffers = iface.uniformBuffers |> MapExt.map (fun _ -> applyLayout)
+            uniformBuffers = iface.uniformBuffers |> MapExt.map (fun _ b -> applyLayout b)
             inputs = iface.inputs |> List.map (fun p -> { p with paramType = layout p.paramType})
             outputs = iface.outputs |> List.map (fun p -> { p with paramType = layout p.paramType})
             shaders = iface.shaders |> MapExt.map (fun _ (s : GLSLShaderInterface) ->

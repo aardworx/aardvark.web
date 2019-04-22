@@ -515,17 +515,17 @@ module MapExtImplementation =
                 let r2 = map f r 
                 MapNode(k,v2,l2, r2,h,c)
 
-        let rec mapiOpt (f:OptimizedClosures.FSharpFunc<_,_,_>) m = 
+        let rec mapiOpt f m = 
             match m with
             | MapEmpty -> empty
-            | MapOne(k,v) -> MapOne(k, f.Invoke(k, v))
+            | MapOne(k,v) -> MapOne(k, f k v)
             | MapNode(k,v,l,r,h,c) -> 
                 let l2 = mapiOpt f l 
-                let v2 = f.Invoke(k, v) 
+                let v2 = f k v
                 let r2 = mapiOpt f r 
                 MapNode(k,v2, l2, r2,h,c)
 
-        let mapi f m = mapiOpt (OptimizedClosures.FSharpFunc<_,_,_>.Adapt(f)) m
+        let mapi f m = mapiOpt f m
 
         let rec mapiMonotonicAux (f:OptimizedClosures.FSharpFunc<_,_,_>) m =
             match m with
@@ -871,6 +871,7 @@ module MapExtImplementation =
                 | MapOne(k,v) -> (k,v)::acc
                 | MapNode(k,v,l,r,_,_) -> loop l ((k,v)::loop r acc)
             loop m []
+
         let toArray m = m |> toList |> Array.ofList
         let ofList comparer l = List.fold (fun acc (k,v) -> add comparer k v acc) empty l
 
@@ -1090,7 +1091,7 @@ type MapExt<[<EqualityConditionalOn>]'Key,[<EqualityConditionalOn;ComparisonCond
 
     member m.MapRange f  = new MapExt<'Key,'b>(comparer,MapTree.map f tree)
 
-    member m.MapExt f  = new MapExt<'Key,'b>(comparer,MapTree.mapi f tree)
+    member m.Map f  = new MapExt<'Key,'b>(comparer,MapTree.mapi f tree)
     
     member m.MapMonotonic<'Key2, 'Value2 when 'Key2 : comparison> (f : 'Key -> 'Value -> 'Key2 * 'Value2) : MapExt<'Key2,'Value2> = new MapExt<'Key2,'Value2>(LanguagePrimitives.FastGenericComparer<'Key2>, MapTree.mapiMonotonic f tree)
    
@@ -1327,8 +1328,8 @@ module MapExt =
 
     let mapRange f (m:MapExt<_,_>) = m.MapRange(f)
 
-    [<CompiledName("MapExt")>]
-    let map f (m:MapExt<_,_>) = m.MapExt(f)
+    [<CompiledName("Map")>]
+    let map f (m:MapExt<_,_>) = m.Map(f)
 
     [<CompiledName("Fold")>]
     let fold<'Key,'T,'State when 'Key : comparison> f (z:'State) (m:MapExt<'Key,'T>) = MapTree.fold f z m.Tree
