@@ -609,6 +609,7 @@ module FShadeTest =
     type Vertex = 
         { 
             [<Position>] pos : V4d
+            [<Color>] c : V4d
             [<Semantic("WorldPos")>] wp : V4d
             [<Normal>] n : V3d 
             [<TexCoord>] tc : V2d 
@@ -616,6 +617,7 @@ module FShadeTest =
 
     type UniformScope with
         member x.CameraLocation : V3d = uniform?PerView?CameraLocation
+        member x.NormalMatrix : M33d = uniform?PerModel?NormalMatrix
         member x.ModelTrafo : M44d = uniform?PerModel?ModelTrafo
         member x.ViewProjTrafo : M44d = uniform?PerView?ViewProjTrafo
 
@@ -625,24 +627,32 @@ module FShadeTest =
             addressU WrapMode.Wrap
             addressV WrapMode.Wrap
             filter Filter.MinMagMipLinear
-            //maxAnisotropy 16
+        }
+        
+    let constantColor (c : V4d) (v : Vertex) =
+        vertex {
+            return { v with c = c }
         }
 
     let trafo (v : Vertex) =
         vertex {
             let wp = uniform.ModelTrafo * v.pos
-            return { v with pos = uniform.ViewProjTrafo * wp; wp = wp }
+            return { v with pos = uniform.ViewProjTrafo * wp; wp = wp; n = Vec.normalize (uniform.NormalMatrix * v.n) }
         }
 
     let diffuseTexture (v : Vertex) =
+        fragment {
+            return sammy.Sample(v.tc)
+        }
+
+    let simpleLight (v : Vertex) =
         fragment {
             let d = 
                 let dir = Vec.normalize (uniform.CameraLocation - v.wp.XYZ)
                 let n = Vec.normalize v.n
                 Vec.dot n dir
-            let col = sammy.Sample(v.tc)
-            let ambient = 0.15
-            return V4d((ambient + (1.0 - ambient) * d) * col.XYZ, 1.0)
+            let ambient = 0.1
+            return V4d((ambient + (1.0 - ambient) * d) * v.c.XYZ, v.c.W)
         }
 
 
@@ -835,7 +845,7 @@ let main argv =
             
             let control = new Aardvark.Application.RenderControl(canvas)
 
-            let initial = CameraView.lookAt (V3d(3.0, 3.0, 2.0)) V3d.Zero V3d.OOI
+            let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
             let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
             let anim = Mod.constant true //control.Keyboard.IsDown(Aardvark.Application.Keys.Space)
             let angle =
@@ -867,12 +877,12 @@ let main argv =
 
 
             let sphere =
-                Sg.sphere 1
+                Sg.sphere 2
                 |> Sg.trafo (Mod.constant (Trafo3d.Scale(0.5)))
 
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
-                |> Sg.uniform "DiffuseColorTexture" (Mod.constant (FileTexture "cliffs_color.jpg" :> ITexture))
+                |> Sg.uniform "DiffuseColorTexture" (Mod.constant (FileTexture "pattern.jpg" :> ITexture))
                 
             let sphere2 =
                 Sg.sphere 4
@@ -880,7 +890,7 @@ let main argv =
 
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
-                |> Sg.uniform "DiffuseColorTexture" (Mod.constant (FileTexture "pattern.jpg" :> ITexture))
+                |> Sg.uniform "DiffuseColorTexture" (Mod.constant (FileTexture "cliffs_color.jpg" :> ITexture))
                     
             let box =
                 Sg.box Box3d.Unit
@@ -889,7 +899,7 @@ let main argv =
                 |> Sg.viewTrafo view
                 |> Sg.projTrafo proj
                 |> Sg.uniform "DiffuseColorTexture" (Mod.constant (FileTexture "test.jpg" :> ITexture))
-                
+
             let rand = System.Random()
             let sett =
                 let s = 3
@@ -911,7 +921,7 @@ let main argv =
                                 let model = angle |> Mod.map (fun a -> Trafo3d.Rotation(axis, speed * a))
                                 let s = 
                                     sg 
-                                    //|> Sg.trafo model
+                                    |> Sg.trafo model
                                     |> Sg.trafo (Mod.constant <| Trafo3d.Translation t)
                                 yield s
                 ]
@@ -919,8 +929,10 @@ let main argv =
             let sg =
                 Sg.set sett
                 |> Sg.effect [
+                    FShade.Effect.ofFunction (FShadeTest.constantColor V4d.IOOI)
                     FShade.Effect.ofFunction FShadeTest.trafo
                     FShade.Effect.ofFunction FShadeTest.diffuseTexture
+                    FShade.Effect.ofFunction FShadeTest.simpleLight
                 ]
             let objects = sg.RenderObjects()
 

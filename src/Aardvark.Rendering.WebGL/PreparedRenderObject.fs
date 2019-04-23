@@ -183,33 +183,80 @@ module Resources =
 
         let private cache = Dict<string * bool * FramebufferSignature, GLSLShader>(Unchecked.hash, Unchecked.equals)
 
-        open Fable.Core.JsInterop
+        module GLSLType =
+            let rec toString (t : GLSLType) =
+                match t with
+                | GLSLType.Array(len, t, _) -> sprintf "%s[%d]" (toString t) len
+                | GLSLType.Bool -> "bool"
+                | GLSLType.DynamicArray(t,_) -> sprintf "%s[]" (toString t)
+                | GLSLType.Float b -> sprintf "float%d" b
+                | GLSLType.Int(true, b) -> sprintf "int%d" b
+                | GLSLType.Int(false, b) -> sprintf "uint%d" b
+                | GLSLType.Image i -> "image"
+                | GLSLType.Mat(c, r, Float 32) -> if c = r then sprintf "mat%d" r else sprintf "mat%dx%d" c r
+                | GLSLType.Mat(c, r, Float 64) -> if c = r then sprintf "dmat%d" r else sprintf "mat%dx%d" c r
+                | GLSLType.Mat(c, r, t) -> sprintf "%smat%dx%d" (toString t) c r
+                | GLSLType.Sampler s -> 
+                    let dimStr =
+                        match s.dimension with
+                            | SamplerDimension.Sampler1d -> "1D"
+                            | SamplerDimension.Sampler2d -> "2D"
+                            | SamplerDimension.Sampler3d -> "3D"
+                            | SamplerDimension.SamplerCube -> "Cube"
+                            | _ -> failwith "unsupported sampler dimension"
 
+                    let shadowSuffix = if s.isShadow then "Shadow" else ""
+                    let msSuffix = if s.isMS then "MS" else ""
+                    let typePrefix = 
+                        match s.valueType with
+                            | Vec(_, Int _) -> "i"
+                            | _ -> ""
+
+                    if s.isArray then sprintf "%ssampler%s%sArray%s" typePrefix dimStr msSuffix shadowSuffix
+                    else sprintf "%ssampler%s%s%s" typePrefix dimStr msSuffix shadowSuffix 
+                        
+                | GLSLType.Struct(name, fields, _) -> sprintf "struct %s { %s }" name (fields |> Seq.map (fun (n,t,_) -> sprintf "%s : %s" n (toString t)) |> FSharp.Core.String.concat "; ")
+                | GLSLType.Vec(d, Float 32) -> sprintf "vec%d" d
+                | GLSLType.Vec(d, Float 64) -> sprintf "dvec%d" d
+                | GLSLType.Vec(d, Int(true, 32)) -> sprintf "ivec%d" d
+                | GLSLType.Vec(d, Int(false, 32)) -> sprintf "uvec%d" d
+                | GLSLType.Vec(d, Bool) -> sprintf "bvec%d" d
+                | GLSLType.Vec(d, t) -> sprintf "%sx%d" (toString t) d
+                | GLSLType.Void -> "void"
+                
         let printShader (s : GLSLShader) =
-            let newObj (kv : list<string * obj>) =
-                let o = obj()
-                for (k,v) in kv do o?(k) <- v
-                o
 
-            console.group "code"
-            console.log s.code
-            console.groupEnd()
+            let lines = s.code.Split([|"\r\n"|], StringSplitOptions.None)
+            let len = log10 (float lines.Length + 0.5) |> ceil |> int
+            let code = 
+                lines |> FSharp.Collections.Array.mapi (fun i l -> 
+                    let id = string (1 + i)
+                    let id = 
+                        if id.Length < len then System.String(' ', len - id.Length) + id
+                        else id
+                    id + "  " + l
+                ) |> FSharp.Core.String.concat "\n"
+
+
 
             console.groupCollapsed "interface"
+
             console.group "inputs"
             for i in s.iface.inputs do
-                console.log (newObj ["location", i.paramLocation :> obj; "name", i.paramName :> obj; "semantic", i.paramSemantic :> obj])
+                let typ = GLSLType.toString i.paramType
+                if i.paramSemantic <> i.paramName then
+                    console.log (sprintf "layout(location = %d) %s %s [%s]" i.paramLocation typ i.paramName i.paramSemantic)
+                else
+                    console.log (sprintf "layout(location = %d) %s %s" i.paramLocation typ i.paramName)
             console.groupEnd()
 
             
             console.group "uniforms"
-            //console.warn s.iface.uniformBuffers
             for (name, buf) in MapExt.toArray s.iface.uniformBuffers do
-                //console.warn el
-                //let  (name, buf) = el
-                console.group (sprintf "buffer %s (%d)" name buf.ubSize)
-                for f in buf.ubFields do
-                    console.log (newObj ["name", f.ufName :> obj; "type", string f.ufType :> obj; "offset", f.ufOffset :> obj])
+                console.group (sprintf "uniform %s // size: %d" name buf.ubSize)
+                for f in buf.ubFields do    
+                    let typ = GLSLType.toString f.ufType
+                    console.log (sprintf "%s %s // offset: %d" typ f.ufName f.ufOffset)
                 console.groupEnd()
 
             for (name, sam) in MapExt.toArray s.iface.samplers do
@@ -218,22 +265,91 @@ module Resources =
                     | [name,_] -> name
                     | _ -> List.map fst sam.samplerTextures |> FSharp.Core.String.concat ", " |> sprintf "[%s]"
 
-                console.groupCollapsed (sprintf "sampler %s (%s)" name tex)
-
-
-
-                console.log (newObj ["name", name :> obj; "textures", tex :> obj ])
-                //conosle.sam.samplerType
+                let typ = GLSLType.toString (GLSLType.Sampler sam.samplerType)
+                console.groupCollapsed (sprintf "%s %s (%s)" typ name tex)
+                console.log("type", typ)
+                console.log("name", "\"" + name + "\"")
+                console.log("binding", sam.samplerBinding)
+                console.log("count", sam.samplerCount)
                 console.groupEnd()
+
 
 
             console.groupEnd()
 
             console.group "outputs"
             for i in s.iface.outputs do
-                console.log (newObj ["location", i.paramLocation :> obj; "name", i.paramName :> obj; "semantic", i.paramSemantic :> obj])
+                let typ = GLSLType.toString i.paramType
+                if i.paramSemantic <> i.paramName then
+                    console.log (sprintf "layout(location = %d) %s %s [%s]" i.paramLocation typ i.paramName i.paramSemantic)
+                else
+                    console.log (sprintf "layout(location = %d) %s %s" i.paramLocation typ i.paramName)
             console.groupEnd()
+
+            
+            console.groupCollapsed "shaders"
+            for (stage, shader) in MapExt.toSeq s.iface.shaders do
+                let name =
+                   match stage with
+                   | ShaderStage.Vertex -> "Vertex"
+                   | ShaderStage.TessControl -> "TessControl"
+                   | ShaderStage.TessEval -> "TessEval"
+                   | ShaderStage.Geometry -> "Geometry"
+                   | ShaderStage.Fragment -> "Fragment"
+                   | _ -> "Compute"
+                console.group name
+                
+                console.group "inputs"
+                match MapExt.tryFind Imperative.ParameterKind.Input shader.shaderBuiltIns with
+                | Some inputs ->
+                    for (name, typ) in MapExt.toSeq inputs do
+                        let typ = GLSLType.toString typ
+                        console.log (sprintf "builtin %s %s" typ name)
+                | None -> ()
+                for i in shader.shaderInputs do
+                    let typ = GLSLType.toString i.paramType
+
+                    let loc =
+                        if stage = ShaderStage.Vertex then sprintf "layout(location = %d) " i.paramLocation 
+                        else ""
+                    if i.paramSemantic <> i.paramName then
+                        console.log (sprintf "%s%s %s [%s]" loc typ i.paramName i.paramSemantic)
+                    else
+                        console.log (sprintf "%s%s %s" loc typ i.paramName)
+                    
+                console.groupEnd()
+
+                console.group "outputs"
+                match MapExt.tryFind Imperative.ParameterKind.Output shader.shaderBuiltIns with
+                | Some inputs ->
+                    for (name, typ) in MapExt.toSeq inputs do
+                        let typ = GLSLType.toString typ
+                        console.log (sprintf "builtin %s %s" typ name)
+                | None -> ()
+                for i in shader.shaderOutputs do
+                    let typ = GLSLType.toString i.paramType
+                    
+                    let loc =
+                        if stage = ShaderStage.Fragment then sprintf "layout(location = %d) " i.paramLocation 
+                        else ""
+
+                    if i.paramSemantic <> i.paramName then
+                        console.log (sprintf "%s%s %s [%s]" loc typ i.paramName i.paramSemantic)
+                    else
+                        console.log (sprintf "%s%s %s" loc typ i.paramName)
+                    
+                console.groupEnd()
+
+                console.groupEnd()
             console.groupEnd()
+            
+            
+            console.groupEnd()
+            
+            console.group "code"
+            console.log code
+            console.groupEnd()
+            
 
         let compile (glsl300 : bool) (signature : FramebufferSignature) (effect : Effect) =
             let key = effect.Id, glsl300, signature
@@ -268,9 +384,8 @@ module Resources =
 
 
                 let str = if glsl300 then "GLES300" else "GLES100"
-                Log.startCollapsed "compiled %s (%d)" str glsl.code.Length
+                Log.start "compiled %s (%d)" str glsl.code.Length
                 printShader glsl
-                //Log.line "%s" glsl.code
                 Log.stop()
 
                 glsl
@@ -326,7 +441,7 @@ module Resources =
                         if x.IsGL2 then
                             let anisotropic = match samplerState.MaxAnisotropy with | Some a -> a > 1 | None -> false
                             if anisotropic then
-                                Log.warn "cannot use anisotropic filtering with samplers: https://github.com/KhronosGroup/WebGL/issues/2006"
+                                Log.warn "duplicated texture due to anisotropic filtering: https://github.com/KhronosGroup/WebGL/issues/2006"
                                 let tex = x.CreateSampledTexture(unbox m, samplerState)
                                 Some (location, tex, None)
                             else

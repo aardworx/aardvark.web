@@ -95,16 +95,6 @@ module ConstantFolding =
                 [], t
 
         for (name, (fType, f)) in l do
-            //let fType = f.GetType()
-            //let invoke : MethodInfo = 
-            //    fType.GetMethods(BindingFlags.Public ||| BindingFlags.Instance) 
-            //        |> Array.filter (fun mi -> mi.Name = "Invoke") 
-            //        |> Array.maxBy (fun mi -> mi.GetParameters().Length)
-
-            //let parameters =
-            //    invoke.GetParameters() |> Array.map (fun p -> p.ParameterType) |> Array.toList
-
-
             let args, ret = getFunctionElements fType
 
             let rec run (f : obj) (args : list<obj>) : obj = 

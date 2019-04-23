@@ -1841,7 +1841,7 @@ module Assembler =
             | _ ->
                 ()
 
-        let code = definitions.Run(state) |> String.concat "\r\n\r\n"
+        let code = definitions.Run(state) |> String.concat "\r\n"
         let state = !state
         let iface = LayoutStd140.apply state.ifaceNew
 

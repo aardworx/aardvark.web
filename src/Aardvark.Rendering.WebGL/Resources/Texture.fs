@@ -163,6 +163,14 @@ module TextureImpl =
                     //Log.warn "[GL] max anisotropy: %.0f" a
                 else
                     Log.warn "[GL] anisotropic filtering not supported"
+
+            
+            let addressU = WrapMode.toRepeatMode gl sam.AddressU
+            let addressV = WrapMode.toRepeatMode gl sam.AddressV
+            gl.samplerParameteri(handle, gl.TEXTURE_WRAP_S, addressU)
+            gl.samplerParameteri(handle, gl.TEXTURE_WRAP_T, addressV)
+
+
             match ComparisonFunction.toGL gl sam.Comparison with
             | Some f ->
                 gl.samplerParameteri(handle, gl.TEXTURE_COMPARE_FUNC, f)
