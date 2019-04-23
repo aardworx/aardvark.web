@@ -1,0 +1,4 @@
+[submodule "fable"]
+	path = fable
+	url = git@github.com:krauthaufen/Fable.git
+	branch = master

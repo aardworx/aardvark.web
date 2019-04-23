@@ -31,7 +31,7 @@ module.exports = {
 				loader: "fable-loader",
 				options: {
 					cli: {
-						path: "C:\\Users\\Schorsch\\Development\\Fable\\src\\Fable.Cli"
+						path: "./fable/src/Fable.Cli"
 					}
 				}
 			}

@@ -5,6 +5,7 @@
   "author": "",
   "license": "ISC",
   "scripts": {
+    "build-compiler": "pushd fable && npm install && npm run build compiler && popd",
     "start": "webpack-dev-server",
     "build": "webpack -p"
   },
