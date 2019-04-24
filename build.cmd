@@ -12,12 +12,12 @@ if NOT exist .paket\Paket.Restore.targets (
 
 if NOT exist node_modules (
 	powershell write-host -fore Red yarn install
-	cmd.exe /c "yarn install"
+	cmd.exe /c "npm install"
 )
 
 if NOT exist paket-files\krauthaufen\Fable\build\fable-library (
 	powershell write-host -fore Red build compiler
-	cmd.exe /c "yarn build-compiler"
+	cmd.exe /c "npm run build-compiler"
 )
 
-cmd.exe /c "yarn %*"
+cmd.exe /c "npm run %*"
