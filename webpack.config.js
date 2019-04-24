@@ -30,6 +30,7 @@ module.exports = {
             use: {
 				loader: "fable-loader",
 				options: {
+					define: ["FABLE_QUOTATIONS"],
 					cli: {
 						path: "./paket-files/krauthaufen/Fable/src/Fable.Cli"
 					}

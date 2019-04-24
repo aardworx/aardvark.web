@@ -292,4 +292,4 @@ NUGET
     System.ValueTuple (4.5) - restriction: >= netcoreapp2.0
 GITHUB
   remote: krauthaufen/Fable
-    FULLPROJECT (be89aa6fc999ebda4751610f667ae932ae5d4880)
+    FULLPROJECT (2aa205ae93f0a97e942cd452295c6da9f4384450)
