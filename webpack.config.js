@@ -31,7 +31,7 @@ module.exports = {
 				loader: "fable-loader",
 				options: {
 					cli: {
-						path: "./fable/src/Fable.Cli"
+						path: "./paket-files/krauthaufen/Fable/src/Fable.Cli"
 					}
 				}
 			}
