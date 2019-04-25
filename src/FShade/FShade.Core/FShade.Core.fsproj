@@ -1,9 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
-
   <ItemGroup>
     <None Include="SamplerCodeGen.fsx" />
     <Compile Include="Helpers.fs" />
@@ -23,10 +22,9 @@
     <Compile Include="EffectInputLayout.fs" />
     <Compile Include="Effect.fs" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />
     <ProjectReference Include="..\FShade.Imperative\FShade.Imperative.fsproj" />
   </ItemGroup>
-
+  <Import Project="..\..\..\.paket\Paket.Restore.targets" />
 </Project>

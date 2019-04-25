@@ -1,9 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="Utilities.fs" />
     <Compile Include="IntrinsicFunctions.fs" />
@@ -12,13 +11,10 @@
     <Compile Include="Assembler.fs" />
     <Compile Include="Extensions.fs" />
   </ItemGroup>
-
-  <ItemGroup />
-
   <ItemGroup>
     <ProjectReference Include="..\..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />
     <ProjectReference Include="..\FShade.Core\FShade.Core.fsproj" />
     <ProjectReference Include="..\FShade.Imperative\FShade.Imperative.fsproj" />
   </ItemGroup>
-
+  <Import Project="..\..\..\.paket\Paket.Restore.targets" />
 </Project>
