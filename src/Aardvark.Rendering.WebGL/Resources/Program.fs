@@ -80,6 +80,71 @@ module ProgramImpl =
 
             else failwithf "invalid type: %A" t
 
+    type Tree (fields : list<UniformField>, children : MapExt<string, Tree>) =
+        member x.Fields = fields
+        member x.Children = children
+
+    module Tree =
+        let empty = Tree([], MapExt.empty)
+
+        let private getKey (f : UniformField) =
+            let arr = f.name.Split([| '.' |]) 
+            if arr.Length > 0 then
+                List.ofArray arr.[0 .. arr.Length - 2]
+            else
+                []
+                
+        let private getName (f : UniformField) =
+            let arr = f.name.Split([| '.' |]) 
+            if arr.Length > 0 then
+                arr.[arr.Length-1]
+            else
+                f.name
+
+        let add (f : UniformField) (t : Tree) =
+            let key = getKey f
+            let rec add (t : Tree) (key : list<string>) (f : UniformField) =
+                match key with
+                | [] -> Tree(f :: t.Fields, t.Children)
+                | h :: hs ->
+                    let children = 
+                        t.Children |> MapExt.alter h (fun o ->
+                            let o = match o with | Some o -> o | None -> empty
+                            add o hs f |> Some
+                        )
+                    Tree(t.Fields, children)
+            add t key f
+
+        let rec allFields (t : Tree) : list<UniformField> =
+            let structs = 
+                t.Children |> MapExt.toList |> List.choose (fun (name, tree) -> 
+                    let fields = allFields tree |> List.sortBy (fun f -> f.offset)
+                    match fields with
+                    | [] -> None
+                    | h :: _ ->
+                        let firstOffset = h.offset
+                        let fields = fields |> List.map (fun f -> { FieldInfo.name = f.name; FieldInfo.offset = f.offset - firstOffset; FieldInfo.typ = f.typ; FieldInfo.rowMajor = f.rowMajor; FieldInfo.size = f.size; FieldInfo.stride = f.stride })
+                        let size = fields |> List.map (fun f -> f.offset + PrimitiveType.size f.typ) |> List.max
+                        Some {
+                            UniformField.name = name
+                            UniformField.typ = Struct(size, fields)
+                            UniformField.offset = firstOffset
+                            UniformField.stride = 0
+                            UniformField.size = size
+                            UniformField.rowMajor = false
+                        }
+                )
+            let direct =
+                t.Fields |> List.map ( fun f -> { f with name = getName f })
+
+            List.append direct structs
+
+    let private groupStructs (fields : list<UniformField>) =
+        fields 
+        |> List.fold (fun t f -> Tree.add f t) Tree.empty
+        |> Tree.allFields
+        |> List.sortBy (fun f -> f.offset)
+
     type WebGL2RenderingContext with
         member x.IsGL2 = 
             let v = unbox<string> (x.getParameter(x.VERSION)) 
@@ -129,7 +194,9 @@ module ProgramImpl =
                                 
                             )
                             |> List.choose id
+                            |> groupStructs
                             |> List.sortBy (fun f -> f.offset)
+
 
                         yield bi, { index = bi; size = size; name = name; fields = fields; fieldsByName = fields |> Seq.map (fun f -> f.name, f) |> Map.ofSeq }
                 ]
@@ -237,6 +304,7 @@ module ProgramImpl =
 
         member x.CreateProgram(signature : FramebufferSignature, code : string) =
             Log.debug "create program"
+
             match x.CompileShader(x.GL.VERTEX_SHADER, code), x.CompileShader(x.GL.FRAGMENT_SHADER, code) with
             | Some vs, Some fs ->
                 let p = x.GL.createProgram()

@@ -27,6 +27,7 @@ type IMod =
     /// </summary>
     abstract member GetValueObj : AdaptiveToken -> obj
 
+    abstract member ValueType : Type
 
 
 
@@ -66,9 +67,10 @@ type IModRef<'a> =
 /// cell which can be changed by the user and
 /// implements IMod<'a>
 /// </summary>
-type ModRef<'a>(value : 'a) =
+type ModRef<'a>(value : 'a, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) =
     inherit AdaptiveObject()
 
+    let valueType = r.Value.ResolveType()
     let mutable value = value
     let mutable cache = value
     
@@ -86,6 +88,7 @@ type ModRef<'a>(value : 'a) =
 
 
     interface IMod<'a> with
+        member x.ValueType = valueType
         member x.GetValueObj(token : AdaptiveToken) =
             x.EvaluateAlways token (fun token ->
                 if x.OutOfDate then
@@ -129,15 +132,17 @@ type ModRef<'a>(value : 'a) =
 // Note that constant cells are considered equal whenever
 // their content is equal. Therefore equality checks will 
 // force the evaluation of a constant cell.
-type ConstantMod<'a>(value : Lazy<'a>) =
+type ConstantMod<'a>(value : Lazy<'a>, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) =
     inherit ConstantObject()
-
+    
+    let valueType = r.Value.ResolveType()
     override x.Kind = "Mod"
 
     member x.Value =
         value.Value
 
     interface IMod with
+        member x.ValueType = valueType
         member x.GetValueObj(token : AdaptiveToken) = 
             value.Value :> obj
             
@@ -163,8 +168,8 @@ type ConstantMod<'a>(value : Lazy<'a>) =
     override x.ToString() =
         value.Value.ToString()
 
-    new(value : 'a) = ConstantMod<'a>(System.Lazy<'a>.CreateFromValue value)
-    new(compute : unit -> 'a) = ConstantMod<'a>( lazy (compute()) )
+    new(value : 'a, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) = ConstantMod<'a>(System.Lazy<'a>.CreateFromValue value, ?r = r)
+    new(compute : unit -> 'a, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) = ConstantMod<'a>( lazy (compute()), ?r = r)
 
 
 /// <summary>
@@ -176,17 +181,19 @@ module Mod =
     let mutable private depth = 0
 
     [<AbstractClass>]
-    type AbstractMod<'a>() =
+    type AbstractMod<'a>(r : Fable.Core.ITypeResolver<'a>) =
         inherit AdaptiveObject()
 
 
-
+        
+        let valueType = r.ResolveType()
         let mutable cache = Unchecked.defaultof<'a>
         
         override x.Kind = "Mod"
         abstract member Compute : AdaptiveToken -> 'a
 
         interface IMod with
+            member x.ValueType = valueType
             member x.IsConstant = false
             member x.GetValueObj(token) =
                 x.EvaluateAlways token (fun token ->
@@ -266,14 +273,14 @@ module Mod =
     // LazyMod<'a> (as the name suggests) implements IMod<'a>
     // and will be evaluated lazily (if not forced to be eager
     // by a callback or subsequent eager computations)
-    type LazyMod<'a>(compute : AdaptiveToken -> 'a) =
-        inherit AbstractMod<'a>()
+    type LazyMod<'a>(compute : AdaptiveToken -> 'a, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) =
+        inherit AbstractMod<'a>(r.Value)
         override x.Compute(token) = compute(token)
 
 
 
-    type internal MapMod<'a, 'b>(inner : IMod<'a>, f : 'a -> 'b) =
-        inherit AbstractMod<'b>()
+    type MapMod<'a, 'b>(inner : IMod<'a>, f : 'a -> 'b, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'b>) =
+        inherit AbstractMod<'b>(r.Value)
 
         member x.Inner = inner
         member x.F = f
@@ -281,8 +288,8 @@ module Mod =
         override x.Compute(token) =
             inner.GetValue token |> f
 
-    type internal Map2Mod<'a, 'b, 'c>(a : IMod<'a>, b : IMod<'b>, f : 'a -> 'b -> 'c) =
-        inherit AbstractMod<'c>()
+    type Map2Mod<'a, 'b, 'c>(a : IMod<'a>, b : IMod<'b>, f : 'a -> 'b -> 'c, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'c>) =
+        inherit AbstractMod<'c>(r.Value)
 
         member x.Left = a
         member x.Right = a
@@ -292,8 +299,8 @@ module Mod =
             f (a.GetValue token) (b.GetValue token)
 
 
-    type internal BindMod<'a, 'b>(m : IMod<'a>, f : 'a -> IMod<'b>) =
-        inherit AbstractMod<'b>()
+    type BindMod<'a, 'b>(m : IMod<'a>, f : 'a -> IMod<'b>, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'b>) =
+        inherit AbstractMod<'b>(r.Value)
 
         let mutable inner : Option<'a * IMod<'b>> = None
         let mutable mChanged = 1
@@ -350,8 +357,8 @@ module Mod =
                     // new inner cell.
                     i.GetValue token
 
-    type internal Bind2Mod<'a, 'b, 'c>(ma : IMod<'a>, mb : IMod<'b>, f : 'a -> 'b -> IMod<'c>) =
-        inherit AbstractMod<'c>()
+    type Bind2Mod<'a, 'b, 'c>(ma : IMod<'a>, mb : IMod<'b>, f : 'a -> 'b -> IMod<'c>, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'c>) =
+        inherit AbstractMod<'c>(r.Value)
         static let empty = ref HSet.empty
 
         let mutable inner : Option<'a * 'b * IMod<'c>> = None
@@ -390,8 +397,8 @@ module Mod =
                         
                     i.GetValue token 
  
-    type internal DynamicMod<'a>(f : unit -> IMod<'a>) =
-        inherit AbstractMod<'a>()
+    type DynamicMod<'a>(f : unit -> IMod<'a>, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) =
+        inherit AbstractMod<'a>(r.Value)
 
         let inner = lazy (f())
 
@@ -405,7 +412,7 @@ module Mod =
     /// However the system will not statically assume the
     /// cell to be constant in any case.
     /// </summary>
-    let custom (compute : AdaptiveToken -> 'a) : IMod<'a> =
+    let inline custom (compute : AdaptiveToken -> 'a) : IMod<'a> =
         LazyMod(compute) :> IMod<_>
 
 
@@ -421,27 +428,27 @@ module Mod =
     /// <summary>
     /// initializes a new constant cell using the given value.
     /// </summary>
-    let constant (v : 'a)  =
+    let inline constant (v : 'a)  =
         ConstantMod<'a>(v) :> IMod<_>
 
     /// <summary>
     /// initializes a new modifiable input cell using the given value.
     /// </summary>
-    let init (v : 'a) =
+    let inline init (v : 'a) =
         ModRef v
 
 
     /// <summary>
     /// initializes a new constant cell using the given lazy value.
     /// </summary>
-    let delay (f : unit -> 'a) =
+    let inline delay (f : unit -> 'a) =
         ConstantMod<'a> (f) :> IMod<_>
 
     /// <summary>
     /// adaptively applies a function to a cell's value
     /// resulting in a new dependent cell.
     /// </summary>
-    let map (f : 'a -> 'b) (m : IMod<'a>) =
+    let inline map (f : 'a -> 'b) (m : IMod<'a>) =
         if m.IsConstant then
             delay (fun () -> m.GetValue(AdaptiveToken.Empty) |> f)
         else
@@ -451,7 +458,7 @@ module Mod =
     /// adaptively applies a function to two cell's values
     /// resulting in a new dependent cell.
     /// </summary>
-    let map2 (f : 'a -> 'b -> 'c) (m1 : IMod<'a>) (m2 : IMod<'b>)=
+    let inline map2 (f : 'a -> 'b -> 'c) (m1 : IMod<'a>) (m2 : IMod<'b>)=
         match m1.IsConstant, m2.IsConstant with
             | (true, true) -> 
                 delay (fun () -> f (m1.GetValue(AdaptiveToken.Empty)) (m2.GetValue(AdaptiveToken.Empty))) 
@@ -469,7 +476,7 @@ module Mod =
     /// and compute function (being evaluated whenever any of
     /// the inputs changes.
     /// </summary>
-    let mapN (f : seq<'a> -> 'b) (inputs : seq<#IMod<'a>>) =
+    let inline mapN (f : seq<'a> -> 'b) (inputs : seq<#IMod<'a>>) =
         let inputs : list<IMod<'a>> = Seq.toList (Seq.cast inputs)
         custom (fun token ->
             let values = inputs |> List.map (fun i -> i.GetValue token)
@@ -487,7 +494,7 @@ module Mod =
     /// and returns a new dependent cell holding the inner
     /// cell's content.
     /// </summary>
-    let bind (f : 'a -> #IMod<'b>) (m : IMod<'a>) =
+    let inline bind (f : 'a -> #IMod<'b>) (m : IMod<'a>) =
         if m.IsConstant then
             m.GetValue(AdaptiveToken.Empty) |> f :> IMod<_>
         else
@@ -499,7 +506,7 @@ module Mod =
     /// and returns a new dependent cell holding the inner
     /// cell's content.
     /// </summary>
-    let bind2 (f : 'a -> 'b -> #IMod<'c>) (ma : IMod<'a>) (mb : IMod<'b>) =
+    let inline bind2 (f : 'a -> 'b -> #IMod<'c>) (ma : IMod<'a>) (mb : IMod<'b>) =
         match ma.IsConstant, mb.IsConstant with
             | (true, true) ->
                 f (ma.GetValue(AdaptiveToken.Empty)) (mb.GetValue(AdaptiveToken.Empty)) :> IMod<_>
@@ -514,7 +521,7 @@ module Mod =
     /// creates a dynamic cell using the given function
     /// while maintaining lazy evaluation.
     /// </summary>
-    let dynamic (f : unit -> IMod<'a>) =
+    let inline dynamic (f : unit -> IMod<'a>) =
         DynamicMod(f) :> IMod<_>
 
 

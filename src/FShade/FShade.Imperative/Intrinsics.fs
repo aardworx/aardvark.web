@@ -32,8 +32,9 @@ module ``Reflection Helpers`` =
         raise <| FShadeOnlyInShaderCodeException msg
 
     type System.Reflection.MethodBase with
-        member x.Intrinsic<'a when 'a :> IntrinsicAttribute>() =
-            let att = x.GetCustomAttributes(typeof<'a>, true) |> Seq.map unbox<IntrinsicAttribute> |> Seq.toList
+        member x.Intrinsic<'a when 'a :> IntrinsicAttribute>([<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) =
+            let t = r.Value.ResolveType()
+            let att = x.GetCustomAttributes(t, true) |> Seq.map unbox<IntrinsicAttribute> |> Seq.toList
             match att with
                 | h :: _ -> Some h.Intrinsic
                 | _ -> None

@@ -105,9 +105,10 @@ type RelevantNode<'s, 'a> =
     end
 
 [<AllowNullLiteral>]
-type History<'s, 'op> private(input : Option<Lazy<IOpReader<'op>>>, t : Traceable<'s, 'op>, finalize : 'op -> unit) =
+type History<'s, 'op> private(input : Option<Lazy<IOpReader<'op>>>, t : Traceable<'s, 'op>, finalize : 'op -> unit, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'s>) =
     inherit AdaptiveObject()
 
+    let valueType = r.Value.ResolveType()
     let mutable state   : 's = t.tempty
     let mutable first   : RelevantNode<'s, 'op> = null
     let mutable last    : RelevantNode<'s, 'op> = null
@@ -289,6 +290,7 @@ type History<'s, 'op> private(input : Option<Lazy<IOpReader<'op>>>, t : Traceabl
     new (input : unit -> IOpReader<'op>, t : Traceable<'s, 'op>) = History<'s, 'op>(Some (lazy (input())), t, ignore)
 
     interface IMod with
+        member x.ValueType = valueType
         member x.IsConstant = false
         member x.GetValueObj c = x.GetValue c :> obj
             

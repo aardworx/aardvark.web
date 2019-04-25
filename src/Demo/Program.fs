@@ -11,26 +11,7 @@ open Aardvark.Base.Rendering
 open Aardvark.Rendering.WebGL
 open Aardvark.SceneGraph
 open Fable.Core.JsInterop
-
-
-[<AllowNullLiteral>]
-type CodeFragment() =
-    let store = ArrayBuffer.Create(100.0)
-    let mutable prev : CodeFragment = null
-    let mutable next : CodeFragment = null
-
-    member x.AddCall(code : int, [<ParamArray>] args : obj[]) =
-        ()
-
-    member x.Prev
-        with get() = prev
-        and set p = prev <- p
-        
-    member x.Next
-        with get() = next
-        and set p = next <- p
-
-        
+  
 [<AllowNullLiteral>]
 type ILinked =
     abstract member Next : ILinked with get, set
@@ -172,7 +153,6 @@ type TrieNode<'k, 'a>(dirty : DictSet<ILinked>, parent : TrieNode<'k, 'a>, creat
             | None ->
                 false
 
-
 and TrieRef<'k, 'a> =
     | Nothing
     | Trie of TrieNode<'k, 'a>
@@ -189,8 +169,6 @@ and TrieRef<'k, 'a> =
         | Nothing -> null
         | Trie t -> t.Last
         | Value v -> v
-
-
 
 type Trie<'k, 'a>(create : 'a -> ILinked) =
     let dirty = DictSet<ILinked>(Unchecked.hash, Unchecked.equals)
@@ -419,8 +397,6 @@ module Compiler =
         |]
 
 
-
-
 [<AllowNullLiteral>]
 type RenderObjectFragment(o : PreparedRenderObject) =
     let mutable prev : RenderObjectFragment = null
@@ -484,7 +460,8 @@ module Helpers =
 
 type RenderTask(signature : FramebufferSignature, manager : ResourceManager, objects : aset<RenderObject>) =
     inherit DirtyTrackingAdaptiveObject<IResource>("Resource")
-
+    
+    let mutable inRender = true
     let trie = Trie<obj, PreparedRenderObject>(fun o -> RenderObjectFragment(o) :> ILinked)
 
     let getKey (o : PreparedRenderObject) =
@@ -532,12 +509,8 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
     member x.Run(token : AdaptiveToken) =
         x.EvaluateAlways' token (fun token dirty ->
             let mutable dirty = HRefSet.ofSeq dirty
-
-            //let rand = System.Random()
             let ops = reader.GetOperations token
-            //let ops = ops |> Seq.map (fun o -> rand.Next(), o) |> Seq.toList |> List.sortBy fst |> Seq.map snd
-
-            let mutable inRender = true
+            inRender <- true
             for o in ops do
                 match o with
                 | Add(_,o) ->
@@ -570,9 +543,7 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
                     dirty |> Seq.map (fun d -> d.Update token) |> Prom.all |> unbox<Promise<unit>>
                 else
                     Prom.value ()
-            //if dirty.Count > 0 then
-            //    for d in dirty do
-            //        d.Update token
+
             promises.``then``(fun () ->
                 UniformBufferManager.UploadAll()
                 trie.Update(token)
@@ -592,16 +563,9 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
         member x.Dispose() = x.Dispose()
         member x.Run t = x.Run t
 
-type MyUnion =
-    | A of int
-    | B 
-    | C of string
-
 
 module FShadeTest =
-    open FShade.Imperative
     open FShade
-    open FShade.GLSL
     
     type TexCoord() = inherit SemanticAttribute("DiffuseColorCoordinates")
     type Normal() = inherit SemanticAttribute("Normals")
@@ -614,13 +578,19 @@ module FShadeTest =
             [<Normal>] n : V3d 
             [<TexCoord>] tc : V2d 
         }
+        
+    type MyRecord = { ambient : float; diffuse : float }
+    type MyUnion =
+        | A of MyRecord
+        | B of float
+
 
     type UniformScope with
         member x.CameraLocation : V3d = uniform?PerView?CameraLocation
         member x.NormalMatrix : M33d = uniform?PerModel?NormalMatrix
         member x.ModelTrafo : M44d = uniform?PerModel?ModelTrafo
         member x.ViewProjTrafo : M44d = uniform?PerView?ViewProjTrafo
-
+        member x.Ambient : MyUnion = uniform?Ambient
     let sammy =
         sampler2d {
             texture uniform?DiffuseColorTexture
@@ -645,14 +615,21 @@ module FShadeTest =
             return sammy.Sample(v.tc)
         }
 
+    [<GLSLIntrinsic("mix({0}, {1}, {2})")>]
+    let lerp (a : 'a) (b : 'a) (t : float) = onlyInShaderCode "mix"
+
     let simpleLight (v : Vertex) =
         fragment {
-            let d = 
-                let dir = Vec.normalize (uniform.CameraLocation - v.wp.XYZ)
-                let n = Vec.normalize v.n
-                Vec.dot n dir
-            let ambient = 0.1
-            return V4d((ambient + (1.0 - ambient) * d) * v.c.XYZ, v.c.W)
+            match uniform.Ambient with 
+            | A a -> 
+                let d = 
+                    let dir = Vec.normalize (uniform.CameraLocation - v.wp.XYZ)
+                    let n = Vec.normalize v.n
+                    Vec.dot n dir
+                let ambient = lerp 0.0 1.0 a.ambient
+                return V4d((ambient + a.diffuse * (1.0 - ambient) * d) * v.c.XYZ, v.c.W)
+            | B f ->
+                return f * v.c
         }
 
 
@@ -902,7 +879,7 @@ let main argv =
 
             let rand = System.Random()
             let sett =
-                let s = 3
+                let s = 2
                 cset [
                     for x in -s/2 .. (s - s/2 - 1) do
                         for y in -s/2 .. (s - s/2 - 1) do
@@ -926,6 +903,8 @@ let main argv =
                                 yield s
                 ]
 
+            let mode = Mod.init (FShadeTest.A { FShadeTest.ambient = 0.1; FShadeTest.diffuse = 0.9 })
+
             let sg =
                 Sg.set sett
                 |> Sg.effect [
@@ -934,6 +913,9 @@ let main argv =
                     FShade.Effect.ofFunction FShadeTest.diffuseTexture
                     FShade.Effect.ofFunction FShadeTest.simpleLight
                 ]
+                |> Sg.uniform "Ambient" mode
+
+
             let objects = sg.RenderObjects()
 
             //let test = <@ (1 + 2) * 3 @>
@@ -969,6 +951,12 @@ let main argv =
 
             control.Keyboard.DownWithRepeats.Add(fun k ->
                 match k with
+                | Aardvark.Application.Keys.Space ->
+                    transact (fun () ->
+                        match mode.Value with
+                        | FShadeTest.A _ -> mode.Value <- FShadeTest.B 1.2
+                        | FShadeTest.B _ -> mode.Value <- FShadeTest.A { FShadeTest.ambient = 0.1; FShadeTest.diffuse = 0.9 }
+                    )
                 | Aardvark.Application.Keys.Delete ->
                     if active then
                         active <- false

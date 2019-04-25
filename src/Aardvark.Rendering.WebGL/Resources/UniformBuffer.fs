@@ -8,6 +8,7 @@ open Fable.Import.JS
 open FSharp.Collections
 open Aardvark.Base.Rendering
 open Fable.Core
+open Microsoft.FSharp.Reflection
 
 module private Blit =
     open Fable.Core.JsInterop
@@ -115,6 +116,132 @@ module private Blit =
                 failwithf "[GL] bad uniform conversion form %A to %A" src dst
                     
 
+    open System
+    module private Array =
+        let choosei (f : int -> 'a -> Option<'b>) (arr : 'a[]) =
+            let res = System.Collections.Generic.List<'b>()
+            for i in 0 .. arr.Length - 1 do
+                match f i arr.[i] with
+                | Some r -> res.Add r
+                | None -> ()
+            Seq.toArray res
+
+
+    let private primitiveTypes =
+        HMap.ofList [
+            "System.Boolean", Bool
+            "System.Byte", Int(false, 8)
+            "System.SByte", Int(true, 8)
+            "System.UInt16", Int(false, 16)
+            "System.Int16", Int(true, 16)
+            "System.UInt32", Int(false, 32)
+            "System.Int32", Int(true, 32)
+            "System.UInt64", Int(false, 64)
+            "System.Int64", Int(true, 64)
+            "System.Single", Float 32
+            "System.Double", Float 64
+
+            "Aardvark.Base.V2i", Vec(Int(true, 32), 2)
+            "Aardvark.Base.V3i", Vec(Int(true, 32), 3)
+            "Aardvark.Base.V4i", Vec(Int(true, 32), 4)
+            "Aardvark.Base.V2d", Vec(Float 64, 2)
+            "Aardvark.Base.V3d", Vec(Float 64, 3)
+            "Aardvark.Base.V4d", Vec(Float 64, 4)
+
+            
+            "Aardvark.Base.M22d", Mat(Float 64, 2, 2)
+            "Aardvark.Base.M23d", Mat(Float 64, 2, 3)
+            "Aardvark.Base.M24d", Mat(Float 64, 2, 4)
+            "Aardvark.Base.M32d", Mat(Float 64, 3, 2)
+            "Aardvark.Base.M33d", Mat(Float 64, 3, 3)
+            "Aardvark.Base.M34d", Mat(Float 64, 3, 4)
+            "Aardvark.Base.M42d", Mat(Float 64, 4, 2)
+            "Aardvark.Base.M43d", Mat(Float 64, 4, 3)
+            "Aardvark.Base.M44d", Mat(Float 64, 4, 4)
+            "Aardvark.Base.Trafo3d", Trafo
+        ]
+
+    let (|Union|Record|Primitive|Other|) (t : Type) =
+        if FSharpType.IsUnion t then
+            Union (FSharpType.GetUnionCases t |> List.ofArray)
+        elif FSharpType.IsRecord t then
+            Record (FSharpType.GetRecordFields t |> List.ofArray)
+        else
+            match HMap.tryFind t.FullName primitiveTypes with
+            | Some prim -> Primitive prim   
+            | _ -> Other t
+
+    let rec getBlitTyped (buffer : bool) (src : Type) (dst : PrimitiveType) =
+        match src, dst with
+        | Primitive prim, dst ->
+            getBlit buffer prim dst
+
+        | Record srcFields, Struct(_size, dstFields) ->
+            let srcFieldsByName = srcFields |> List.mapi (fun i f -> f.Name, (f, i)) |> Map.ofList
+            let writers =
+                dstFields |> List.toArray |> FSharp.Collections.Array.choose (fun dst ->
+                    match Map.tryFind dst.name srcFieldsByName with
+                    | Some (src, index) ->
+                        let _, blit = getBlitTyped buffer src.PropertyType dst.typ
+                        Some (index, fun view off value -> blit view (off + dst.offset) value)
+                    | None ->
+                        None
+                )
+                
+            let blit (view : DataView) (offset : int) (value : obj) =
+                let values = FSharpValue.GetRecordFields(value)
+                for (i, write) in writers do
+                    write view offset values.[i]
+
+            0, blit
+
+        | Record _, _ -> failwithf "[GL] unexpected record %A value for field %A" src dst
+
+        | Union cases, Struct(_size, fields) ->
+            let fieldsByName = fields |> List.map (fun f -> f.name, f) |> Map.ofList
+            match Map.tryFind "tag" fieldsByName with
+            | Some tagField -> 
+                let writers =
+                    cases |> List.choose (fun c ->
+                        let writeFields = 
+                            c.GetFields() |> Array.choosei (fun i f ->
+                                let name = sprintf "%s_%s" c.Name f.Name
+                                match Map.tryFind name fieldsByName with
+                                | Some dst ->
+                                    let _, blit = getBlitTyped buffer f.PropertyType dst.typ
+                                    Some (i, fun view off value -> blit view (off + dst.offset) value)
+                                | None ->
+                                    None
+                            )
+                        if writeFields.Length > 0 then
+                            Some (c.Tag, writeFields)
+                        else
+                            None
+                    )
+                    |> Map.ofList
+
+                let _,blitTag = getBlit buffer (Int(true, 32)) tagField.typ
+
+                let blit (view : DataView) (offset : int) (value : obj) =
+                    let case, fields = FSharpValue.GetUnionFields(value, src)
+                    blitTag view (offset + tagField.offset) case.Tag
+                    match Map.tryFind case.Tag writers with
+                    | Some writes ->
+                        for (i, write) in writes do
+                            write view offset fields.[i]
+                    | None ->
+                        ()
+
+
+
+                0, blit
+            | _ ->
+                failwith "bad union target"
+            
+        | Union _, _ -> failwithf "[GL] unexpected union %A value for field %A" src dst
+
+        | Other _, _ -> failwithf "[GL] unexpected type %A value for field %A" src dst
+
 
 [<AllowNullLiteral>]
 type UniformBufferSlot(parent : UniformBufferStore, handle : WebGLBuffer, store : Uint8Array, index : int, offset : int, layout : UniformBlockInfo) =
@@ -142,18 +269,33 @@ type UniformBufferSlot(parent : UniformBufferStore, handle : WebGLBuffer, store 
 
     member x.GetWriter(name : string, m : IMod) =
         let writer = ref None
-        Mod.custom (fun t ->
-            let v = m.GetValueObj t
-            let write = 
-                match !writer with
-                | Some w -> w
-                | None ->
-                    let w = x.GetWriterTemplate(name, v)
-                    writer := Some w
-                    w
-            write v
-            parent.Dirty()
-        )
+        let vt = m.ValueType
+
+        if vt.IsGenericParameter then
+            Log.warn "[GL] uniform value %s does not have type-information" name
+            Mod.custom (fun t ->
+                let v = m.GetValueObj t
+                let write = 
+                    match !writer with
+                    | Some w -> w
+                    | None ->
+                        let w = x.GetWriterTemplate(name, v)
+                        writer := Some w
+                        w
+                write v
+                parent.Dirty()
+            )
+        else
+            match Map.tryFind name layout.fieldsByName with
+            | Some f ->
+                let _, blit = Blit.getBlitTyped true vt f.typ
+                Mod.custom (fun t ->
+                    let v = m.GetValueObj t
+                    blit view f.offset v
+                    parent.Dirty()
+                )
+            | None ->
+                Mod.custom (fun _ -> Log.warn "[GL] unknown field: %s" name)
 
     member x.Free() = parent.Free x
 
@@ -266,17 +408,33 @@ type UniformBuffer(ctx : Context, handle : WebGLBuffer, layout : UniformBlockInf
 
     member x.GetWriter(name : string, m : IMod) =
         let writer = ref None
-        Mod.custom (fun t ->
-            let v = m.GetValueObj t
-            let write = 
-                match !writer with
-                | Some w -> w
-                | None ->
-                    let w = x.GetWriterTemplate(name, v)
-                    writer := Some w
-                    w
-            write v
-        )
+        let vt = m.ValueType
+
+        if vt.IsGenericParameter then
+            Log.warn "[GL] uniform value %s does not have type-information" name
+            Mod.custom (fun t ->
+                let v = m.GetValueObj t
+                let write = 
+                    match !writer with
+                    | Some w -> w
+                    | None ->
+                        let w = x.GetWriterTemplate(name, v)
+                        writer := Some w
+                        w
+                write v
+            )
+        else
+            match Map.tryFind name layout.fieldsByName with
+            | Some f ->
+                let _, blit = Blit.getBlitTyped true vt f.typ
+                Mod.custom (fun t ->
+                    let v = m.GetValueObj t
+                    blit view f.offset v
+                )
+            | None ->
+                Mod.custom (fun _ -> Log.warn "[GL] unknown field: %s" name)
+                
+                
 
     member x.SetField(name : string, value : obj) =
         x.GetWriterTemplate(name, value) value
@@ -304,17 +462,27 @@ type UniformLocation(ctx : Context, typ : PrimitiveType) =
         
     member x.GetWriter(m : IMod) =
         let writer = ref None
-        Mod.custom (fun t ->
-            let v = m.GetValueObj t
-            let write = 
-                match !writer with
-                | Some w -> w
-                | None ->
-                    let w = x.GetWriterTemplate(v)
-                    writer := Some w
-                    w
-            write v
-        )
+        let vt = m.ValueType
+
+        if vt.IsGenericParameter then
+            Log.warn "[GL] uniform value %s does not have type-information" name
+            Mod.custom (fun t ->
+                let v = m.GetValueObj t
+                let write = 
+                    match !writer with
+                    | Some w -> w
+                    | None ->
+                        let w = x.GetWriterTemplate(name, v)
+                        writer := Some w
+                        w
+                write v
+            )
+        else
+            let _, blit = Blit.getBlitTyped false vt typ
+            Mod.custom (fun t ->
+                let v = m.GetValueObj t
+                blit view 0 v
+            )
 
     member x.Store = store
 
