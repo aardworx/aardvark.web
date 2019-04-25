@@ -188,7 +188,7 @@ module Index =
                 Monitor.Exit l
 
         override x.Finalize() =
-            Fable.Import.JS.console.warn "finalize"
+            Aardvark.Import.JS.console.warn "finalize"
             //queue.Add real
 
         override x.CompareTo (o : obj) =

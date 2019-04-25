@@ -1,6 +1,6 @@
 ﻿namespace Aardvark.Base.Rendering
 
-open Fable.Import.JS
+open Aardvark.Import.JS
 open Aardvark.Base.Incremental
 
 type IArrayBuffer =

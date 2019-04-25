@@ -6,7 +6,7 @@ open Aardvark.Base.Incremental
 open FSharp.Collections
 open Aardvark.Base.Rendering
 open Aardvark.Rendering.WebGL
-open Fable.Import.JS
+open Aardvark.Import.JS
 
 
 

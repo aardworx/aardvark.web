@@ -1,8 +1,8 @@
 ﻿namespace Aardvark.Application
 
 open Fable.Core
-open Fable.Import.JS
-open Fable.Import.Browser
+open Aardvark.Import.JS
+open Aardvark.Import.Browser
 open Aardvark.Base.Incremental
 open System
 open Aardvark.Base

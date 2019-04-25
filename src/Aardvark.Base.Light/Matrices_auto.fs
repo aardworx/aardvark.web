@@ -2,7 +2,7 @@ namespace Aardvark.Base
 
 open Aardvark.Base
 open Fable.Core
-open Fable.Import.JS
+open Aardvark.Import.JS
 
 type M22d(m00 : float, m01 : float, m10 : float, m11 : float) =
     let mutable m00 = m00
@@ -132,8 +132,8 @@ type M22d(m00 : float, m01 : float, m10 : float, m11 : float) =
         )
     new(arr : Float32Array) = 
         M22d(
-            arr.[0], arr.[1], 
-            arr.[2], arr.[3]
+            float arr.[0], float arr.[1], 
+            float arr.[2], float arr.[3]
         )
     new(arr : Float64Array) = 
         M22d(
@@ -141,24 +141,24 @@ type M22d(m00 : float, m01 : float, m10 : float, m11 : float) =
             arr.[2], arr.[3]
         )
     member x.CopyTo(arr : Float32Array, index : int) = 
-        arr.[index + 0] <- m00; arr.[index + 1] <- m01
-        arr.[index + 2] <- m10; arr.[index + 3] <- m11
+        arr.[index + 0] <- float32 m00; arr.[index + 1] <- float32 m01
+        arr.[index + 2] <- float32 m10; arr.[index + 3] <- float32 m11
     member x.CopyTo(arr : Float64Array, index : int) = 
         arr.[index + 0] <- m00; arr.[index + 1] <- m01
         arr.[index + 2] <- m10; arr.[index + 3] <- m11
     member x.ToFloat32Array() : Float32Array =
-        let arr = Float32Array.Create(4.0)
-        arr.[0] <- m00; arr.[1] <- m01
-        arr.[2] <- m10; arr.[3] <- m11
+        let arr = Float32Array.Create(4)
+        arr.[0] <- float32 m00; arr.[1] <- float32 m01
+        arr.[2] <- float32 m10; arr.[3] <- float32 m11
         arr
     member x.ToFloat64Array() : Float64Array =
-        let arr = Float64Array.Create(4.0)
+        let arr = Float64Array.Create(4)
         arr.[0] <- m00; arr.[1] <- m01
         arr.[2] <- m10; arr.[3] <- m11
         arr
     member x.Inverse : M22d = 
         let lu = x.ToFloat64Array()
-        let inv = Float64Array.Create(4.0)
+        let inv = Float64Array.Create(4)
         let perm = Microsoft.FSharp.Collections.Array.zeroCreate 2
         lu.LuFactorize(0, 1, 2, perm)
         lu.LuInverse(0, 1, 2, perm, inv, 0, 1, 2)
@@ -326,8 +326,8 @@ and M23d(m00 : float, m01 : float, m02 : float, m10 : float, m11 : float, m12 : 
         )
     new(arr : Float32Array) = 
         M23d(
-            arr.[0], arr.[1], arr.[2], 
-            arr.[3], arr.[4], arr.[5]
+            float arr.[0], float arr.[1], float arr.[2], 
+            float arr.[3], float arr.[4], float arr.[5]
         )
     new(arr : Float64Array) = 
         M23d(
@@ -336,18 +336,18 @@ and M23d(m00 : float, m01 : float, m02 : float, m10 : float, m11 : float, m12 : 
         )
     member x.UpperLeftM22() : M22d = M22d(x)
     member x.CopyTo(arr : Float32Array, index : int) = 
-        arr.[index + 0] <- m00; arr.[index + 1] <- m01; arr.[index + 2] <- m02
-        arr.[index + 3] <- m10; arr.[index + 4] <- m11; arr.[index + 5] <- m12
+        arr.[index + 0] <- float32 m00; arr.[index + 1] <- float32 m01; arr.[index + 2] <- float32 m02
+        arr.[index + 3] <- float32 m10; arr.[index + 4] <- float32 m11; arr.[index + 5] <- float32 m12
     member x.CopyTo(arr : Float64Array, index : int) = 
         arr.[index + 0] <- m00; arr.[index + 1] <- m01; arr.[index + 2] <- m02
         arr.[index + 3] <- m10; arr.[index + 4] <- m11; arr.[index + 5] <- m12
     member x.ToFloat32Array() : Float32Array =
-        let arr = Float32Array.Create(6.0)
-        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02
-        arr.[3] <- m10; arr.[4] <- m11; arr.[5] <- m12
+        let arr = Float32Array.Create(6)
+        arr.[0] <- float32 m00; arr.[1] <- float32 m01; arr.[2] <- float32 m02
+        arr.[3] <- float32 m10; arr.[4] <- float32 m11; arr.[5] <- float32 m12
         arr
     member x.ToFloat64Array() : Float64Array =
-        let arr = Float64Array.Create(6.0)
+        let arr = Float64Array.Create(6)
         arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02
         arr.[3] <- m10; arr.[4] <- m11; arr.[5] <- m12
         arr
@@ -517,8 +517,8 @@ and M24d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
         )
     new(arr : Float32Array) = 
         M24d(
-            arr.[0], arr.[1], arr.[2], arr.[3], 
-            arr.[4], arr.[5], arr.[6], arr.[7]
+            float arr.[0], float arr.[1], float arr.[2], float arr.[3], 
+            float arr.[4], float arr.[5], float arr.[6], float arr.[7]
         )
     new(arr : Float64Array) = 
         M24d(
@@ -527,18 +527,18 @@ and M24d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
         )
     member x.UpperLeftM22() : M22d = M22d(x)
     member x.CopyTo(arr : Float32Array, index : int) = 
-        arr.[index + 0] <- m00; arr.[index + 1] <- m01; arr.[index + 2] <- m02; arr.[index + 3] <- m03
-        arr.[index + 4] <- m10; arr.[index + 5] <- m11; arr.[index + 6] <- m12; arr.[index + 7] <- m13
+        arr.[index + 0] <- float32 m00; arr.[index + 1] <- float32 m01; arr.[index + 2] <- float32 m02; arr.[index + 3] <- float32 m03
+        arr.[index + 4] <- float32 m10; arr.[index + 5] <- float32 m11; arr.[index + 6] <- float32 m12; arr.[index + 7] <- float32 m13
     member x.CopyTo(arr : Float64Array, index : int) = 
         arr.[index + 0] <- m00; arr.[index + 1] <- m01; arr.[index + 2] <- m02; arr.[index + 3] <- m03
         arr.[index + 4] <- m10; arr.[index + 5] <- m11; arr.[index + 6] <- m12; arr.[index + 7] <- m13
     member x.ToFloat32Array() : Float32Array =
-        let arr = Float32Array.Create(8.0)
-        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02; arr.[3] <- m03
-        arr.[4] <- m10; arr.[5] <- m11; arr.[6] <- m12; arr.[7] <- m13
+        let arr = Float32Array.Create(8)
+        arr.[0] <- float32 m00; arr.[1] <- float32 m01; arr.[2] <- float32 m02; arr.[3] <- float32 m03
+        arr.[4] <- float32 m10; arr.[5] <- float32 m11; arr.[6] <- float32 m12; arr.[7] <- float32 m13
         arr
     member x.ToFloat64Array() : Float64Array =
-        let arr = Float64Array.Create(8.0)
+        let arr = Float64Array.Create(8)
         arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02; arr.[3] <- m03
         arr.[4] <- m10; arr.[5] <- m11; arr.[6] <- m12; arr.[7] <- m13
         arr
@@ -717,9 +717,9 @@ and M32d(m00 : float, m01 : float, m10 : float, m11 : float, m20 : float, m21 : 
         )
     new(arr : Float32Array) = 
         M32d(
-            arr.[0], arr.[1], 
-            arr.[2], arr.[3], 
-            arr.[4], arr.[5]
+            float arr.[0], float arr.[1], 
+            float arr.[2], float arr.[3], 
+            float arr.[4], float arr.[5]
         )
     new(arr : Float64Array) = 
         M32d(
@@ -729,21 +729,21 @@ and M32d(m00 : float, m01 : float, m10 : float, m11 : float, m20 : float, m21 : 
         )
     member x.UpperLeftM22() : M22d = M22d(x)
     member x.CopyTo(arr : Float32Array, index : int) = 
-        arr.[index + 0] <- m00; arr.[index + 1] <- m01
-        arr.[index + 2] <- m10; arr.[index + 3] <- m11
-        arr.[index + 4] <- m20; arr.[index + 5] <- m21
+        arr.[index + 0] <- float32 m00; arr.[index + 1] <- float32 m01
+        arr.[index + 2] <- float32 m10; arr.[index + 3] <- float32 m11
+        arr.[index + 4] <- float32 m20; arr.[index + 5] <- float32 m21
     member x.CopyTo(arr : Float64Array, index : int) = 
         arr.[index + 0] <- m00; arr.[index + 1] <- m01
         arr.[index + 2] <- m10; arr.[index + 3] <- m11
         arr.[index + 4] <- m20; arr.[index + 5] <- m21
     member x.ToFloat32Array() : Float32Array =
-        let arr = Float32Array.Create(6.0)
-        arr.[0] <- m00; arr.[1] <- m01
-        arr.[2] <- m10; arr.[3] <- m11
-        arr.[4] <- m20; arr.[5] <- m21
+        let arr = Float32Array.Create(6)
+        arr.[0] <- float32 m00; arr.[1] <- float32 m01
+        arr.[2] <- float32 m10; arr.[3] <- float32 m11
+        arr.[4] <- float32 m20; arr.[5] <- float32 m21
         arr
     member x.ToFloat64Array() : Float64Array =
-        let arr = Float64Array.Create(6.0)
+        let arr = Float64Array.Create(6)
         arr.[0] <- m00; arr.[1] <- m01
         arr.[2] <- m10; arr.[3] <- m11
         arr.[4] <- m20; arr.[5] <- m21
@@ -998,9 +998,9 @@ and M33d(m00 : float, m01 : float, m02 : float, m10 : float, m11 : float, m12 : 
         )
     new(arr : Float32Array) = 
         M33d(
-            arr.[0], arr.[1], arr.[2], 
-            arr.[3], arr.[4], arr.[5], 
-            arr.[6], arr.[7], arr.[8]
+            float arr.[0], float arr.[1], float arr.[2], 
+            float arr.[3], float arr.[4], float arr.[5], 
+            float arr.[6], float arr.[7], float arr.[8]
         )
     new(arr : Float64Array) = 
         M33d(
@@ -1010,28 +1010,28 @@ and M33d(m00 : float, m01 : float, m02 : float, m10 : float, m11 : float, m12 : 
         )
     member x.UpperLeftM22() : M22d = M22d(x)
     member x.CopyTo(arr : Float32Array, index : int) = 
-        arr.[index + 0] <- m00; arr.[index + 1] <- m01; arr.[index + 2] <- m02
-        arr.[index + 3] <- m10; arr.[index + 4] <- m11; arr.[index + 5] <- m12
-        arr.[index + 6] <- m20; arr.[index + 7] <- m21; arr.[index + 8] <- m22
+        arr.[index + 0] <- float32 m00; arr.[index + 1] <- float32 m01; arr.[index + 2] <- float32 m02
+        arr.[index + 3] <- float32 m10; arr.[index + 4] <- float32 m11; arr.[index + 5] <- float32 m12
+        arr.[index + 6] <- float32 m20; arr.[index + 7] <- float32 m21; arr.[index + 8] <- float32 m22
     member x.CopyTo(arr : Float64Array, index : int) = 
         arr.[index + 0] <- m00; arr.[index + 1] <- m01; arr.[index + 2] <- m02
         arr.[index + 3] <- m10; arr.[index + 4] <- m11; arr.[index + 5] <- m12
         arr.[index + 6] <- m20; arr.[index + 7] <- m21; arr.[index + 8] <- m22
     member x.ToFloat32Array() : Float32Array =
-        let arr = Float32Array.Create(9.0)
-        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02
-        arr.[3] <- m10; arr.[4] <- m11; arr.[5] <- m12
-        arr.[6] <- m20; arr.[7] <- m21; arr.[8] <- m22
+        let arr = Float32Array.Create(9)
+        arr.[0] <- float32 m00; arr.[1] <- float32 m01; arr.[2] <- float32 m02
+        arr.[3] <- float32 m10; arr.[4] <- float32 m11; arr.[5] <- float32 m12
+        arr.[6] <- float32 m20; arr.[7] <- float32 m21; arr.[8] <- float32 m22
         arr
     member x.ToFloat64Array() : Float64Array =
-        let arr = Float64Array.Create(9.0)
+        let arr = Float64Array.Create(9)
         arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02
         arr.[3] <- m10; arr.[4] <- m11; arr.[5] <- m12
         arr.[6] <- m20; arr.[7] <- m21; arr.[8] <- m22
         arr
     member x.Inverse : M33d = 
         let lu = x.ToFloat64Array()
-        let inv = Float64Array.Create(9.0)
+        let inv = Float64Array.Create(9)
         let perm = Microsoft.FSharp.Collections.Array.zeroCreate 3
         lu.LuFactorize(0, 1, 3, perm)
         lu.LuInverse(0, 1, 3, perm, inv, 0, 1, 3)
@@ -1310,9 +1310,9 @@ and M34d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
         )
     new(arr : Float32Array) = 
         M34d(
-            arr.[0], arr.[1], arr.[2], arr.[3], 
-            arr.[4], arr.[5], arr.[6], arr.[7], 
-            arr.[8], arr.[9], arr.[10], arr.[11]
+            float arr.[0], float arr.[1], float arr.[2], float arr.[3], 
+            float arr.[4], float arr.[5], float arr.[6], float arr.[7], 
+            float arr.[8], float arr.[9], float arr.[10], float arr.[11]
         )
     new(arr : Float64Array) = 
         M34d(
@@ -1323,21 +1323,21 @@ and M34d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
     member x.UpperLeftM22() : M22d = M22d(x)
     member x.UpperLeftM33() : M33d = M33d(x)
     member x.CopyTo(arr : Float32Array, index : int) = 
-        arr.[index + 0] <- m00; arr.[index + 1] <- m01; arr.[index + 2] <- m02; arr.[index + 3] <- m03
-        arr.[index + 4] <- m10; arr.[index + 5] <- m11; arr.[index + 6] <- m12; arr.[index + 7] <- m13
-        arr.[index + 8] <- m20; arr.[index + 9] <- m21; arr.[index + 10] <- m22; arr.[index + 11] <- m23
+        arr.[index + 0] <- float32 m00; arr.[index + 1] <- float32 m01; arr.[index + 2] <- float32 m02; arr.[index + 3] <- float32 m03
+        arr.[index + 4] <- float32 m10; arr.[index + 5] <- float32 m11; arr.[index + 6] <- float32 m12; arr.[index + 7] <- float32 m13
+        arr.[index + 8] <- float32 m20; arr.[index + 9] <- float32 m21; arr.[index + 10] <- float32 m22; arr.[index + 11] <- float32 m23
     member x.CopyTo(arr : Float64Array, index : int) = 
         arr.[index + 0] <- m00; arr.[index + 1] <- m01; arr.[index + 2] <- m02; arr.[index + 3] <- m03
         arr.[index + 4] <- m10; arr.[index + 5] <- m11; arr.[index + 6] <- m12; arr.[index + 7] <- m13
         arr.[index + 8] <- m20; arr.[index + 9] <- m21; arr.[index + 10] <- m22; arr.[index + 11] <- m23
     member x.ToFloat32Array() : Float32Array =
-        let arr = Float32Array.Create(12.0)
-        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02; arr.[3] <- m03
-        arr.[4] <- m10; arr.[5] <- m11; arr.[6] <- m12; arr.[7] <- m13
-        arr.[8] <- m20; arr.[9] <- m21; arr.[10] <- m22; arr.[11] <- m23
+        let arr = Float32Array.Create(12)
+        arr.[0] <- float32 m00; arr.[1] <- float32 m01; arr.[2] <- float32 m02; arr.[3] <- float32 m03
+        arr.[4] <- float32 m10; arr.[5] <- float32 m11; arr.[6] <- float32 m12; arr.[7] <- float32 m13
+        arr.[8] <- float32 m20; arr.[9] <- float32 m21; arr.[10] <- float32 m22; arr.[11] <- float32 m23
         arr
     member x.ToFloat64Array() : Float64Array =
-        let arr = Float64Array.Create(12.0)
+        let arr = Float64Array.Create(12)
         arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02; arr.[3] <- m03
         arr.[4] <- m10; arr.[5] <- m11; arr.[6] <- m12; arr.[7] <- m13
         arr.[8] <- m20; arr.[9] <- m21; arr.[10] <- m22; arr.[11] <- m23
@@ -1552,10 +1552,10 @@ and M42d(m00 : float, m01 : float, m10 : float, m11 : float, m20 : float, m21 : 
         )
     new(arr : Float32Array) = 
         M42d(
-            arr.[0], arr.[1], 
-            arr.[2], arr.[3], 
-            arr.[4], arr.[5], 
-            arr.[6], arr.[7]
+            float arr.[0], float arr.[1], 
+            float arr.[2], float arr.[3], 
+            float arr.[4], float arr.[5], 
+            float arr.[6], float arr.[7]
         )
     new(arr : Float64Array) = 
         M42d(
@@ -1566,24 +1566,24 @@ and M42d(m00 : float, m01 : float, m10 : float, m11 : float, m20 : float, m21 : 
         )
     member x.UpperLeftM22() : M22d = M22d(x)
     member x.CopyTo(arr : Float32Array, index : int) = 
-        arr.[index + 0] <- m00; arr.[index + 1] <- m01
-        arr.[index + 2] <- m10; arr.[index + 3] <- m11
-        arr.[index + 4] <- m20; arr.[index + 5] <- m21
-        arr.[index + 6] <- m30; arr.[index + 7] <- m31
+        arr.[index + 0] <- float32 m00; arr.[index + 1] <- float32 m01
+        arr.[index + 2] <- float32 m10; arr.[index + 3] <- float32 m11
+        arr.[index + 4] <- float32 m20; arr.[index + 5] <- float32 m21
+        arr.[index + 6] <- float32 m30; arr.[index + 7] <- float32 m31
     member x.CopyTo(arr : Float64Array, index : int) = 
         arr.[index + 0] <- m00; arr.[index + 1] <- m01
         arr.[index + 2] <- m10; arr.[index + 3] <- m11
         arr.[index + 4] <- m20; arr.[index + 5] <- m21
         arr.[index + 6] <- m30; arr.[index + 7] <- m31
     member x.ToFloat32Array() : Float32Array =
-        let arr = Float32Array.Create(8.0)
-        arr.[0] <- m00; arr.[1] <- m01
-        arr.[2] <- m10; arr.[3] <- m11
-        arr.[4] <- m20; arr.[5] <- m21
-        arr.[6] <- m30; arr.[7] <- m31
+        let arr = Float32Array.Create(8)
+        arr.[0] <- float32 m00; arr.[1] <- float32 m01
+        arr.[2] <- float32 m10; arr.[3] <- float32 m11
+        arr.[4] <- float32 m20; arr.[5] <- float32 m21
+        arr.[6] <- float32 m30; arr.[7] <- float32 m31
         arr
     member x.ToFloat64Array() : Float64Array =
-        let arr = Float64Array.Create(8.0)
+        let arr = Float64Array.Create(8)
         arr.[0] <- m00; arr.[1] <- m01
         arr.[2] <- m10; arr.[3] <- m11
         arr.[4] <- m20; arr.[5] <- m21
@@ -1836,10 +1836,10 @@ and M43d(m00 : float, m01 : float, m02 : float, m10 : float, m11 : float, m12 : 
         )
     new(arr : Float32Array) = 
         M43d(
-            arr.[0], arr.[1], arr.[2], 
-            arr.[3], arr.[4], arr.[5], 
-            arr.[6], arr.[7], arr.[8], 
-            arr.[9], arr.[10], arr.[11]
+            float arr.[0], float arr.[1], float arr.[2], 
+            float arr.[3], float arr.[4], float arr.[5], 
+            float arr.[6], float arr.[7], float arr.[8], 
+            float arr.[9], float arr.[10], float arr.[11]
         )
     new(arr : Float64Array) = 
         M43d(
@@ -1851,24 +1851,24 @@ and M43d(m00 : float, m01 : float, m02 : float, m10 : float, m11 : float, m12 : 
     member x.UpperLeftM22() : M22d = M22d(x)
     member x.UpperLeftM33() : M33d = M33d(x)
     member x.CopyTo(arr : Float32Array, index : int) = 
-        arr.[index + 0] <- m00; arr.[index + 1] <- m01; arr.[index + 2] <- m02
-        arr.[index + 3] <- m10; arr.[index + 4] <- m11; arr.[index + 5] <- m12
-        arr.[index + 6] <- m20; arr.[index + 7] <- m21; arr.[index + 8] <- m22
-        arr.[index + 9] <- m30; arr.[index + 10] <- m31; arr.[index + 11] <- m32
+        arr.[index + 0] <- float32 m00; arr.[index + 1] <- float32 m01; arr.[index + 2] <- float32 m02
+        arr.[index + 3] <- float32 m10; arr.[index + 4] <- float32 m11; arr.[index + 5] <- float32 m12
+        arr.[index + 6] <- float32 m20; arr.[index + 7] <- float32 m21; arr.[index + 8] <- float32 m22
+        arr.[index + 9] <- float32 m30; arr.[index + 10] <- float32 m31; arr.[index + 11] <- float32 m32
     member x.CopyTo(arr : Float64Array, index : int) = 
         arr.[index + 0] <- m00; arr.[index + 1] <- m01; arr.[index + 2] <- m02
         arr.[index + 3] <- m10; arr.[index + 4] <- m11; arr.[index + 5] <- m12
         arr.[index + 6] <- m20; arr.[index + 7] <- m21; arr.[index + 8] <- m22
         arr.[index + 9] <- m30; arr.[index + 10] <- m31; arr.[index + 11] <- m32
     member x.ToFloat32Array() : Float32Array =
-        let arr = Float32Array.Create(12.0)
-        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02
-        arr.[3] <- m10; arr.[4] <- m11; arr.[5] <- m12
-        arr.[6] <- m20; arr.[7] <- m21; arr.[8] <- m22
-        arr.[9] <- m30; arr.[10] <- m31; arr.[11] <- m32
+        let arr = Float32Array.Create(12)
+        arr.[0] <- float32 m00; arr.[1] <- float32 m01; arr.[2] <- float32 m02
+        arr.[3] <- float32 m10; arr.[4] <- float32 m11; arr.[5] <- float32 m12
+        arr.[6] <- float32 m20; arr.[7] <- float32 m21; arr.[8] <- float32 m22
+        arr.[9] <- float32 m30; arr.[10] <- float32 m31; arr.[11] <- float32 m32
         arr
     member x.ToFloat64Array() : Float64Array =
-        let arr = Float64Array.Create(12.0)
+        let arr = Float64Array.Create(12)
         arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02
         arr.[3] <- m10; arr.[4] <- m11; arr.[5] <- m12
         arr.[6] <- m20; arr.[7] <- m21; arr.[8] <- m22
@@ -2221,10 +2221,10 @@ and M44d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
         )
     new(arr : Float32Array) = 
         M44d(
-            arr.[0], arr.[1], arr.[2], arr.[3], 
-            arr.[4], arr.[5], arr.[6], arr.[7], 
-            arr.[8], arr.[9], arr.[10], arr.[11], 
-            arr.[12], arr.[13], arr.[14], arr.[15]
+            float arr.[0], float arr.[1], float arr.[2], float arr.[3], 
+            float arr.[4], float arr.[5], float arr.[6], float arr.[7], 
+            float arr.[8], float arr.[9], float arr.[10], float arr.[11], 
+            float arr.[12], float arr.[13], float arr.[14], float arr.[15]
         )
     new(arr : Float64Array) = 
         M44d(
@@ -2236,24 +2236,24 @@ and M44d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
     member x.UpperLeftM22() : M22d = M22d(x)
     member x.UpperLeftM33() : M33d = M33d(x)
     member x.CopyTo(arr : Float32Array, index : int) = 
-        arr.[index + 0] <- m00; arr.[index + 1] <- m01; arr.[index + 2] <- m02; arr.[index + 3] <- m03
-        arr.[index + 4] <- m10; arr.[index + 5] <- m11; arr.[index + 6] <- m12; arr.[index + 7] <- m13
-        arr.[index + 8] <- m20; arr.[index + 9] <- m21; arr.[index + 10] <- m22; arr.[index + 11] <- m23
-        arr.[index + 12] <- m30; arr.[index + 13] <- m31; arr.[index + 14] <- m32; arr.[index + 15] <- m33
+        arr.[index + 0] <- float32 m00; arr.[index + 1] <- float32 m01; arr.[index + 2] <- float32 m02; arr.[index + 3] <- float32 m03
+        arr.[index + 4] <- float32 m10; arr.[index + 5] <- float32 m11; arr.[index + 6] <- float32 m12; arr.[index + 7] <- float32 m13
+        arr.[index + 8] <- float32 m20; arr.[index + 9] <- float32 m21; arr.[index + 10] <- float32 m22; arr.[index + 11] <- float32 m23
+        arr.[index + 12] <- float32 m30; arr.[index + 13] <- float32 m31; arr.[index + 14] <- float32 m32; arr.[index + 15] <- float32 m33
     member x.CopyTo(arr : Float64Array, index : int) = 
         arr.[index + 0] <- m00; arr.[index + 1] <- m01; arr.[index + 2] <- m02; arr.[index + 3] <- m03
         arr.[index + 4] <- m10; arr.[index + 5] <- m11; arr.[index + 6] <- m12; arr.[index + 7] <- m13
         arr.[index + 8] <- m20; arr.[index + 9] <- m21; arr.[index + 10] <- m22; arr.[index + 11] <- m23
         arr.[index + 12] <- m30; arr.[index + 13] <- m31; arr.[index + 14] <- m32; arr.[index + 15] <- m33
     member x.ToFloat32Array() : Float32Array =
-        let arr = Float32Array.Create(16.0)
-        arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02; arr.[3] <- m03
-        arr.[4] <- m10; arr.[5] <- m11; arr.[6] <- m12; arr.[7] <- m13
-        arr.[8] <- m20; arr.[9] <- m21; arr.[10] <- m22; arr.[11] <- m23
-        arr.[12] <- m30; arr.[13] <- m31; arr.[14] <- m32; arr.[15] <- m33
+        let arr = Float32Array.Create(16)
+        arr.[0] <- float32 m00; arr.[1] <- float32 m01; arr.[2] <- float32 m02; arr.[3] <- float32 m03
+        arr.[4] <- float32 m10; arr.[5] <- float32 m11; arr.[6] <- float32 m12; arr.[7] <- float32 m13
+        arr.[8] <- float32 m20; arr.[9] <- float32 m21; arr.[10] <- float32 m22; arr.[11] <- float32 m23
+        arr.[12] <- float32 m30; arr.[13] <- float32 m31; arr.[14] <- float32 m32; arr.[15] <- float32 m33
         arr
     member x.ToFloat64Array() : Float64Array =
-        let arr = Float64Array.Create(16.0)
+        let arr = Float64Array.Create(16)
         arr.[0] <- m00; arr.[1] <- m01; arr.[2] <- m02; arr.[3] <- m03
         arr.[4] <- m10; arr.[5] <- m11; arr.[6] <- m12; arr.[7] <- m13
         arr.[8] <- m20; arr.[9] <- m21; arr.[10] <- m22; arr.[11] <- m23
@@ -2261,7 +2261,7 @@ and M44d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
         arr
     member x.Inverse : M44d = 
         let lu = x.ToFloat64Array()
-        let inv = Float64Array.Create(16.0)
+        let inv = Float64Array.Create(16)
         let perm = Microsoft.FSharp.Collections.Array.zeroCreate 4
         lu.LuFactorize(0, 1, 4, perm)
         lu.LuInverse(0, 1, 4, perm, inv, 0, 1, 4)

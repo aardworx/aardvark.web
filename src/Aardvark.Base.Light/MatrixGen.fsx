@@ -23,7 +23,7 @@ let run () =
     printfn ""
     printfn "open Aardvark.Base"
     printfn "open Fable.Core"
-    printfn "open Fable.Import.JS"
+    printfn "open Aardvark.Import.JS"
     printfn ""
 
     let getName (d : Description) =
@@ -313,7 +313,7 @@ let run () =
                     create true "        " d (fun r c -> if r < rr && c < cc then sprintf "o.M%d%d" r c elif r = c then d.one else d.zero)
 
         printfn "    new(arr : Float32Array) = "
-        create true "        " d (fun r c -> sprintf "arr.[%d]" (r * d.cols + c))
+        create true "        " d (fun r c -> sprintf "float arr.[%d]" (r * d.cols + c))
         
         printfn "    new(arr : Float64Array) = "
         create true "        " d (fun r c -> sprintf "arr.[%d]" (r * d.cols + c))
@@ -330,7 +330,7 @@ let run () =
         printfn "    member x.CopyTo(arr : Float32Array, index : int) = "
         let mutable o = 0
         for r in 0 .. d.rows - 1 do
-            let setAll = List.init d.cols id |> Seq.mapi (fun i c -> sprintf "arr.[index + %d] <- m%d%d" (o + i) r c) |> String.concat "; "
+            let setAll = List.init d.cols id |> Seq.mapi (fun i c -> sprintf "arr.[index + %d] <- float32 m%d%d" (o + i) r c) |> String.concat "; "
             printfn "        %s" setAll
             o <- o + d.cols
 
@@ -345,17 +345,17 @@ let run () =
 
 
         printfn "    member x.ToFloat32Array() : Float32Array ="
-        printfn "        let arr = Float32Array.Create(%d.0)" (d.rows * d.cols)
+        printfn "        let arr = Float32Array.Create(%d)" (d.rows * d.cols)
         let mutable o = 0
         for r in 0 .. d.rows - 1 do
-            let setAll = List.init d.cols id |> Seq.mapi (fun i c -> sprintf "arr.[%d] <- m%d%d" (o + i) r c) |> String.concat "; "
+            let setAll = List.init d.cols id |> Seq.mapi (fun i c -> sprintf "arr.[%d] <- float32 m%d%d" (o + i) r c) |> String.concat "; "
             printfn "        %s" setAll
             o <- o + d.cols
         printfn "        arr"
 
         
         printfn "    member x.ToFloat64Array() : Float64Array ="
-        printfn "        let arr = Float64Array.Create(%d.0)" (d.rows * d.cols)
+        printfn "        let arr = Float64Array.Create(%d)" (d.rows * d.cols)
         let mutable o = 0
         for r in 0 .. d.rows - 1 do
             let setAll = List.init d.cols id |> Seq.mapi (fun i c -> sprintf "arr.[%d] <- m%d%d" (o + i) r c) |> String.concat "; "
@@ -369,7 +369,7 @@ let run () =
 
             printfn "    member x.Inverse : %s = " name
             printfn "        let lu = x.ToFloat64Array()"
-            printfn "        let inv = Float64Array.Create(%d.0)" (n * n)
+            printfn "        let inv = Float64Array.Create(%d)" (n * n)
             printfn "        let perm = Microsoft.FSharp.Collections.Array.zeroCreate %d" n
             printfn "        lu.LuFactorize(0, 1, %d, perm)" n
             printfn "        lu.LuInverse(0, 1, %d, perm, inv, 0, 1, %d)" n n

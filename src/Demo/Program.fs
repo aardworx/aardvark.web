@@ -3,8 +3,8 @@
 open System
 open Aardvark.Base
 open Fable.Core
-open Fable.Import.Browser
-open Fable.Import.JS
+open Aardvark.Import.Browser
+open Aardvark.Import.JS
 open FSharp.Collections
 open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
@@ -196,21 +196,21 @@ module Compiler =
 
     let private setUniform (gl : WebGL2RenderingContext) (typ : PrimitiveType) (loc : WebGLUniformLocation) (r : nref<UniformLocation>) =
         match typ with
-        | Bool -> fun () -> gl.uniform1iv(loc, Int32Array.Create(r.Value.Store.buffer, 0.0, 1.0))
+        | Bool -> fun () -> gl.uniform1iv(loc, Int32Array.Create(r.Value.Store.buffer, 0, 1))
 
-        | Float _ -> fun () -> gl.uniform1fv(loc, Float32Array.Create(r.Value.Store.buffer, 0.0, 1.0))
-        | Vec (Float _, 2) -> fun () -> gl.uniform2fv(loc, Float32Array.Create(r.Value.Store.buffer, 0.0, 2.0))
-        | Vec (Float _, 3) -> fun () -> gl.uniform3fv(loc, Float32Array.Create(r.Value.Store.buffer, 0.0, 3.0))
-        | Vec (Float _, 4) -> fun () -> gl.uniform4fv(loc, Float32Array.Create(r.Value.Store.buffer, 0.0, 4.0))
+        | Float _ -> fun () -> gl.uniform1fv(loc, Float32Array.Create(r.Value.Store.buffer, 0, 1))
+        | Vec (Float _, 2) -> fun () -> gl.uniform2fv(loc, Float32Array.Create(r.Value.Store.buffer, 0, 2))
+        | Vec (Float _, 3) -> fun () -> gl.uniform3fv(loc, Float32Array.Create(r.Value.Store.buffer, 0, 3))
+        | Vec (Float _, 4) -> fun () -> gl.uniform4fv(loc, Float32Array.Create(r.Value.Store.buffer, 0, 4))
 
-        | Int _ -> fun () -> gl.uniform1iv(loc, Int32Array.Create(r.Value.Store.buffer, 0.0, 1.0))
-        | Vec (Int _, 2) -> fun () -> gl.uniform2iv(loc, Int32Array.Create(r.Value.Store.buffer, 0.0, 2.0))
-        | Vec (Int _, 3) -> fun () -> gl.uniform3iv(loc, Int32Array.Create(r.Value.Store.buffer, 0.0, 3.0))
-        | Vec (Int _, 4) -> fun () -> gl.uniform4iv(loc, Int32Array.Create(r.Value.Store.buffer, 0.0, 4.0))
+        | Int _ -> fun () -> gl.uniform1iv(loc, Int32Array.Create(r.Value.Store.buffer, 0, 1))
+        | Vec (Int _, 2) -> fun () -> gl.uniform2iv(loc, Int32Array.Create(r.Value.Store.buffer, 0, 2))
+        | Vec (Int _, 3) -> fun () -> gl.uniform3iv(loc, Int32Array.Create(r.Value.Store.buffer, 0, 3))
+        | Vec (Int _, 4) -> fun () -> gl.uniform4iv(loc, Int32Array.Create(r.Value.Store.buffer, 0, 4))
 
-        | Mat (Float _, 2, 2) -> fun () -> gl.uniformMatrix2fv(loc, false, Float32Array.Create(r.Value.Store.buffer, 0.0, 4.0))
-        | Mat (Float _, 3, 3) -> fun () -> gl.uniformMatrix3fv(loc, false, Float32Array.Create(r.Value.Store.buffer, 0.0, 9.0))
-        | Mat (Float _, 4, 4) -> fun () -> gl.uniformMatrix4fv(loc, false, Float32Array.Create(r.Value.Store.buffer, 0.0, 16.0))
+        | Mat (Float _, 2, 2) -> fun () -> gl.uniformMatrix2fv(loc, false, Float32Array.Create(r.Value.Store.buffer, 0, 4))
+        | Mat (Float _, 3, 3) -> fun () -> gl.uniformMatrix3fv(loc, false, Float32Array.Create(r.Value.Store.buffer, 0, 9))
+        | Mat (Float _, 4, 4) -> fun () -> gl.uniformMatrix4fv(loc, false, Float32Array.Create(r.Value.Store.buffer, 0, 16))
 
         | _ -> failwithf "bad uniform type : %A" typ
 

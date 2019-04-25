@@ -2,7 +2,7 @@
 
 
 module Log =
-    open Fable.Import.JS
+    open Aardvark.Import.JS
 
     
     let mutable private currentTimers = []

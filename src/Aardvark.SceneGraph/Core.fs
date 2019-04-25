@@ -21,8 +21,8 @@ type ISg =
     abstract member RenderObjects : TraversalState -> aset<RenderObject>
 
 module Sg =
-    let private mulCache : Fable.Import.JS.WeakMap<IMod<Trafo3d>, Fable.Import.JS.WeakMap<IMod<Trafo3d>, IMod<Trafo3d>>> = Fable.Import.JS.WeakMap.Create() |> unbox
-    let private cameraLocationCache : Fable.Import.JS.WeakMap<IMod, IMod<V3d>> = Fable.Import.JS.WeakMap.Create() |> unbox
+    let private mulCache : Aardvark.Import.JS.WeakMap<IMod<Trafo3d>, Aardvark.Import.JS.WeakMap<IMod<Trafo3d>, IMod<Trafo3d>>> = Aardvark.Import.JS.WeakMap.Create() |> unbox
+    let private cameraLocationCache : Aardvark.Import.JS.WeakMap<IMod, IMod<V3d>> = Aardvark.Import.JS.WeakMap.Create() |> unbox
 
 
     let inline private (<*>) (l : IMod<Trafo3d>) (r : IMod<Trafo3d>) =
@@ -39,7 +39,7 @@ module Sg =
                     c.set(r, d) |> ignore
                     d
             else
-                let c = Fable.Import.JS.WeakMap.Create() |> unbox
+                let c = Aardvark.Import.JS.WeakMap.Create() |> unbox
                 mulCache.set(l, c) |> ignore
                 let d = Mod.map2 (*) l r
                 c.set(r, d) |> ignore

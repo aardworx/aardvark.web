@@ -1,8 +1,8 @@
 ﻿namespace Aardvark.Rendering.WebGL
 
 
-open Fable.Import.Browser
-open Fable.Import.JS
+open Aardvark.Import.Browser
+open Aardvark.Import.JS
 open FSharp.Collections
 open Aardvark.Base.Rendering
 open Fable.Core

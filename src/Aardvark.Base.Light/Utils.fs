@@ -3,7 +3,7 @@
 open System
 open System.Runtime.CompilerServices
 open Fable.Core
-open Fable.Import.JS
+open Aardvark.Import.JS
 open FSharp.Collections
 
 
@@ -460,7 +460,7 @@ type Conversion private() =
 
 
 module Prom = 
-    open Fable.Import.Browser
+    open Aardvark.Import.Browser
 
     let fetchString (url : string) =
         Promise.Create(fun fin err ->
@@ -531,7 +531,7 @@ type Future<'a> =
 
 
 module Future =
-    open Fable.Import.Browser
+    open Aardvark.Import.Browser
 
 
     let create (action : ('a -> unit) -> (string -> unit) -> IDisposable) =
