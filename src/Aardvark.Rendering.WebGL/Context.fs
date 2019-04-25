@@ -2,8 +2,8 @@
 
 open System
 open Aardvark.Base
-open Fable.Import.JS
-open Fable.Import.Browser
+open Aardvark.Import.JS
+open Aardvark.Import.Browser
 
 
 type WebGLVertexArrayObject =

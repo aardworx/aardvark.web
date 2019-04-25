@@ -2,7 +2,7 @@
 
 open Aardvark.Base.Incremental
 open FSharp.Collections
-open Fable.Import.JS
+open Aardvark.Import.JS
 
 type IRenderTask =
     inherit IAdaptiveObject

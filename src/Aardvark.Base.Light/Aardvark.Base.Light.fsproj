@@ -4,6 +4,8 @@
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Fable.Import.JS.fs" />
+    <Compile Include="Fable.Import.Browser.fs" />
     <None Include="VectorGen.fsx" />
     <None Include="MatrixGen.fsx" />
     <Compile Include="Log.fs" />

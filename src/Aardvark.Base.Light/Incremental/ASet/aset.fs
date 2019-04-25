@@ -73,7 +73,7 @@ module ASet =
 
     [<AutoOpen>]
     module Readers =
-        open Fable.Import.JS
+        open Aardvark.Import.JS
 
         type MyPromise<'a>(p : Promise<'a>) =
             let mutable live = true
@@ -352,7 +352,7 @@ module ASet =
                                         else
                                             r.GetOperations token
                                     | None -> 
-                                        Fable.Import.JS.console.warn "serious hate occured"
+                                        Aardvark.Import.JS.console.warn "serious hate occured"
                                         HDeltaSet.empty
                                 
                             | _ -> unexpected()
@@ -875,7 +875,7 @@ module ASet =
         else
             aset <| fun () -> new MapReader<'a, 'b>(set, mapping)
  
-    let mapPromise (mapping : 'a -> Fable.Import.JS.Promise<'b>) (set : aset<'a>) =
+    let mapPromise (mapping : 'a -> Aardvark.Import.JS.Promise<'b>) (set : aset<'a>) =
         aset <| fun () -> new MapPromiseReader<'a, 'b>(set, mapping)
 
     let mapUse<'a, 'b when 'b :> IDisposable> (mapping : 'a -> 'b) (set : aset<'a>) : aset<'b> =

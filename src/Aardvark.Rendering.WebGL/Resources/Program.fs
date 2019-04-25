@@ -1,7 +1,7 @@
 ﻿namespace Aardvark.Rendering.WebGL
 
-open Fable.Import.Browser
-open Fable.Import.JS
+open Aardvark.Import.Browser
+open Aardvark.Import.JS
 open FSharp.Collections
 open Aardvark.Base.Rendering
 open Aardvark.Base
@@ -183,9 +183,9 @@ module ProgramImpl =
                                 let size = sizes.[i] |> unbox<int>
                                 let stride = strides.[i] |> unbox<int>
                                 let rowMajor = rowMajors.[i] |> unbox<bool>
-                                let t = types.[i] |> PrimitiveType.ofGLType x
+                                let t = types.[i] |> float |> PrimitiveType.ofGLType x
 
-                                let r = x.getActiveUniform(p, indices.[i])
+                                let r = x.getActiveUniform(p, float indices.[i])
                                 if unbox r.name then
                                     Some { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }
                                 else

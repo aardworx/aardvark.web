@@ -3,8 +3,8 @@
 open Aardvark.Base
 open Aardvark.Base.Incremental
 
-open Fable.Import.Browser
-open Fable.Import.JS
+open Aardvark.Import.Browser
+open Aardvark.Import.JS
 open FSharp.Collections
 open Aardvark.Base.Rendering
 open Fable.Core
@@ -43,21 +43,15 @@ module private Blit =
         | _ -> None
             
    
-    [<AutoOpen>]
-    module private Helpers = 
-        let inline number (v : obj) =
-            if unbox v then unbox v
-            else 0.0
-
     let toFloatArray (t : PrimitiveType) =
         match t with
-        | Scalar -> fun (value : obj) -> Float32Array.``of`` [| number value|]
-        | Vec(Float _ ,2) -> fun (value : obj) -> let value = unbox<V2d> value in Float32Array.``of`` [| value.X; value.Y |]
-        | Vec(Float _ ,3) -> fun (value : obj) -> let value = unbox<V3d> value in Float32Array.``of`` [| value.X; value.Y; value.Z |]
-        | Vec(Float _ ,4) -> fun (value : obj) -> let value = unbox<V4d> value in Float32Array.``of`` [| value.X; value.Y; value.Z; value.W |]
-        | Vec(Int _ ,2) -> fun (value : obj) -> let value = unbox<V2i> value in Float32Array.``of`` [| float value.X; float value.Y |]
-        | Vec(Int _ ,3) -> fun (value : obj) -> let value = unbox<V3i> value in Float32Array.``of`` [| float value.X; float value.Y; float value.Z |]
-        | Vec(Int _ ,4) -> fun (value : obj) -> let value = unbox<V4i> value in Float32Array.``of`` [| float value.X; float value.Y; float value.Z; float value.W |]
+        | Scalar -> fun (value : obj) -> Float32Array.``of`` [| unbox value|]
+        | Vec(Float _ ,2) -> fun (value : obj) -> let value = unbox<V2d> value in Float32Array.``of`` [| float32 value.X; float32 value.Y |]
+        | Vec(Float _ ,3) -> fun (value : obj) -> let value = unbox<V3d> value in Float32Array.``of`` [| float32 value.X; float32 value.Y; float32 value.Z |]
+        | Vec(Float _ ,4) -> fun (value : obj) -> let value = unbox<V4d> value in Float32Array.``of`` [| float32 value.X; float32 value.Y; float32 value.Z; float32 value.W |]
+        | Vec(Int _ ,2) -> fun (value : obj) -> let value = unbox<V2i> value in Float32Array.``of`` [| float32 value.X; float32 value.Y |]
+        | Vec(Int _ ,3) -> fun (value : obj) -> let value = unbox<V3i> value in Float32Array.``of`` [| float32 value.X; float32 value.Y; float32 value.Z |]
+        | Vec(Int _ ,4) -> fun (value : obj) -> let value = unbox<V4i> value in Float32Array.``of`` [| float32 value.X; float32 value.Y; float32 value.Z; float32 value.W |]
         | Mat(_,2,2) -> fun (value : obj) -> (unbox<M22d> value).ToFloat32Array()
         | Mat(_,2,3) -> fun (value : obj) -> (unbox<M23d> value).ToFloat32Array()
         | Mat(_,2,4) -> fun (value : obj) -> (unbox<M24d> value).ToFloat32Array()
@@ -72,16 +66,16 @@ module private Blit =
 
     let rec getBlit (buffer : bool) (src : PrimitiveType) (dst : PrimitiveType) =
         match src, dst with
-            | Bool, Bool                -> 4, fun (view : DataView) (offset : int) (value : obj) -> view.setUint32(float offset, (if unbox value then 1.0 else 0.0), true)
-            | Scalar, Bool              -> 4, fun (view : DataView) (offset : int) (value : obj) -> view.setUint32(float offset, number value, true)
-            | Scalar, Int(false, 8)     -> 1, fun (view : DataView) (offset : int) (value : obj) -> view.setUint8(float offset, number value)
-            | Scalar, Int(false, 16)    -> 2, fun (view : DataView) (offset : int) (value : obj) -> view.setUint16(float offset, number value, true)
-            | Scalar, Int(false, 32)    -> 4, fun (view : DataView) (offset : int) (value : obj) -> view.setUint32(float offset, number value, true)
-            | Scalar, Int(true, 8)      -> 1, fun (view : DataView) (offset : int) (value : obj) -> view.setInt8(float offset, number value)
-            | Scalar, Int(true, 16)     -> 2, fun (view : DataView) (offset : int) (value : obj) -> view.setInt16(float offset, number value, true)
-            | Scalar, Int(true, 32)     -> 4, fun (view : DataView) (offset : int) (value : obj) -> view.setInt32(float offset, number value, true)
-            | Scalar, Float 32          -> 4, fun (view : DataView) (offset : int) (value : obj) -> view.setFloat32(float offset, number value, true)
-            | Scalar, Float 64          -> 8, fun (view : DataView) (offset : int) (value : obj) -> view.setFloat64(float offset, number value, true)
+            | Bool, Bool                -> 4, fun (view : DataView) (offset : int) (value : obj) -> view.setUint32(offset, (if unbox value then 1u else 0u), true)
+            | Scalar, Bool              -> 4, fun (view : DataView) (offset : int) (value : obj) -> view.setUint32(offset, unbox value, true)
+            | Scalar, Int(false, 8)     -> 1, fun (view : DataView) (offset : int) (value : obj) -> view.setUint8(offset, unbox value)
+            | Scalar, Int(false, 16)    -> 2, fun (view : DataView) (offset : int) (value : obj) -> view.setUint16(offset, unbox value, true)
+            | Scalar, Int(false, 32)    -> 4, fun (view : DataView) (offset : int) (value : obj) -> view.setUint32(offset, unbox value, true)
+            | Scalar, Int(true, 8)      -> 1, fun (view : DataView) (offset : int) (value : obj) -> view.setInt8(offset, unbox value)
+            | Scalar, Int(true, 16)     -> 2, fun (view : DataView) (offset : int) (value : obj) -> view.setInt16(offset, unbox value, true)
+            | Scalar, Int(true, 32)     -> 4, fun (view : DataView) (offset : int) (value : obj) -> view.setInt32(offset, unbox value, true)
+            | Scalar, Float 32          -> 4, fun (view : DataView) (offset : int) (value : obj) -> view.setFloat32(offset, unbox value, true)
+            | Scalar, Float 64          -> 8, fun (view : DataView) (offset : int) (value : obj) -> view.setFloat64(offset, unbox value, true)
 
             | Vec(tSrc, _), Vec(tDst, dDst) ->
                 let toArray = toFloatArray src
@@ -109,7 +103,7 @@ module private Blit =
                 let size = 4 * r1 * c1
                 let toArray = toFloatArray dst
                 size, fun (view : DataView) (offset : int) (value : obj) -> 
-                    let dst = Float32Array.Create(view.buffer, view.byteOffset + float offset, float (r0 * c0))
+                    let dst = Float32Array.Create(view.buffer, view.byteOffset + offset, (r0 * c0))
                     dst.set(unbox (toArray value))
 
             | _ ->
@@ -247,7 +241,7 @@ module private Blit =
 type UniformBufferSlot(parent : UniformBufferStore, handle : WebGLBuffer, store : Uint8Array, index : int, offset : int, layout : UniformBlockInfo) =
     
     let mutable next : UniformBufferSlot = null
-    let view = DataView.Create(store.buffer, float offset)
+    let view = DataView.Create(store.buffer, offset)
 
     member x.Index = index
     member x.Handle = handle
@@ -316,7 +310,7 @@ and UniformBufferStore(parent : UniformBufferManager, ctx : Context, layout : Un
         b
 
     let store = 
-        Uint8Array.Create(float (capacity * virtualSize))
+        Uint8Array.Create((capacity * virtualSize))
 
     let mutable dirty = false
     let mutable count = 0
@@ -388,7 +382,7 @@ and UniformBufferManager(ctx : Context, layout : UniformBlockInfo) =
 type UniformBuffer(ctx : Context, handle : WebGLBuffer, layout : UniformBlockInfo) =
     inherit Resource(ctx)
 
-    let mutable store = Uint8Array.Create(float layout.size)
+    let mutable store = Uint8Array.Create(layout.size)
     let view = DataView.Create(store.buffer)
 
     member x.Handle = handle
@@ -452,7 +446,7 @@ type UniformBuffer(ctx : Context, handle : WebGLBuffer, layout : UniformBlockInf
 type UniformLocation(ctx : Context, typ : PrimitiveType) =
     inherit Resource(ctx)
 
-    let store = Uint8Array.Create(float (PrimitiveType.size typ))
+    let store = Uint8Array.Create((PrimitiveType.size typ))
     let view = DataView.Create(store.buffer)
 
     member x.GetWriterTemplate(template : obj) =

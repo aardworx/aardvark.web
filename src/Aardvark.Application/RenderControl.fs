@@ -3,9 +3,9 @@
 open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
-open Fable.Import.Browser
+open Aardvark.Import.Browser
 open Aardvark.Rendering.WebGL
-open Fable.Import.JS
+open Aardvark.Import.JS
 open Fable.Core
 open Fable.Core.JsInterop
 

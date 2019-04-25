@@ -1,6 +1,6 @@
 ﻿namespace Aardvark.Base
 
-open Fable.Import.JS
+open Aardvark.Import.JS
 
 
 module private DictConstants =
