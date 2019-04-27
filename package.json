@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "AGPL",
   "scripts": {
     "build-compiler": "pushd paket-files\\fable-compiler\\Fable && npm install && npm run build compiler && popd",
     "start": "webpack-dev-server",
