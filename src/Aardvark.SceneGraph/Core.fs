@@ -139,7 +139,6 @@ module Sg =
                             Mod.constant noCall
 
             let uniforms = 
-                Log.warn "%A" (List.toArray state.trafos)
                 state.uniforms
                 |> Map.add "ModelTrafo" (List.foldBack (<*>) state.trafos (Mod.constant Trafo3d.Identity)  :> IMod)
                 |> Map.add "ViewTrafo" (state.viewTrafo :> IMod)

@@ -34,6 +34,10 @@ module FShadeTest =
             addressV WrapMode.Wrap
             filter Filter.MinMagMipLinear
         }
+    let diffuseTexture (v : Vertex) =
+        fragment {
+            return sammy.Sample(v.tc)
+        }
         
     let constantColor (c : V4d) (v : Vertex) =
         vertex {
@@ -46,10 +50,6 @@ module FShadeTest =
             return { v with pos = uniform.ViewProjTrafo * wp; wp = wp; n = Vec.normalize (uniform.NormalMatrix * v.n) }
         }
 
-    let diffuseTexture (v : Vertex) =
-        fragment {
-            return sammy.Sample(v.tc)
-        }
 
     [<GLSLIntrinsic("mix({0}, {1}, {2})")>]
     let lerp (a : 'a) (b : 'a) (t : float) = onlyInShaderCode "mix"
