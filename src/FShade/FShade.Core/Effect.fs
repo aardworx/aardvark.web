@@ -64,6 +64,8 @@ type Effect internal(id : string, shaders : Lazy<Map<ShaderStage, Shader>>, comp
             shaders.Value |> Map.values |> Seq.filter (fun s -> s.shaderStage < ShaderStage.Fragment) |> Seq.tryLast
         )
 
+    static member EffectCache = effectCache
+
     static member internal NewId() =
         Guid.NewGuid().ToByteArray() |> Convert.ToBase64String
 

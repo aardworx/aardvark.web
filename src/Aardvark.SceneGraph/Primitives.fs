@@ -5,11 +5,11 @@ open Aardvark.Base
 open Aardvark.Base.Rendering
 open Aardvark.Base.Incremental
 
-type Box3d(min : V3d, max : V3d) =
-    member x.Min = min
-    member x.Max = max
+type Box3d(bmin : V3d, bMax : V3d) =
+    member x.Min = bmin
+    member x.Max = bMax
 
-    member x.Size = max - min
+    member x.Size = bMax - bmin
 
     static member FromMinAndSize(min : V3d, size : V3d) =
         Box3d(min, min + size)
@@ -206,7 +206,7 @@ module SgPrimitives =
                 Sg.VertexAttributeApplicator(name, view, sg) :> ISg
 
             let trafo =
-                Trafo3d.Scale(1.0 / b.Size) *
+                Trafo3d.Scale(b.Size) *
                 Trafo3d.Translation(b.Min)
 
             Sg.RenderNode(PrimitiveTopology.TriangleList, Mod.constant { faceVertexCount = 36; instanceCount = 1; first = 0 })

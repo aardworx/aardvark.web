@@ -281,15 +281,15 @@ module ExpressionExtensions =
 
 module Affected =
     
-    type State = { dependencies : Map<Var, Set<string>>; affected : Map<string, Set<string>> }
+    type State = { dependencies : hmap<Var, Set<string>>; affected : Map<string, Set<string>> }
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module State =
         let add (v : Var) (deps : Set<string>) = 
             State.modify (fun s -> 
-                match Map.tryFind v s.dependencies with
-                    | Some old -> { s with dependencies = Map.add v (Set.union old deps) s.dependencies }
-                    | None -> { s with dependencies = Map.add v deps s.dependencies }
+                match HMap.tryFind v s.dependencies with
+                    | Some old -> { s with dependencies = HMap.add v (Set.union old deps) s.dependencies }
+                    | None -> { s with dependencies = HMap.add v deps s.dependencies }
             )
 
         let affects (o : string) (deps : Set<string>) = 
@@ -301,7 +301,7 @@ module Affected =
 
         let dependencies (v : Var) =
             State.get |> State.map (fun s -> 
-                match Map.tryFind v s.dependencies with
+                match HMap.tryFind v s.dependencies with
                     | Some d -> d
                     | _ -> Set.empty
             )
@@ -358,7 +358,7 @@ module Affected =
         }
 
     let getAffectedOutputsMap (e : Expr) =
-        let s, _ = usedInputsS e |> State.run { dependencies = Map.empty; affected = Map.empty }
+        let s, _ = usedInputsS e |> State.run { dependencies = HMap.empty; affected = Map.empty }
         s.affected
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

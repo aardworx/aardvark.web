@@ -283,8 +283,8 @@ module ShaderPreprocessor =
             inputs          : Map<string, ParameterDescription>
             outputs         : Map<string, ParameterDescription>
             uniforms        : Map<string, UniformParameter>
-            vertexIndex     : Map<Var, Expr>
-            variableValues  : Map<Var, Expr>
+            vertexIndex     : hmap<Var, Expr>
+            variableValues  : hmap<Var, Expr>
             shaders         : list<Shader>
             localSize       : V3i
         }
@@ -308,8 +308,8 @@ module ShaderPreprocessor =
                 inputs          = Map.empty
                 outputs         = Map.empty
                 uniforms        = Map.empty
-                vertexIndex     = Map.empty
-                variableValues  = Map.empty
+                vertexIndex     = HMap.empty
+                variableValues  = HMap.empty
                 shaders         = []
                 localSize       = V3i.Zero
             }
@@ -383,18 +383,18 @@ module ShaderPreprocessor =
 
         let setVertexIndex (v : Var) (index : Expr) =
             State.modify (fun s ->
-                { s with vertexIndex = Map.add v index s.vertexIndex }
+                { s with vertexIndex = HMap.add v index s.vertexIndex }
             )
 
         let setVariableValue (v : Var) (value : Expr) =
             State.modify (fun s ->
-                { s with variableValues = Map.add v value s.variableValues }
+                { s with variableValues = HMap.add v value s.variableValues }
             )
             
 
 
         let tryGetVertexIndex (v : Var) =
-            State.get |> State.map (fun s -> Map.tryFind v s.vertexIndex)
+            State.get |> State.map (fun s -> HMap.tryFind v s.vertexIndex)
 
     let rec preprocessComputeS (e : Expr) : Preprocess<Expr> =
         state {
@@ -584,7 +584,7 @@ module ShaderPreprocessor =
                             |> Seq.toList 
                             |> List.choose2S (fun v ->
                                 state {
-                                    match Map.tryFind v s.variableValues with
+                                    match HMap.tryFind v s.variableValues with
                                         | Some (ReadInput(ParameterKind.Input, name, Some TrivialInput) as e) ->
                                             return Choice1Of2 (v, e)
                                         | _ -> 
@@ -950,7 +950,7 @@ module ShaderPreprocessor =
 
         }
 
-    and toShaders (inputType : Type) (vertexIndex : Map<Var, Expr>) (e : Expr) =
+    and toShaders (inputType : Type) (vertexIndex : hmap<Var, Expr>) (e : Expr) =
         let run = preprocessS e
         let state = ref { State.ofInputType inputType with vertexIndex = vertexIndex }
         let body = run.Run(state)
@@ -1703,7 +1703,7 @@ module Shader =
 
     let ofExpr (inputType : Type) (e : Expr) =
         let debugRange = e.CustomAttributes |> List.tryPick (function DebugRange r -> Some r | _ -> None)
-        ShaderPreprocessor.toShaders inputType Map.empty e 
+        ShaderPreprocessor.toShaders inputType HMap.empty e 
             |> List.map optimize
             |> List.map (fun shader -> { shader with shaderDebugRange = debugRange })
 
@@ -2234,7 +2234,8 @@ module Shader =
                                 match kind with
                                     | ParameterKind.Input -> 
                                         match Map.tryFind name variables with
-                                            | Some(v,_) -> Expr.Var v |> Some
+                                            | Some(v,_) -> 
+                                                Expr.Var v |> Some
                                             | _ -> None
                                     | _ ->
                                         None

@@ -688,7 +688,7 @@ module Compiler =
     type CompilerState =
         {
             nameIndices         : Map<string, int>
-            variables           : Map<Var, CVar>
+            variables           : hmap<Var, CVar>
             reservedNames       : Set<string>
 
             usedFunctions       : hmap<obj, FunctionDefinition>
@@ -852,7 +852,7 @@ module Compiler =
     let emptyState (m : ModuleState) =
         {
             nameIndices         = Map.empty
-            variables           = Map.empty
+            variables           = HMap.empty
             reservedNames       = Set.empty
             usedFunctions       = HMap.empty
             usedGlobalFunctions = HSet.empty
@@ -904,11 +904,11 @@ module Compiler =
                     let name, indices = findName index s.nameIndices
 
                     let res = { ctype = t; name = name }
-                    let state = { s with nameIndices = indices; variables = Map.add v res s.variables }
+                    let state = { s with nameIndices = indices; variables = HMap.add v res s.variables }
                     state, res
                 | None ->
                     let res = { ctype = t; name = v.Name }
-                    let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variables = Map.add v res s.variables }
+                    let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variables = HMap.add v res s.variables }
                     state, res
         )
         
@@ -922,7 +922,7 @@ module Compiler =
     /// creating a fresh name for it (and caching it)
     let toCVarOfTypeS (v : Var) (t : CType) =
         State.custom (fun s ->
-            match Map.tryFind v s.variables with
+            match HMap.tryFind v s.variables with
                 | Some v -> 
                     s, v
 
@@ -1027,7 +1027,7 @@ module Compiler =
                     let oldState =
                         ref {
                             nameIndices         = Map.empty
-                            variables           = Map.empty
+                            variables           = HMap.empty
                             reservedNames       = oldState.reservedNames
                             usedGlobalFunctions = HSet.empty
                             usedFunctions       = HMap.empty

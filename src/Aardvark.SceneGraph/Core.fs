@@ -28,7 +28,7 @@ module Sg =
 
     let inline private (<*>) (l : IMod<Trafo3d>) (r : IMod<Trafo3d>) =
         if l.IsConstant && r.IsConstant then
-            Mod.map2 (*) l r
+            Mod.constant (l.GetValue(AdaptiveToken.Top) * r.GetValue(AdaptiveToken.Top))
         else
             let c = mulCache.get(l)
             if unbox c then
@@ -139,8 +139,9 @@ module Sg =
                             Mod.constant noCall
 
             let uniforms = 
+                Log.warn "%A" (List.toArray state.trafos)
                 state.uniforms
-                |> Map.add "ModelTrafo" (List.foldBack (<*>) state.trafos (Mod.constant Trafo3d.Identity) :> IMod)
+                |> Map.add "ModelTrafo" (List.foldBack (<*>) state.trafos (Mod.constant Trafo3d.Identity)  :> IMod)
                 |> Map.add "ViewTrafo" (state.viewTrafo :> IMod)
                 |> Map.add "ProjTrafo" (state.projTrafo :> IMod)
 
@@ -199,6 +200,32 @@ module Sg =
             sg.RenderObjects { state with depthMode = mode }
 
 
+    type SgShaderBuilder() =
+        member x.Yield(()) = []
+
+        member x.Bind (e : FShade.Effect, f : unit -> list<FShade.Effect>) =
+            e :: f()
+            
+        member x.Bind (e : ('a -> Microsoft.FSharp.Quotations.Expr<'b>), f : unit -> list<FShade.Effect>, [<Fable.Core.Inject>] ?ra : Fable.Core.ITypeResolver<'a>) =
+            let effect = FShade.Effect.ofFunction(e, ?ra = ra)
+            effect :: f()
+
+        member x.Zero() =
+            []
+
+        member x.Return(()) =
+            []
+
+        member x.Combine(l : list<FShade.Effect>, r : list<FShade.Effect>) = l @ r
+
+        member x.Delay(f : unit -> list<FShade.Effect>) = f()
+
+        member x.Run(l : list<FShade.Effect>) =
+            fun (s : ISg) -> EffectApplicator(FShade.Effect.compose l, s) :> ISg
+
+
+
+
     let empty = EmptyNode() :> ISg
     let draw (mode : PrimitiveTopology) = RenderNode(mode, null) :> ISg
     let inline indexBuffer (att : IMod<'a>) (sg : ISg) = IndexApplicator(BufferView.ofArray att, sg) :> ISg
@@ -214,6 +241,7 @@ module Sg =
     let ofList (sg : list<ISg>) = sg |> ASet.ofList |> set
     let uniform (name : string) (value : IMod<'a>) (sg : ISg) = UniformApplicator(name, value :> IMod, sg) :> ISg
     let depthTest (mode : IMod<DepthTestMode>) (sg : ISg) = DepthTestModeApplicator(mode, sg) :> ISg
+    let shader = SgShaderBuilder()
 
 [<AutoOpen>]
 module SgExtensions =

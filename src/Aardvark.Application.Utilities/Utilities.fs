@@ -29,7 +29,7 @@ module Utilities =
         
                 let control = new Aardvark.Application.RenderControl(canvas, config.antialias)
 
-                let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
+                let initial = CameraView.lookAt (V3d(6.0, 5.0, 4.0)) V3d.Zero V3d.OOI
                 let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
                 let view = cam |> Mod.map CameraView.viewTrafo
                 let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 0.1 1000.0 (float s.X / float s.Y) |> Frustum.projTrafo)

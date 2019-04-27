@@ -21,7 +21,7 @@ module ConstantFolding =
     
     type State = 
         {
-            variableValues : Map<Var, obj>
+            variableValues : hmap<Var, obj>
             isGlobalSideEffect : MemberInfo -> bool
         }
 
@@ -29,7 +29,7 @@ module ConstantFolding =
     module State =
         let empty = 
             { 
-                variableValues = Map.empty
+                variableValues = HMap.empty
                 isGlobalSideEffect = fun mi -> 
                     match mi with
                         | :? MethodInfo as mi -> mi.ReturnType = typeof<unit> || mi.ReturnType = typeof<System.Void>
@@ -58,12 +58,12 @@ module ConstantFolding =
 
         let setVar (v : Var) (value : obj) =
             State.modify (fun s ->
-                { s with variableValues = Map.add v value s.variableValues }
+                { s with variableValues = HMap.add v value s.variableValues }
             )
 
         let getVar (v : Var) =
             State.get |> State.map (fun s ->
-                Map.tryFind v s.variableValues
+                HMap.tryFind v s.variableValues
             )
 
     let rec private (|AllConstant|_|) (e : list<Expr>) =
