@@ -289,5 +289,5 @@ NUGET
       System.Runtime.Handles (>= 4.3) - restriction: && (< monoandroid) (< monotouch) (< net46) (>= netstandard1.3) (< xamarinios) (< xamarinmac) (< xamarintvos) (< xamarinwatchos)
     System.ValueTuple (4.5) - restriction: >= netcoreapp2.0
 GITHUB
-  remote: krauthaufen/Fable
-    FULLPROJECT (2aa205ae93f0a97e942cd452295c6da9f4384450)
+  remote: fable-compiler/Fable
+    FULLPROJECT (0edf884bca0750f01dee07e29a4a0a5561c6aa32)

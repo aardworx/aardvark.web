@@ -15,7 +15,7 @@ if NOT exist node_modules (
 	cmd.exe /c "npm install"
 )
 
-if NOT exist paket-files\krauthaufen\Fable\build\fable-library (
+if NOT exist paket-files\fable-compiler\Fable\build\fable-library (
 	powershell write-host -fore Red build compiler
 	cmd.exe /c "npm run build-compiler"
 )

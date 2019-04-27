@@ -32,7 +32,7 @@ module.exports = {
 				options: {
 					define: ["FABLE_QUOTATIONS"],
 					cli: {
-						path: "./paket-files/krauthaufen/Fable/src/Fable.Cli"
+						path: "./paket-files/fable-compiler/Fable/src/Fable.Cli"
 					}
 				}
 			}

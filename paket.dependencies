@@ -5,4 +5,4 @@ clitool dotnet-fable
 nuget Fable.Core ~> 3.0.0
 
 
-github krauthaufen/Fable
+github fable-compiler/Fable:quotations
