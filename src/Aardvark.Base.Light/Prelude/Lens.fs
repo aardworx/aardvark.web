@@ -28,8 +28,8 @@ type Lens<'s, 'a>() =
 [<AutoOpen>]
 module ``Lens Operators`` =
 
-    let inline (|.) (l : ^a) (r : ^b) : ^c =
-        ( (^a or ^b) : (static member Compose : ^a * ^b -> ^c) (l, r))
+    let inline (|.) (l : Lens<'a, 'b>) (r : Lens<'b, 'c>) : Lens<'a, 'c> =
+        Lens.Compose(l, r)
 
     let inline (|?) (l : Lens<'s, Option<'a>>) (r : 'a) : Lens<'s, 'a> =
         let def (o : Option<'a>) =

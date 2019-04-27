@@ -28,11 +28,6 @@ type nref<'a>(v : 'a) =
         | :? nref<obj> as o -> o.Id = id
         | _ -> false
 
-//[<AutoOpen>]
-//module Assign =
-//    let inline (:=) (a : ^a) (b : ^b) = ((^a) : (member set_Value : ^b -> unit) (a, b))
-//    let inline (!) (l : ^a) = ((^a) : (member get_Value : unit -> ^b) (l))
-
 type IResourceToken =
     inherit IDisposable
     abstract member Context : Context

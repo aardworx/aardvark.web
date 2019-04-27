@@ -167,7 +167,7 @@ let run() =
                 | _ -> failwith "unsupported sampler-kind"
 
         line "[<SamplerType>]"
-        start "type %s(tex : SemanticValue, state : SamplerState) =" name
+        start "type %s(tex : string, state : SamplerState) =" name
 
         start "interface ISampler with"
         line  "member x.Texture = tex"
@@ -357,10 +357,10 @@ let run() =
 
         start "type %s() = " builderName
         line  "inherit SamplerBaseBuilder()"
-        line  "member x.Run((t : ShaderTextureHandle, s : SamplerState)) ="
+        line  "member x.Run((t : string, s : SamplerState)) ="
         line  "    %s(t, s)" typeName
-        line  "member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) ="
-        line  "    Array.init count (fun i -> %s(t.WithIndex(i), s))" typeName
+        line  "member x.Run(((t : string, count : int), s : SamplerState)) ="
+        line  "    Array.init count (fun i -> %s(t + string i, s))" typeName
         stop  ()
         line  "let %s = %s()" valueName builderName
         line  ""

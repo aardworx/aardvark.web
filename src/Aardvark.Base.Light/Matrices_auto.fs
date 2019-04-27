@@ -89,7 +89,9 @@ type M22d(m00 : float, m01 : float, m10 : float, m11 : float) =
             m00, m10, 
             m01, m11
         )
+    interface NoSRTP.IHasTransposed<M22d> with member x.Transposed = x.Transposed
     member x.Det : float = m00 * m11 - m01 * m10
+    interface NoSRTP.IHasDet<float> with member x.Det = x.Det
     new(o : M23d) = 
         M22d(
             o.M00, o.M01, 
@@ -163,6 +165,7 @@ type M22d(m00 : float, m01 : float, m10 : float, m11 : float) =
         lu.LuFactorize(0, 1, 2, perm)
         lu.LuInverse(0, 1, 2, perm, inv, 0, 1, 2)
         M22d(inv)
+    interface NoSRTP.IHasInverse<M22d> with member x.Inverse = x.Inverse
     override __.GetHashCode() = HashCode.Combine(m00.GetHashCode(), m01.GetHashCode(), m10.GetHashCode(), m11.GetHashCode())
     override __.Equals(o) = match o with | :? M22d as o -> m00 = o.M00 && m01 = o.M01 && m10 = o.M10 && m11 = o.M11 | _ -> false
     override __.ToString() = sprintf "[[%f, %f], [%f, %f]]" m00 m01 m10 m11
@@ -284,6 +287,7 @@ and M23d(m00 : float, m01 : float, m02 : float, m10 : float, m11 : float, m12 : 
             m01, m11, 
             m02, m12
         )
+    interface NoSRTP.IHasTransposed<M32d> with member x.Transposed = x.Transposed
     new(o : M22d) = 
         M23d(
             o.M00, o.M01,  0.0 , 
@@ -475,6 +479,7 @@ and M24d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
             m02, m12, 
             m03, m13
         )
+    interface NoSRTP.IHasTransposed<M42d> with member x.Transposed = x.Transposed
     new(o : M22d) = 
         M24d(
             o.M00, o.M01,  0.0 ,  0.0 , 
@@ -667,6 +672,7 @@ and M32d(m00 : float, m01 : float, m10 : float, m11 : float, m20 : float, m21 : 
             m00, m10, m20, 
             m01, m11, m21
         )
+    interface NoSRTP.IHasTransposed<M23d> with member x.Transposed = x.Transposed
     new(o : M22d) = 
         M32d(
             o.M00, o.M01, 
@@ -945,9 +951,11 @@ and M33d(m00 : float, m01 : float, m02 : float, m10 : float, m11 : float, m12 : 
             m01, m11, m21, 
             m02, m12, m22
         )
+    interface NoSRTP.IHasTransposed<M33d> with member x.Transposed = x.Transposed
     member x.Det : float = 
         m00 * m11 * m22 + m01 * m12 * m20 + m02 * m10 * m21 - 
         m20 * m11 * m02 - m21 * m12 * m00 - m22 * m10 * m01
+    interface NoSRTP.IHasDet<float> with member x.Det = x.Det
     new(o : M22d) = 
         M33d(
             o.M00, o.M01,  0.0 , 
@@ -1036,6 +1044,7 @@ and M33d(m00 : float, m01 : float, m02 : float, m10 : float, m11 : float, m12 : 
         lu.LuFactorize(0, 1, 3, perm)
         lu.LuInverse(0, 1, 3, perm, inv, 0, 1, 3)
         M33d(inv)
+    interface NoSRTP.IHasInverse<M33d> with member x.Inverse = x.Inverse
     override __.GetHashCode() = HashCode.Combine(m00.GetHashCode(), m01.GetHashCode(), m02.GetHashCode(), m10.GetHashCode(), m11.GetHashCode(), m12.GetHashCode(), m20.GetHashCode(), m21.GetHashCode(), m22.GetHashCode())
     override __.Equals(o) = match o with | :? M33d as o -> m00 = o.M00 && m01 = o.M01 && m02 = o.M02 && m10 = o.M10 && m11 = o.M11 && m12 = o.M12 && m20 = o.M20 && m21 = o.M21 && m22 = o.M22 | _ -> false
     override __.ToString() = sprintf "[[%f, %f, %f], [%f, %f, %f], [%f, %f, %f]]" m00 m01 m02 m10 m11 m12 m20 m21 m22
@@ -1260,6 +1269,7 @@ and M34d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
             m02, m12, m22, 
             m03, m13, m23
         )
+    interface NoSRTP.IHasTransposed<M43d> with member x.Transposed = x.Transposed
     new(o : M22d) = 
         M34d(
             o.M00, o.M01,  0.0 ,  0.0 , 
@@ -1494,6 +1504,7 @@ and M42d(m00 : float, m01 : float, m10 : float, m11 : float, m20 : float, m21 : 
             m00, m10, m20, m30, 
             m01, m11, m21, m31
         )
+    interface NoSRTP.IHasTransposed<M24d> with member x.Transposed = x.Transposed
     new(o : M22d) = 
         M42d(
             o.M00, o.M01, 
@@ -1778,6 +1789,7 @@ and M43d(m00 : float, m01 : float, m02 : float, m10 : float, m11 : float, m12 : 
             m01, m11, m21, m31, 
             m02, m12, m22, m32
         )
+    interface NoSRTP.IHasTransposed<M34d> with member x.Transposed = x.Transposed
     new(o : M22d) = 
         M43d(
             o.M00, o.M01,  0.0 , 
@@ -2146,6 +2158,7 @@ and M44d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
             m02, m12, m22, m32, 
             m03, m13, m23, m33
         )
+    interface NoSRTP.IHasTransposed<M44d> with member x.Transposed = x.Transposed
     member x.Det : float = 
         m33 * (
             m00 * m11 * m22 + m01 * m12 * m20 + m02 * m10 * m21 - 
@@ -2163,6 +2176,7 @@ and M44d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
            m01 * m12 * m23 + m02 * m13 * m21 + m03 * m11 * m22 -
            m21 * m12 * m03 - m22 * m13 * m01 - m23 * m11 * m02
         )
+    interface NoSRTP.IHasDet<float> with member x.Det = x.Det
     new(o : M22d) = 
         M44d(
             o.M00, o.M01,  0.0 ,  0.0 , 
@@ -2266,6 +2280,7 @@ and M44d(m00 : float, m01 : float, m02 : float, m03 : float, m10 : float, m11 : 
         lu.LuFactorize(0, 1, 4, perm)
         lu.LuInverse(0, 1, 4, perm, inv, 0, 1, 4)
         M44d(inv)
+    interface NoSRTP.IHasInverse<M44d> with member x.Inverse = x.Inverse
     override __.GetHashCode() = HashCode.Combine(m00.GetHashCode(), m01.GetHashCode(), m02.GetHashCode(), m03.GetHashCode(), m10.GetHashCode(), m11.GetHashCode(), m12.GetHashCode(), m13.GetHashCode(), m20.GetHashCode(), m21.GetHashCode(), m22.GetHashCode(), m23.GetHashCode(), m30.GetHashCode(), m31.GetHashCode(), m32.GetHashCode(), m33.GetHashCode())
     override __.Equals(o) = match o with | :? M44d as o -> m00 = o.M00 && m01 = o.M01 && m02 = o.M02 && m03 = o.M03 && m10 = o.M10 && m11 = o.M11 && m12 = o.M12 && m13 = o.M13 && m20 = o.M20 && m21 = o.M21 && m22 = o.M22 && m23 = o.M23 && m30 = o.M30 && m31 = o.M31 && m32 = o.M32 && m33 = o.M33 | _ -> false
     override __.ToString() = sprintf "[[%f, %f, %f, %f], [%f, %f, %f, %f], [%f, %f, %f, %f], [%f, %f, %f, %f]]" m00 m01 m02 m03 m10 m11 m12 m13 m20 m21 m22 m23 m30 m31 m32 m33

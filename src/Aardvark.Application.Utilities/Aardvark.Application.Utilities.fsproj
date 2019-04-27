@@ -1,22 +1,22 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
+
   <ItemGroup>
-    <Compile Include="Program.fs" />
+    <Compile Include="Utilities.fs" />
   </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\Aardvark.Application.Utilities\Aardvark.Application.Utilities.fsproj" />
     <ProjectReference Include="..\Aardvark.Application\Aardvark.Application.fsproj" />
     <ProjectReference Include="..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />
     <ProjectReference Include="..\Aardvark.Base.Rendering\Aardvark.Base.Rendering.fsproj" />
     <ProjectReference Include="..\Aardvark.Rendering.WebGL\Aardvark.Rendering.WebGL.fsproj" />
     <ProjectReference Include="..\Aardvark.SceneGraph\Aardvark.SceneGraph.fsproj" />
+    <ProjectReference Include="..\FShade\FShade.Core\FShade.Core.fsproj" />
     <ProjectReference Include="..\FShade\FShade.GLSL\FShade.GLSL.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Imperative\FShade.Imperative.fsproj" />
-    <ProjectReference Include="..\FShade\FShade.Core\FShade.Core.fsproj" />
   </ItemGroup>
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
+
 </Project>

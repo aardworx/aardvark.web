@@ -20,6 +20,7 @@ type TraversalState =
 type ISg =
     abstract member RenderObjects : TraversalState -> aset<RenderObject>
 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]    
 module Sg =
     let private mulCache : Aardvark.Import.JS.WeakMap<IMod<Trafo3d>, Aardvark.Import.JS.WeakMap<IMod<Trafo3d>, IMod<Trafo3d>>> = Aardvark.Import.JS.WeakMap.Create() |> unbox
     let private cameraLocationCache : Aardvark.Import.JS.WeakMap<IMod, IMod<V3d>> = Aardvark.Import.JS.WeakMap.Create() |> unbox

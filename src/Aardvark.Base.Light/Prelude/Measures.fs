@@ -1,9 +1,6 @@
 ﻿namespace Aardvark.Base
 
 open System
-open System.Diagnostics
-
-
 
 [<StructuredFormatDisplay("{AsString}")>]
 type MicroTime =
@@ -309,6 +306,3 @@ module ``Stopwatch Extensions`` =
 
     type TimeSpan with
         member x.MicroTime = MicroTime x
-
-    type Stopwatch with
-        member x.MicroTime = MicroTime x.Elapsed

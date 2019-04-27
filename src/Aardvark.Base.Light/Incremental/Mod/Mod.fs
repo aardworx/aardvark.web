@@ -27,7 +27,7 @@ type IMod =
     /// </summary>
     abstract member GetValueObj : AdaptiveToken -> obj
 
-    abstract member ValueType : Type
+    abstract member ValueType : Option<Type>
 
 
 
@@ -70,7 +70,7 @@ type IModRef<'a> =
 type ModRef<'a>(value : 'a, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) =
     inherit AdaptiveObject()
 
-    let valueType = r.Value.ResolveType()
+    let valueType = resolveType r
     let mutable value = value
     let mutable cache = value
     
@@ -135,7 +135,7 @@ type ModRef<'a>(value : 'a, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<
 type ConstantMod<'a>(value : Lazy<'a>, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) =
     inherit ConstantObject()
     
-    let valueType = r.Value.ResolveType()
+    let valueType = resolveType r
     override x.Kind = "Mod"
 
     member x.Value =
@@ -181,12 +181,12 @@ module Mod =
     let mutable private depth = 0
 
     [<AbstractClass>]
-    type AbstractMod<'a>(r : Fable.Core.ITypeResolver<'a>) =
+    type AbstractMod<'a>(r : Option<Fable.Core.ITypeResolver<'a>>) =
         inherit AdaptiveObject()
 
 
         
-        let valueType = r.ResolveType()
+        let valueType = resolveType r
         let mutable cache = Unchecked.defaultof<'a>
         
         override x.Kind = "Mod"
@@ -274,13 +274,13 @@ module Mod =
     // and will be evaluated lazily (if not forced to be eager
     // by a callback or subsequent eager computations)
     type LazyMod<'a>(compute : AdaptiveToken -> 'a, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) =
-        inherit AbstractMod<'a>(r.Value)
+        inherit AbstractMod<'a>(r)
         override x.Compute(token) = compute(token)
 
 
 
     type MapMod<'a, 'b>(inner : IMod<'a>, f : 'a -> 'b, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'b>) =
-        inherit AbstractMod<'b>(r.Value)
+        inherit AbstractMod<'b>(r)
 
         member x.Inner = inner
         member x.F = f
@@ -289,7 +289,7 @@ module Mod =
             inner.GetValue token |> f
 
     type Map2Mod<'a, 'b, 'c>(a : IMod<'a>, b : IMod<'b>, f : 'a -> 'b -> 'c, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'c>) =
-        inherit AbstractMod<'c>(r.Value)
+        inherit AbstractMod<'c>(r)
 
         member x.Left = a
         member x.Right = a
@@ -300,7 +300,7 @@ module Mod =
 
 
     type BindMod<'a, 'b>(m : IMod<'a>, f : 'a -> IMod<'b>, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'b>) =
-        inherit AbstractMod<'b>(r.Value)
+        inherit AbstractMod<'b>(r)
 
         let mutable inner : Option<'a * IMod<'b>> = None
         let mutable mChanged = 1
@@ -358,7 +358,7 @@ module Mod =
                     i.GetValue token
 
     type Bind2Mod<'a, 'b, 'c>(ma : IMod<'a>, mb : IMod<'b>, f : 'a -> 'b -> IMod<'c>, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'c>) =
-        inherit AbstractMod<'c>(r.Value)
+        inherit AbstractMod<'c>(r)
         static let empty = ref HSet.empty
 
         let mutable inner : Option<'a * 'b * IMod<'c>> = None
@@ -398,7 +398,7 @@ module Mod =
                     i.GetValue token 
  
     type DynamicMod<'a>(f : unit -> IMod<'a>, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) =
-        inherit AbstractMod<'a>(r.Value)
+        inherit AbstractMod<'a>(r)
 
         let inner = lazy (f())
 

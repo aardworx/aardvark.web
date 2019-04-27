@@ -43,13 +43,36 @@ let run () =
         // props
         for n in names do
             printfn "    member __.%s = %s" n (n.ToLower())
+            printfn "    interface NoSRTP.IHas%s<%s> with member x.%s = x.%s" n  d.baseType n n
 
         // swizzle
         let swizzles =
             let props = Array.toList names //@ ["I"; "O"]
             allChoices d.dimension props
             |> List.filter (function [] | [_] -> false | _ -> true)
-            |> List.filter (List.exists (fun v -> v <> "I" && v <> "O"))
+            |> List.filter (List.exists (fun v -> v <> "I" && v <> "O")) 
+
+        let iface (swizzle : list<string>) =
+            let order = Map.ofList ["X", 0; "Y", 1; "Z", 2; "W", 3]
+            let rec isSorted (l : list<string>) =
+                match l with
+                | [] -> true
+                | [_] -> true
+                | a :: b :: t -> 
+                    match Map.tryFind a order, Map.tryFind b order with
+                    | Some ao, Some bo when bo = ao + 1 ->
+                        isSorted (b :: t)
+                    | _ ->
+                        false
+
+            let isXYZW (l : list<string>) =
+                l |> List.forall(fun s -> s = "X" || s = "Y" || s = "Z" || s = "W")
+
+            if isSorted swizzle && isXYZW swizzle then
+                sprintf "NoSRTP.IHas%s" (String.concat "" swizzle) |> Some
+            else
+                None
+
         for sw in swizzles do
             let len = List.length sw
             let resName = sprintf "V%d%s" len d.suffix
@@ -60,8 +83,16 @@ let run () =
                 | "O" -> d.zero
                 | _ -> n.ToLower()
             )
+
+            
+
             printfn "    member __.%s = %s(%s)" n resName (String.concat ", " values)
 
+            match iface sw with
+            | Some iface -> 
+                printfn "    interface %s<%s> with member x.%s = x.%s" iface resName n n
+            | None ->
+                ()
 
         // creators
         printfn "    static member Zero = %s(%s)" name (Array.create d.dimension d.zero |> String.concat ", ")
@@ -83,18 +114,24 @@ let run () =
         // dot/cross
         printfn "    static member Dot(l : %s, r : %s) = %s" name name (names |> Seq.map (fun n -> sprintf "l.%s * r.%s" n n) |> String.concat " + ")
         printfn "    member __.Dot(r : %s) = %s" name (names |> Seq.map (fun n -> sprintf "%s * r.%s" (n.ToLower()) n) |> String.concat " + ")
+        printfn "    interface NoSRTP.IHasDot<%s, %s> with member x.Dot(r) = x.Dot(r)" name d.baseType
         if d.dimension = 3 then
             printfn "    static member Cross(l : %s, r : %s) = %s(l.Y * r.Z - l.Z * r.Y, l.Z * r.X - l.X * r.Z, l.X * r.Y - l.Y * r.X)" name name name
             printfn "    member __.Cross(r : %s) = %s(y * r.Z - z * r.Y, z * r.X - x * r.Z, x * r.Y - y * r.X)" name name
+            printfn "    interface NoSRTP.IHasCross<%s, %s> with member x.Cross(r) = x.Cross(r)" name name
 
         printfn "    member __.LengthSquared = %s" (names |> Seq.map (fun n -> sprintf "%s*%s" (n.ToLower()) (n.ToLower())) |> String.concat " + ")
+        printfn "    interface NoSRTP.IHasLengthSquared<%s> with member x.LengthSquared = x.LengthSquared" d.baseType
         if d.fract then
             printfn "    member __.Length = sqrt (%s)" (names |> Seq.map (fun n -> sprintf "%s*%s" (n.ToLower()) (n.ToLower())) |> String.concat " + ")
+            printfn "    interface NoSRTP.IHasLength<%s> with member x.Length = x.Length" d.baseType
             
             printfn "    member this.Normalized = let l = this.Length in %s(%s)" name (names |> Seq.map (fun n -> sprintf "%s/l" (n.ToLower())) |> String.concat ", ")
+            printfn "    interface NoSRTP.IHasNormalized<%s> with member x.Normalized = x.Normalized" name
         
         else
             printfn "    member __.Length = sqrt (float (%s))" (names |> Seq.map (fun n -> sprintf "%s*%s" (n.ToLower()) (n.ToLower())) |> String.concat " + ")
+            printfn "    interface NoSRTP.IHasLength<float> with member x.Length = x.Length" 
             
         printfn "    member __.Abs = %s(%s)" name (names |> Seq.map (fun n -> sprintf "abs %s" (n.ToLower())) |> String.concat ", ")
         if d.fract then

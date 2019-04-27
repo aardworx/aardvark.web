@@ -262,11 +262,10 @@ type UniformBufferSlot(parent : UniformBufferStore, handle : WebGLBuffer, store 
             fun value -> Log.warn "[GL] unknown field: %s" name
 
     member x.GetWriter(name : string, m : IMod) =
-        let writer = ref None
-        let vt = m.ValueType
-
-        if vt.IsGenericParameter then
+        match m.ValueType with
+        | None ->
             Log.warn "[GL] uniform value %s does not have type-information" name
+            let writer = ref None
             Mod.custom (fun t ->
                 let v = m.GetValueObj t
                 let write = 
@@ -279,7 +278,7 @@ type UniformBufferSlot(parent : UniformBufferStore, handle : WebGLBuffer, store 
                 write v
                 parent.Dirty()
             )
-        else
+        | Some vt ->
             match Map.tryFind name layout.fieldsByName with
             | Some f ->
                 let _, blit = Blit.getBlitTyped true vt f.typ
@@ -401,11 +400,10 @@ type UniformBuffer(ctx : Context, handle : WebGLBuffer, layout : UniformBlockInf
             fun value -> Log.warn "[GL] unknown field: %s" name
 
     member x.GetWriter(name : string, m : IMod) =
-        let writer = ref None
-        let vt = m.ValueType
-
-        if vt.IsGenericParameter then
+        match m.ValueType with
+        | None -> 
             Log.warn "[GL] uniform value %s does not have type-information" name
+            let writer = ref None
             Mod.custom (fun t ->
                 let v = m.GetValueObj t
                 let write = 
@@ -417,7 +415,7 @@ type UniformBuffer(ctx : Context, handle : WebGLBuffer, layout : UniformBlockInf
                         w
                 write v
             )
-        else
+        | Some vt ->
             match Map.tryFind name layout.fieldsByName with
             | Some f ->
                 let _, blit = Blit.getBlitTyped true vt f.typ
@@ -455,11 +453,10 @@ type UniformLocation(ctx : Context, typ : PrimitiveType) =
         fun value -> blit view 0 value
         
     member x.GetWriter(m : IMod) =
-        let writer = ref None
-        let vt = m.ValueType
-
-        if vt.IsGenericParameter then
+        match m.ValueType with
+        | None ->
             Log.warn "[GL] uniform value %s does not have type-information" name
+            let writer = ref None
             Mod.custom (fun t ->
                 let v = m.GetValueObj t
                 let write = 
@@ -471,7 +468,7 @@ type UniformLocation(ctx : Context, typ : PrimitiveType) =
                         w
                 write v
             )
-        else
+        | Some vt ->
             let _, blit = Blit.getBlitTyped false vt typ
             Mod.custom (fun t ->
                 let v = m.GetValueObj t

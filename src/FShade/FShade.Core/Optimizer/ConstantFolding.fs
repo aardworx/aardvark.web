@@ -76,11 +76,11 @@ module ConstantFolding =
 
     open Fable.Core.JsInterop
 
-    type FunctionTrampoline () =
+    type private FunctionTrampoline () =
         static member FTramp (a : 'a, [<Fable.Core.Inject>] ?ra : Fable.Core.ITypeResolver<'a>) =
             ra.Value.ResolveType(), a :> obj
 
-    let inline tramp (v : 'a) = FunctionTrampoline.FTramp v
+    let inline private tramp (v : 'a) = FunctionTrampoline.FTramp v
 
 
     let functionTable (l : list<string * (Type * obj)>) =

@@ -121,10 +121,14 @@ type HashCode =
 [<AutoOpen>]
 module CoreExtensions =
 
-    [<Emit("Object.getPrototypeOf($0).constructor.name")>]
-    let private tt (o : obj) : string = failwith ""
-    type System.Object with
-        member x.GetTypeName() : string = tt x
+    let resolveType (r : Option<Fable.Core.ITypeResolver<'a>>) =
+        match r with
+        | Some r -> 
+            let t = r.ResolveType()
+            if t.IsGenericParameter then None
+            else Some t
+        | None ->
+            None
 
 [<AbstractClass; Sealed; Extension>]
 type HashExtensions private() =
@@ -835,3 +839,29 @@ type Version(major : int, minor : int, build : int) =
                     else compare build o.Build
             | _ ->
                 failwith "uncomparable"
+
+
+module NoSRTP =
+    type IHasX<'a> = abstract member X : 'a
+    type IHasY<'a> = abstract member Y : 'a
+    type IHasZ<'a> = abstract member Z : 'a
+    type IHasW<'a> = abstract member W : 'a
+    
+    type IHasXY<'a> = abstract member XY : 'a
+    type IHasYZ<'a> = abstract member YZ : 'a
+    type IHasZW<'a> = abstract member ZW : 'a
+    
+    type IHasXYZ<'a> = abstract member XYZ : 'a
+    type IHasYZW<'a> = abstract member YZW : 'a
+    type IHasXYZW<'a> = abstract member XYZW : 'a
+    
+    type IHasDot<'a, 'b> = abstract member Dot : 'a -> 'b
+    type IHasCross<'a, 'b> = abstract member Cross : 'a -> 'b
+    type IHasLength<'a> = abstract member Length : 'a
+    type IHasLengthSquared<'a> = abstract member LengthSquared : 'a
+    type IHasNormalized<'a> = abstract member Normalized : 'a
+
+    
+    type IHasTransposed<'a> = abstract member Transposed : 'a
+    type IHasDet<'a> = abstract member Det : 'a
+    type IHasInverse<'a> = abstract member Inverse : 'a

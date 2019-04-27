@@ -139,7 +139,7 @@ module ExprWorkardound =
 //        Expr.PropertySet(e, prop, value, [index])
 
 [<AutoOpen>]
-module ReflectionPatterns =
+module BasicReflectionPatterns =
 
     type Type with
         member x.IsRef = x.IsGenericType && x.GetGenericTypeDefinition() = typedefof<ref<_>>
@@ -989,7 +989,7 @@ module StateExtensions =
             }
 
 [<AutoOpen>]
-module Helpers = 
+module BuiltInHelpers = 
     open System.Text.RegularExpressions
 
     let cleanTypeNameRx = Regex @"(.*)`[0-9]+"

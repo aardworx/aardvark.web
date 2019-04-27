@@ -15,6 +15,10 @@ open System.Collections.Generic
 
 #nowarn "4321"
 
+module private Trampoline =
+    let mutable ofExpr : System.Type -> Expr -> obj = fun _ _ -> failwith "not possible"
+
+
 [<RequireQualifiedAccess>]
 type ShaderOutputVertices =
     | Unknown
@@ -50,8 +54,18 @@ type Shader =
         shaderDepthWriteMode : DepthWriteMode
     }
 
-[<CompilerMessage("Preprocessor should not be used directly", 4321, IsHidden = true)>]
-module Preprocessor =
+    static member ofFunction (shaderFunction : 'a -> Expr<'b>, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) =
+        let e = 
+            try shaderFunction Unchecked.defaultof<'a>
+            with e -> failwithf "[FShade] shader functions may not access their vertex-input statically (inner cause - NullReferenceException: %A)" e
+        let t = r.Value.ResolveType()
+
+        Trampoline.ofExpr t e |> unbox<list<Shader>>
+
+
+
+[<CompilerMessage("Preprocessor should not be used directly", 4321, IsHidden = true); CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module ShaderPreprocessor =
     
     open System.Reflection
     open System.Collections.Generic
@@ -947,7 +961,7 @@ module Preprocessor =
             match state.builder with
                 | Some builder -> 
                     match Expr.TryEval builder with
-                        | Some (:? ShaderBuilder as v) -> v
+                        | Some (:? AbstractShaderBuilder as v) -> v
                         | _ -> failwithf "[FShade] could not evaluate shader-builder %A" builder
                 | _ ->
                     failwithf "[FShade] could not evaluate shader-builder %A" state.builder
@@ -1322,11 +1336,11 @@ module private GeometryInfo =
 
 type ShaderOutputValue (mode : InterpolationMode, index : Option<Expr>, value : Expr) =
     let value, inputs, uniforms =
-        let value, state = Preprocessor.preprocess V3i.Zero value
+        let value, state = ShaderPreprocessor.preprocess V3i.Zero value
 
         let inputs, uniforms =
             value
-                |> Preprocessor.usedInputs V3i.Zero
+                |> ShaderPreprocessor.usedInputs V3i.Zero
                 |> Map.partition (fun l (kind, t) -> kind = ParameterKind.Input)
 
         let inputs =
@@ -1393,7 +1407,7 @@ module ShaderOutputValueExtensions =
 module Shader =
 
     let tryGetOverrideCode (localSize : V3i) (mi : MethodBase) =
-        match Preprocessor.preprocessMethod localSize mi with
+        match ShaderPreprocessor.preprocessMethod localSize mi with
             | Some (e,_) -> Some e
             | None -> None
              
@@ -1650,7 +1664,7 @@ module Shader =
                 |> Optimizer.eliminateDeadCode' isSideEffect
                 |> Optimizer.evaluateConstants' isSideEffect
                 |> Optimizer.liftInputs
-                |> Preprocessor.preprocess V3i.Zero
+                |> ShaderPreprocessor.preprocess V3i.Zero
 
         let newOutputVertices, newOutputPrimitives =
             match shader.shaderStage with
@@ -1689,24 +1703,24 @@ module Shader =
 
     let ofExpr (inputType : Type) (e : Expr) =
         let debugRange = e.CustomAttributes |> List.tryPick (function DebugRange r -> Some r | _ -> None)
-        Preprocessor.toShaders inputType Map.empty e 
+        ShaderPreprocessor.toShaders inputType Map.empty e 
             |> List.map optimize
             |> List.map (fun shader -> { shader with shaderDebugRange = debugRange })
 
 
-    type OfFunctionTrampoline() =
-        static member ofFunction (shaderFunction : 'a -> Expr<'b>, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) =
-            let expression = 
-                try shaderFunction Unchecked.defaultof<'a>
-                with e -> failwithf "[FShade] shader functions may not access their vertex-input statically (inner cause - NullReferenceException: %A)" e
-            let t = r.Value.ResolveType()
-            ofExpr t expression
+    //type OfFunctionTrampoline() =
+    //    static member ofFunction (shaderFunction : 'a -> Expr<'b>, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) =
+    //        let expression = 
+    //            try shaderFunction Unchecked.defaultof<'a>
+    //            with e -> failwithf "[FShade] shader functions may not access their vertex-input statically (inner cause - NullReferenceException: %A)" e
+    //        let t = r.Value.ResolveType()
+    //        ofExpr t expression
 
-    let inline ofFunction (shaderFunction : 'a -> Expr<'b>) = OfFunctionTrampoline.ofFunction(shaderFunction)
+    //let inline ofFunction (shaderFunction : 'a -> Expr<'b>) = OfFunctionTrampoline.ofFunction(shaderFunction)
 
     let withBody (newBody : Expr) (shader : Shader) =
-        let newBody, state = newBody |> Preprocessor.preprocess V3i.Zero
-        let io = Preprocessor.computeIO V3i.Zero newBody
+        let newBody, state = newBody |> ShaderPreprocessor.preprocess V3i.Zero
+        let io = ShaderPreprocessor.computeIO V3i.Zero newBody
 
         let filterIO (desiredKind : ParameterKind) (build : string -> Type -> 'a) =
 
@@ -2877,3 +2891,4 @@ module Shader =
         else
             failwith "[FShade] cannot compose empty shader-sequence"      
 
+    do Trampoline.ofExpr <- fun a b -> ofExpr a b :> obj

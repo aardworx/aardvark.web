@@ -31,12 +31,12 @@ module Exts =
     [<Emit("Element.ALLOW_KEYBOARD_INPUT")>]
     let ALLOW_KEYBOARD_INPUT : float = jsNative
 
-type RenderControl(canvas : HTMLCanvasElement) =
+type RenderControl(canvas : HTMLCanvasElement, antialias : bool) =
 
     let config =
         {
             alpha = false
-            antialias = true
+            antialias = antialias
             depth = true
             powerPreference = "high-performance"
             preserveDrawingBuffer = true

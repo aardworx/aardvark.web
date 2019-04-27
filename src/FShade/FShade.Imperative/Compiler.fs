@@ -267,7 +267,7 @@ module Compiler =
             )
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-    module Helpers = 
+    module TypeHelpers = 
         let rec tryDeconstructValue (t : Type) (v : obj) =
             //if t.IsEnum then
             //    Expr.Value(unbox<int> v, t) |> Some
@@ -1135,7 +1135,7 @@ module Compiler =
                             return CValue(ct, literal)
 
                         | None ->
-                            match Helpers.tryDeconstructValue t v with
+                            match TypeHelpers.tryDeconstructValue t v with
                                 | Some e -> 
                                     return! toCExprS e
 
@@ -1183,7 +1183,7 @@ module Compiler =
                 | NewObject(ctor, args) ->
                     let! s = State.get
                     let! args = args  |> List.mapS toCExprS
-                    match Helpers.tryGetBuiltInCtor s.moduleState.backend ctor args with
+                    match TypeHelpers.tryGetBuiltInCtor s.moduleState.backend ctor args with
                         | Some b ->
                             return b
                         | None -> 
@@ -1225,7 +1225,7 @@ module Compiler =
 
                     match f.functionMethod with
                         | Some (:? MethodInfo as mi) ->
-                            match Helpers.tryGetBuiltInMethod s.moduleState.backend mi args with
+                            match TypeHelpers.tryGetBuiltInMethod s.moduleState.backend mi args with
                                 | Some e -> 
                                     return e
                                 | None ->
@@ -1251,7 +1251,7 @@ module Compiler =
                     let args = t :: args
                     let! args = args |> List.mapS toCExprS
                     let! s = State.get
-                    match Helpers.tryGetBuiltInMethod s.moduleState.backend mi args with
+                    match TypeHelpers.tryGetBuiltInMethod s.moduleState.backend mi args with
                         | Some e -> 
                             return e
                         | None ->
@@ -1276,7 +1276,7 @@ module Compiler =
                 | FieldGet(Some t, f) ->
                     let! t = toCExprS t
                     let! s = State.get
-                    match Helpers.tryGetBuiltInField s.moduleState.backend f t with
+                    match TypeHelpers.tryGetBuiltInField s.moduleState.backend f t with
                         | Some e ->
                             return e
                         | _ ->

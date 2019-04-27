@@ -196,7 +196,8 @@ module SgPrimitives =
             |> LazyList.scan (fun last _ -> subdivide last) cube
             |> LazyList.map sphereGeometry
 
-
+    
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]  
     module Sg =
         let box (b : Box3d) =
             let (p, n, t) = boxVertices

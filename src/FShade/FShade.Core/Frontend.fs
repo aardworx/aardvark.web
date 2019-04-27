@@ -328,7 +328,7 @@ module ShaderBuilders =
 
     [<AbstractClass>]
     type BaseBuilder() =
-        inherit ShaderBuilder()
+        inherit AbstractShaderBuilder()
         //member x.For(a : Arr<'d, 'a>, f : 'a -> unit) : unit =
         //    for i in a do f i
 
@@ -363,7 +363,7 @@ module ShaderBuilders =
         override x.OutputTopology = None
 
     type GeometryBuilder(size : Option<int>, top : OutputTopology) =
-        inherit ShaderBuilder()
+        inherit AbstractShaderBuilder()
         //member x.For(a : Arr<'d, 'a>, f : 'a -> seq<Primitive<'b>>) : seq<Primitive<'b>> =
         //    a |> Seq.collect f
 

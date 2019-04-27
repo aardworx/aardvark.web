@@ -9,45 +9,47 @@ module Trafo =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Mat =
     let upperLeftM33 (m : M44d) = M33d m
-    let inline transformDir (m : ^m) (v : ^a) : ^c = (^m : (member TransformDir : ^a -> ^c) (m, v))
-    let inline transformPos (m : ^m) (v : ^a) : ^c = (^m : (member TransformPos : ^a -> ^c) (m, v))
-    let inline transpose (m : ^m) : ^b = (^m : (member Transposed : ^b) (m))
-
-    let inline inverse (m : ^m) : ^b =  (^m : (member Inverse : ^b) (m))
-    let inline det (m : ^m) : ^b =  (^m : (member Det : ^b) (m))
+    let inline transformDir (m : M44d) (v : V3d) = m.TransformDir v  
+    let inline transformPos (m : M44d) (v : V3d) = m.TransformPos v  
+    let inline transpose (m : 'm) = (m :> NoSRTP.IHasTransposed<_>).Transposed
+    let inline inverse (m : 'm) = (m :> NoSRTP.IHasInverse<_>).Inverse
+    let inline det (m : 'm) = (m :> NoSRTP.IHasDet<_>).Det
 
 
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Vec =
-    let inline x (a : ^a) : ^b = (^a : (member X : ^b) (a))
-    let inline y (a : ^a) : ^b = (^a : (member Y : ^b) (a))
-    let inline z (a : ^a) : ^b = (^a : (member Z : ^b) (a))
-    let inline w (a : ^a) : ^b = (^a : (member W : ^b) (a))
+    let inline x<'a, 'b when 'a :> NoSRTP.IHasX<'b>> (a : 'a) : 'b = a.X
+    let inline y<'a, 'b when 'a :> NoSRTP.IHasY<'b>> (a : 'a) : 'b = a.Y
+    let inline z<'a, 'b when 'a :> NoSRTP.IHasZ<'b>> (a : 'a) : 'b = a.Z
+    let inline w<'a, 'b when 'a :> NoSRTP.IHasW<'b>> (a : 'a) : 'b = a.W
+
     
-    let inline xy (a : ^a) : ^b = (^a : (member XY : ^b) (a))
-    let inline yz (a : ^a) : ^b = (^a : (member YZ : ^b) (a))
-    let inline zw (a : ^a) : ^b = (^a : (member ZW : ^b) (a))
-    let inline xyz (a : ^a) : ^b = (^a : (member XYZ : ^b) (a))
-    let inline yzw (a : ^a) : ^b = (^a : (member YZW : ^b) (a))
+    let inline xy<'a, 'b when 'a :> NoSRTP.IHasXY<'b>> (a : 'a) : 'b = a.XY
+    let inline yz<'a, 'b when 'a :> NoSRTP.IHasYZ<'b>> (a : 'a) : 'b = a.YZ
+    let inline zw<'a, 'b when 'a :> NoSRTP.IHasZW<'b>> (a : 'a) : 'b = a.ZW
+
+    let inline xyz<'a, 'b when 'a :> NoSRTP.IHasXYZ<'b>> (a : 'a) : 'b = a.XYZ
+    let inline yzw<'a, 'b when 'a :> NoSRTP.IHasYZW<'b>> (a : 'a) : 'b = a.YZW
+    
 
 
     
-    let inline dot (a : ^a) (b : ^a) : ^b = (^a : (static member Dot : ^a * ^a -> ^b) (a, b))
-    let inline cross (a : ^a) (b : ^a) : ^b = (^a : (static member Cross : ^a * ^a -> ^b) (a, b))
+    let inline dot<'a, 'b, 'c when 'a :> NoSRTP.IHasDot<'b, 'c>> (a : 'a) (b : 'b) : 'c = a.Dot(b)
+    let inline cross<'a, 'b, 'c when 'a :> NoSRTP.IHasCross<'b, 'c>> (a : 'a) (b : 'b) : 'c = a.Cross(b)
     
-    let inline normalize (a : ^a) : ^a = (^a : (member Normalized : ^a) (a))
-    let inline length (a : ^a) : ^b = (^a : (member Length : ^b) (a))
-    let inline lengthSquared (a : ^a) : ^b = (^a : (member LengthSquared : ^b) (a))
-
+    
+    let inline normalize<'a, 'b when 'a :> NoSRTP.IHasNormalized<'b>> (a : 'a) : 'b = a.Normalized
+    let inline lengthSquared<'a, 'b when 'a :> NoSRTP.IHasLengthSquared<'b>> (a : 'a) : 'b = a.LengthSquared
+    let inline length<'a, 'b when 'a :> NoSRTP.IHasLength<'b>> (a : 'a) : 'b = a.Length
 
     let inline reflect (v : ^a) (n : ^a) : ^a =
-        let t = (^a : (static member Dot : ^a -> ^a -> ^b) (v,n))
+        let t = (v :> NoSRTP.IHasDot<_,_>).Dot(n)
         v - (t + t) * n
 
 
     let inline refract (v : ^a) (n : ^a) (eta : ^b) =
-        let t = (^a : (static member Dot : ^a -> ^a -> ^b) (v,n))
+        let t = (v :> NoSRTP.IHasDot<_,_>).Dot(n)
 
         let one = LanguagePrimitives.GenericOne
         let k = one - eta * eta * (one - t*t)
@@ -55,29 +57,3 @@ module Vec =
             LanguagePrimitives.GenericZero
         else
             eta * v - (eta * t + sqrt k) * n
-
-
-    let inline anySmaller< ^a, ^b when ^a : (member AnySmaller : ^b -> bool)> (v : ^a) (value : ^b) =
-        (^a : (member AnySmaller : ^b -> bool) (v,value))
-
-    let inline anyGreater< ^a, ^b when ^a : (member AnyGreater : ^b -> bool)> (v : ^a) (value : ^b) =
-        (^a : (member AnyGreater : ^b -> bool) (v,value))
-
-    let inline allSmaller< ^a, ^b when ^a : (member AllSmaller : ^b -> bool)> (v : ^a) (value : ^b) =
-        (^a : (member AllSmaller : ^b -> bool) (v,value))
-
-    let inline allGreater< ^a, ^b when ^a : (member AllGreater : ^b -> bool)> (v : ^a) (value : ^b) =
-        (^a : (member AllGreater : ^b -> bool) (v,value))
-
-    let inline anySmallerOrEqual< ^a, ^b when ^a : (member AnySmallerOrEqual : ^b -> bool)> (v : ^a) (value : ^b) =
-        (^a : (member AnySmallerOrEqual : ^b -> bool) (v,value))
-
-    let inline anyGreaterOrEqual< ^a, ^b when ^a : (member AnyGreaterOrEqual : ^b -> bool)> (v : ^a) (value : ^b) =
-        (^a : (member AnyGreaterOrEqual : ^b -> bool) (v,value))
-
-    let inline allSmallerOrEqual< ^a, ^b when ^a : (member AllSmallerOrEqual : ^b -> bool)> (v : ^a) (value : ^b) =
-        (^a : (member AllSmallerOrEqual : ^b -> bool) (v,value))
-
-    let inline allGreaterOrEqual< ^a, ^b when ^a : (member AllGreaterOrEqual : ^b -> bool)> (v : ^a) (value : ^b) =
-        (^a : (member AllGreaterOrEqual : ^b -> bool) (v,value))
-

@@ -1,49 +1,51 @@
 ﻿namespace FShade
 
+open Aardvark.Import.JS
 open System
 open Aardvark.Base
+
+
 
 type UniformScope private(parent : Option<UniformScope>, name : string) = 
     static let mutable currentId = 0
 
     static let glob = UniformScope(None, "Global")
 
-    let id =
-        let i = currentId
-        currentId <- currentId + 1
-        i
+    let fullName =
+        match parent with
+        | Some parent -> 
+            if parent.IsGlobal then name 
+            else parent.FullName + "_" + name
+        | None -> 
+            name
 
     let childScopes = System.Collections.Generic.Dictionary<string, UniformScope>()
       
     static member Global = glob
 
-    member private x.Id = id
+    member x.IsGlobal =
+        match parent with
+        | None -> true
+        | _ -> false
+
+    member x.FullName = fullName
+
     interface IComparable with
         member x.CompareTo o =
             match o with
-                | :? UniformScope as o -> compare id o.Id
+                | :? UniformScope as o -> compare fullName o.FullName
                 | _ -> failwith "uncomparable"
 
     override x.GetHashCode() =
-        id.GetHashCode()
+        fullName.GetHashCode()
 
     override x.Equals(o) =
         match o with
-            | :? UniformScope as o -> o.Id = id
+            | :? UniformScope as o -> o.FullName = fullName
             | _ -> false
 
     member x.Parent = parent
     member x.Name = name
-    member x.FullName = 
-        let rec build (name : string) (s : UniformScope) =
-            match s.Parent with
-                | None -> 
-                    if name.Length = 0 then "Global"
-                    else name
-                | Some p ->
-                    build (s.Name + name) p
-
-        build "" x
 
     member x.GetChildScope(n : string) =
         match childScopes.TryGetValue n with
@@ -54,11 +56,20 @@ type UniformScope private(parent : Option<UniformScope>, name : string) =
                 childScopes.[n] <- s
                 s
    
-[<AbstractClass>]
-type SemanticValue() =
-    abstract member Semantic : string
-    abstract member Scope : UniformScope
-    
+    static member TryCreate (o : obj) =
+        match o with
+        | :? UniformScope as o ->
+            Some o
+        | _ ->
+            let hasScope = Fable.Core.JsInterop.isIn "UniformScope" o
+            let hasSemantic = Fable.Core.JsInterop.isIn "Semantic" o
+            if hasScope && hasSemantic then
+                let scope : UniformScope = Fable.Core.JsInterop.(?) o "UniformScope"
+                let sem : string = Fable.Core.JsInterop.(?) o "Semantic"
+                scope.GetChildScope sem |> Some
+            else
+                None
+
 [<AttributeUsage(AttributeTargets.Class, AllowMultiple = false)>]
 type ShaderBuilderAttribute() =
     inherit Attribute()
@@ -85,7 +96,7 @@ type PrimitiveIndexAttribute(index : int) =
     member x.Index = index
 
 [<AbstractClass>]
-type ShaderBuilder() =
+type AbstractShaderBuilder() =
     abstract member ShaderStage : ShaderStage
     abstract member OutputTopology : Option<OutputTopology>
 
@@ -242,23 +253,22 @@ type UniformParameter =
 
 type ISampler =
     abstract member SelfType : System.Type
-    abstract member Texture : SemanticValue
+    abstract member Texture : string
     abstract member State : SamplerState
 
 type IImage =
     interface end
 
-type ShaderTextureHandle(semantic : string, scope : UniformScope) =
-    inherit SemanticValue()
-    static member CreateUniform(semantic : string, scope : UniformScope) = ShaderTextureHandle(semantic, scope)
+//type ShaderTextureHandle(semantic : string, scope : UniformScope) =
+//    static member CreateUniform(semantic : string, scope : UniformScope) = ShaderTextureHandle(semantic, scope)
 
-    override x.Semantic = semantic
-    override x.Scope = scope
+//    override x.Semantic = semantic
+//    override x.Scope = scope
 
-    member x.WithIndex (i : int) =
-        ShaderTextureHandle(semantic + string i, scope)
+//    member x.WithIndex (i : int) =
+//        ShaderTextureHandle(semantic + string i, scope)
 
-    new() = ShaderTextureHandle(null, Unchecked.defaultof<UniformScope>)       
+//    new() = ShaderTextureHandle(null, Unchecked.defaultof<UniformScope>)       
     
 
 type TextureMustBeSpecified = TextureMustBeSpecified
@@ -267,11 +277,19 @@ type SamplerBaseBuilder() =
     member x.Yield(_) = TextureMustBeSpecified
 
     [<CustomOperation("texture")>]
-    member x.Texture(b : TextureMustBeSpecified, t : ShaderTextureHandle) =
+    member x.Texture(b : TextureMustBeSpecified, t : string) =
+        let t = 
+            if Fable.Core.JsInterop.isIn "Semantic" t then Fable.Core.JsInterop.(?) t "Semantic"
+            else t
+        
         (t, SamplerState.empty)
 
     [<CustomOperation("textureArray")>]
-    member x.TextureArray(b : TextureMustBeSpecified, t : ShaderTextureHandle, count : int) =
+    member x.TextureArray(b : TextureMustBeSpecified, t : string, count : int) =
+        let t = 
+            if Fable.Core.JsInterop.isIn "Semantic" t then Fable.Core.JsInterop.(?) t "Semantic"
+            else t
+
         ((t, count), SamplerState.empty)
 
 
@@ -311,39 +329,15 @@ module UniformExtensions =
     let uniform = UniformScope.Global //(None, "Global")
 
 
-    type UniformStuff private() =
-
-        [<ThreadStatic; DefaultValue>]
-        static val mutable private current : Option<UniformScope * string>
-
-        static member Push() =
-            let old = UniformStuff.current
-            UniformStuff.current <- None
-            old
-
-        static member Pop(old : Option<_>) =
-            let c = UniformStuff.current
-            UniformStuff.current <- old
-            c
-
-        static member Set(scope : UniformScope, name : string) =
-            UniformStuff.current <- Some(scope, name)
-
-    type SemanticGetter private() =
-        static member Get<'a>(s : UniformScope, name : string, [<Fable.Core.Inject>] ?r : Fable.Core.ITypeResolver<'a>) =
-            let t = r.Value.ResolveType()
-            
-            if t = typeof<ShaderTextureHandle> then
-                let result = ShaderTextureHandle.CreateUniform(name, s)
-                result |> unbox
-                    
-            elif t = typeof<UniformScope> then
-                s.GetChildScope name |> unbox<'a>
-            else
-                UniformStuff.Set(s, name)
-                Unchecked.defaultof<'a>
-
-    let inline (?) (s : UniformScope) (name : string) : 'a = SemanticGetter.Get<'a>(s, name)
+    let (?) (s : UniformScope) (name : string) : 'a = 
+        match UniformScope.TryCreate s with
+        | Some s ->
+            let o = obj()
+            Fable.Core.JsInterop.(?<-) o "UniformScope" s
+            Fable.Core.JsInterop.(?<-) o "Semantic" name
+            unbox o
+        | None ->
+            failwithf "not a UniforScope: %A" s
      
 
 [<AutoOpen>]

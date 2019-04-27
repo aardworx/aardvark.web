@@ -8,7 +8,7 @@ open Aardvark.Base
 open FShade
 
 [<AutoOpen>]
-module ReflectionPatterns = 
+module CoreReflectionPatterns = 
     let private getProp<'a> (name : string) (t : Type) =
         t.GetProperty(name).GetValue(null) |> unbox<'a>
 
@@ -146,7 +146,7 @@ module BasicQuotationPatterns =
                                 Some { 
                                     uniformName = pi.Name
                                     uniformType = sam.SelfType
-                                    uniformValue = Sampler(tex.Semantic, sam.State) 
+                                    uniformValue = Sampler(tex, sam.State) 
                                 } 
 
                             | None ->
@@ -192,25 +192,20 @@ module BasicQuotationPatterns =
             | PropertyGet(Some scope, p, []) when scope.Type = typeof<UniformScope> ->
                 match Expr.TryEval scope with
                     | Some scope ->
-                        let old = UniformStuff.Push()
                         let result = p.GetValue(scope, [||])
-                        match result with
-                            | :? SemanticValue as v ->
-                                Some {
-                                    uniformName = v.Semantic
-                                    uniformType = p.PropertyType
-                                    uniformValue = Attribute(v.Scope, v.Semantic)
-                                }
-                            | _ ->
-                                match UniformStuff.Pop old with
-                                    | Some (scope, name) -> 
-                                        Some {
-                                            uniformName = name
-                                            uniformType = p.PropertyType
-                                            uniformValue = Attribute(scope, name)
-                                        }
-                                    | None -> 
-                                        None
+
+                        let hasSem = Fable.Core.JsInterop.isIn "Semantic" result
+                        let hasScope = Fable.Core.JsInterop.isIn "UniformScope" result
+                        if hasSem && hasScope then
+                            let sem : string = Fable.Core.JsInterop.(?) result "UniformScope"
+                            let scope : UniformScope = Fable.Core.JsInterop.(?) result "Scope"
+                            Some {
+                                uniformName = sem
+                                uniformType = e.Type
+                                uniformValue = Attribute(scope, sem)
+                            }
+                        else
+                            None
                     | None ->
                         None
 //                with :? TargetInvocationException as ex ->
@@ -229,26 +224,19 @@ module BasicQuotationPatterns =
             | Call(None, m, [scope]) when scope.Type = typeof<UniformScope> ->
                 match Expr.TryEval scope with
                     | Some scope ->
-                        let old = UniformStuff.Push()
                         let result = m.Invoke(scope, [| |])
-                        match result with
-                            | :? SemanticValue as v ->
-                                Some {
-                                    uniformName = v.Semantic
-                                    uniformType = m.ReturnType
-                                    uniformValue = Attribute(v.Scope, v.Semantic)
-                                }
-                            | _ ->
-                                match UniformStuff.Pop old with
-                                    | Some (scope, name) -> 
-                                        Some {
-                                            uniformName = name
-                                            uniformType = m.ReturnType
-                                            uniformValue = Attribute(scope, name)
-                                        }
-                                    | None -> 
-                                        None
-
+                        let hasSem = Fable.Core.JsInterop.isIn "Semantic" result
+                        let hasScope = Fable.Core.JsInterop.isIn "UniformScope" result
+                        if hasSem && hasScope then
+                            let sem : string = Fable.Core.JsInterop.(?) result "Semantic"
+                            let scope : UniformScope = Fable.Core.JsInterop.(?) result "UniformScope"
+                            Some {
+                                uniformName = sem
+                                uniformType = e.Type
+                                uniformValue = Attribute(scope, sem)
+                            }
+                        else
+                            None
                     | None ->
                         None
 

@@ -106,7 +106,7 @@ module UtilityFunction =
         wrap f.functionArguments args f.functionBody
 
 [<AutoOpen>]
-module Helpers = 
+module OptimizerToolsHelpers = 
     module State =
         let withLocalState (m : State<'s, 'a>) =
             State.get |> State.map (fun s ->

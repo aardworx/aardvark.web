@@ -272,6 +272,8 @@ let run () =
         let t = { d with cols = d.rows; rows = d.cols }
         printfn "    member x.Transposed : %s =" (getName t)
         create true "        " t (fun r c -> sprintf "m%d%d" c r)
+        printfn "    interface NoSRTP.IHasTransposed<%s> with member x.Transposed = x.Transposed" (getName t)
+
         
 
 
@@ -301,6 +303,7 @@ let run () =
                 printfn "           m01 * m12 * m23 + m02 * m13 * m21 + m03 * m11 * m22 -"
                 printfn "           m21 * m12 * m03 - m22 * m13 * m01 - m23 * m11 * m02"
                 printfn "        )"
+            printfn "    interface NoSRTP.IHasDet<%s> with member x.Det = x.Det" d.baseType
 
 
 
@@ -374,6 +377,7 @@ let run () =
             printfn "        lu.LuFactorize(0, 1, %d, perm)" n
             printfn "        lu.LuInverse(0, 1, %d, perm, inv, 0, 1, %d)" n n
             printfn "        %s(inv)" name
+            printfn "    interface NoSRTP.IHasInverse<%s> with member x.Inverse = x.Inverse" name
             //let mutable xj = 0
             //for j in 0 .. n - 1 do
             //    let mutable xji = xj

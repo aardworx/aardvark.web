@@ -155,5 +155,5 @@ module DefaultCameraController =
             controlPan mouse
             controlZoom mouse
             controllScroll mouse time
-            time |> Mod.stepTime (fun _ dt (o : CameraView) -> o.WithLocation(Trafo3d.RotationZ(0.1 * dt).Forward.TransformPos o.Location).WithForward(Trafo3d.RotationZ(0.1 * dt).Forward.TransformDir o.Forward) ) |> Mod.constant
+            //time |> Mod.stepTime (fun _ dt (o : CameraView) -> o.WithLocation(Trafo3d.RotationZ(0.1 * dt).Forward.TransformPos o.Location).WithForward(Trafo3d.RotationZ(0.1 * dt).Forward.TransformDir o.Forward) ) |> Mod.constant
         ]

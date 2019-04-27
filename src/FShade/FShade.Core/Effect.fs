@@ -15,6 +15,9 @@ open FShade.Imperative
 
 /// Effect encapsulates a set of shaders for the various ShaderStages defined by FShade.
 type Effect internal(id : string, shaders : Lazy<Map<ShaderStage, Shader>>, composedOf : list<Effect>) =
+
+    static let effectCache = Dict<string, Effect>(Unchecked.hash, Unchecked.equals)
+
     let mutable sourceDefintion : Option<Expr * Type> = None
 
     let inputToplogy =
@@ -108,6 +111,42 @@ type Effect internal(id : string, shaders : Lazy<Map<ShaderStage, Shader>>, comp
     new(m) = Effect(Effect.NewId(), m, [])
 
 
+    /// creates an effect from a shader-function
+    static member ofFunction (shaderFunction : 'a -> Expr<'b>, [<Fable.Core.Inject>] ?ra : Fable.Core.ITypeResolver<'a>, [<Fable.Core.Inject>] ?rb : Fable.Core.ITypeResolver<'b>) =
+        let realEx = 
+            try shaderFunction Unchecked.defaultof<'a>
+            with  e -> 
+                failwithf "[FShade] failed to execute shader function.\nInner cause: %A" e
+     
+        let expression = Expr.InlineSplices realEx
+
+        let rec getRecordFields (t : Type) =
+            if FSharpType.IsRecord(t, true) then 
+                FSharpType.GetRecordFields(t, true)
+            elif t.IsGenericType then
+                match t.GetGenericArguments() with
+                    | [| t |] -> getRecordFields t
+                    | _ -> [||]
+            else 
+                [||]
+
+        let ta = ra.Value.ResolveType()
+        let tb = rb.Value.ResolveType()
+        let hash = Guid.NewGuid().ToByteArray() |> Convert.ToBase64String
+
+
+        effectCache.GetOrCreate(hash, fun _ ->
+            let map =
+                lazy (
+                    let shader = Shader.ofExpr ta expression
+                    shader |> List.map (fun s -> s.shaderStage, s) |> Map.ofList
+                )
+
+            let effect = Effect(hash, map, [])
+            effect.SourceDefintion <- Some (expression, ta)
+            effect
+        )
+
 type EffectConfig =
     {
         depthRange          : V2d
@@ -141,12 +180,10 @@ module EffectConfig =
 /// the Effect module provides functions for accessing, creating and modifying effects.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Effect =
-    let private effectCache = Dict<string, Effect>(Unchecked.hash, Unchecked.equals)
     let private composeCache = Dict<string, Effect>(Unchecked.hash, Unchecked.equals)
 
     [<CompilerMessage("clearCaches is considered harmful", 4321, IsError=false, IsHidden=true)>]
     let clearCaches() =
-        effectCache.Clear()
         composeCache.Clear()
 
     let empty = Effect("", Lazy<Map<ShaderStage, Shader>>.CreateFromValue(Map.empty), [])
@@ -248,67 +285,10 @@ module Effect =
         }
 
 
-    type OfFunctionTrampoline() =
-        /// creates an effect from a shader-function
-        static member ofFunction (shaderFunction : 'a -> Expr<'b>, [<Fable.Core.Inject>] ?ra : Fable.Core.ITypeResolver<'a>) =
-            let realEx = 
-                try shaderFunction Unchecked.defaultof<'a>
-                with  e -> 
-                    failwithf "[FShade] failed to execute shader function.\nInner cause: %A" e
-     
-            let expression = Expr.InlineSplices realEx
-
-            let rec getRecordFields (t : Type) =
-                if FSharpType.IsRecord(t, true) then 
-                    FSharpType.GetRecordFields(t, true)
-                elif t.IsGenericType then
-                    match t.GetGenericArguments() with
-                        | [| t |] -> getRecordFields t
-                        | _ -> [||]
-                else 
-                    [||]
-                    //let seq = t.GetInterface(typedefof<seq<_>>.FullName)
-                    //if not (isNull seq) then 
-                    //    getRecordFields (seq.GetGenericArguments().[0])
-                    //else
-                    //    let prim = t.GetInterface(typedefof<Primitive<_>>.Name)
-                    //    if not (isNull prim) then 
-                    //        getRecordFields (prim.GetGenericArguments().[0])
-                    //    else
-                    //        failwithf "[FShade] bad IO-type %A" t
-
-            let ta = ra.Value.ResolveType()
-            //let tb = rb.Value.ResolveType()
-
-            //let key = 
-            //    let inputFields = getRecordFields ta
-            //    let outputFields = getRecordFields tb
-        
-            //    {
-            //        inputSemantics = inputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
-            //        outputSemantics = outputFields |> Seq.map (fun f -> f.Semantic, (f.Interpolation, f.DepthWriteMode)) |> Map.ofSeq
-            //        body = expression
-            //    }
-
-            let hash = Guid.NewGuid().ToByteArray() |> Convert.ToBase64String
 
 
-            effectCache.GetOrCreate(hash, fun _ ->
-                let map =
-                    lazy (
-                        let range = expression.DebugRange
-                        let shader = Shader.ofExpr ta expression
-                        shader |> List.map (fun s -> s.shaderStage, s) |> Map.ofList
-                    )
-
-                let effect = Effect(hash, map, [])
-                effect.SourceDefintion <- Some (expression, ta)
-                effect
-            )
-
-
-    /// creates an effect from a shader-function
-    let inline ofFunction (shaderFunction : 'a -> Expr<'b>) = OfFunctionTrampoline.ofFunction(shaderFunction)
+    ///// creates an effect from a shader-function
+    //let inline ofFunction (shaderFunction : 'a -> Expr<'b>) = OfFunctionTrampoline.ofFunction(shaderFunction)
   
 
     /// gets a Map<ShaderStage, Shader> for the effect containing all Shaders.

@@ -54,8 +54,8 @@ module BufferView =
             v
 
 
-    let inline ofArray<'a when 'a :> IArrayBuffer and 'a : (static member PrimitiveType : PrimitiveType) > (arr : IMod<'a>) =
-        let t = (^a : (static member PrimitiveType : PrimitiveType) ())
+    let ofArray<'a when 'a :> IArrayBuffer> (arr : IMod<'a>) =
+        let t = arr.GetValue(AdaptiveToken.Top).ElementType
         
         {
             buffer  = toBuffer arr //|> Mod.map (fun a -> HostBuffer a :> IBuffer)
