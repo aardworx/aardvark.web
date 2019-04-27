@@ -9,7 +9,7 @@ Aardvark.Web is a project by [Aardworx](https://aardworx.com/).
 
 Simply run `build build` to compile the demo application or use `build start` to start an interactive webpack server.
 
-Linux/Max build is currently untested
+Linux/Mac build is currently untested
 
 Note that compiling might take some time, since we currently use a custom fable-compiler, which will also be built on first start.
 
