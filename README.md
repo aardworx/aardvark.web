@@ -3,6 +3,8 @@
 Aardvark.Web is an attempt to port Aardvarks core concepts to JavaScript using Fable.
 This is a very early prototype and does not provide any documentation.
 
+Aardvark.Web is a project by [Aardworx](https://aardworx.com/).
+
 ## Building
 
 on windows simply run `build build` to compile the demo application or use `build start` to start an interactive webpack server.
