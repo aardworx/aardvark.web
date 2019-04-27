@@ -194,8 +194,8 @@ module BasicQuotationPatterns =
                     | Some scope ->
                         let result = p.GetValue(scope, [||])
 
-                        let hasSem = Fable.Core.JsInterop.isIn "Semantic" result
-                        let hasScope = Fable.Core.JsInterop.isIn "UniformScope" result
+                        let hasSem = hasProperty "Semantic" result
+                        let hasScope = hasProperty "UniformScope" result
                         if hasSem && hasScope then
                             let sem : string = Fable.Core.JsInterop.(?) result "UniformScope"
                             let scope : UniformScope = Fable.Core.JsInterop.(?) result "Scope"
@@ -225,8 +225,8 @@ module BasicQuotationPatterns =
                 match Expr.TryEval scope with
                     | Some scope ->
                         let result = m.Invoke(scope, [| |])
-                        let hasSem = Fable.Core.JsInterop.isIn "Semantic" result
-                        let hasScope = Fable.Core.JsInterop.isIn "UniformScope" result
+                        let hasSem = hasProperty "Semantic" result
+                        let hasScope = hasProperty "UniformScope" result
                         if hasSem && hasScope then
                             let sem : string = Fable.Core.JsInterop.(?) result "Semantic"
                             let scope : UniformScope = Fable.Core.JsInterop.(?) result "UniformScope"

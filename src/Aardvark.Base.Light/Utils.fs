@@ -120,6 +120,8 @@ type HashCode =
 
 [<AutoOpen>]
 module CoreExtensions =
+    [<Emit("$0 in $1")>]
+    let hasProperty (name : string) (o : obj) = jsNative
 
     let resolveType (r : Option<Fable.Core.ITypeResolver<'a>>) =
         match r with

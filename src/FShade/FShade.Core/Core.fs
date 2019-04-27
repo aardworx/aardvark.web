@@ -61,8 +61,8 @@ type UniformScope private(parent : Option<UniformScope>, name : string) =
         | :? UniformScope as o ->
             Some o
         | _ ->
-            let hasScope = Fable.Core.JsInterop.isIn "UniformScope" o
-            let hasSemantic = Fable.Core.JsInterop.isIn "Semantic" o
+            let hasScope = hasProperty "UniformScope" o
+            let hasSemantic = hasProperty "Semantic" o
             if hasScope && hasSemantic then
                 let scope : UniformScope = Fable.Core.JsInterop.(?) o "UniformScope"
                 let sem : string = Fable.Core.JsInterop.(?) o "Semantic"
@@ -279,7 +279,7 @@ type SamplerBaseBuilder() =
     [<CustomOperation("texture")>]
     member x.Texture(b : TextureMustBeSpecified, t : string) =
         let t = 
-            if Fable.Core.JsInterop.isIn "Semantic" t then Fable.Core.JsInterop.(?) t "Semantic"
+            if hasProperty "Semantic" t then Fable.Core.JsInterop.(?) t "Semantic"
             else t
         
         (t, SamplerState.empty)
@@ -287,7 +287,7 @@ type SamplerBaseBuilder() =
     [<CustomOperation("textureArray")>]
     member x.TextureArray(b : TextureMustBeSpecified, t : string, count : int) =
         let t = 
-            if Fable.Core.JsInterop.isIn "Semantic" t then Fable.Core.JsInterop.(?) t "Semantic"
+            if hasProperty "Semantic" t then Fable.Core.JsInterop.(?) t "Semantic"
             else t
 
         ((t, count), SamplerState.empty)
