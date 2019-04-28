@@ -14,3 +14,5 @@ Linux/Mac build is currently untested
 Note that compiling might take some time, since we currently use a custom fable-compiler, which will also be built on first start.
 
 [![Build status](https://ci.appveyor.com/api/projects/status/4cw3da9lpajnx2rc/branch/master?svg=true)](https://ci.appveyor.com/project/krauthaufen/aardvark-web/branch/master)
+
+[![Build Status](https://travis-ci.org/aardworx/aardvark.web.svg?branch=master)](https://travis-ci.org/aardworx/aardvark.web)
