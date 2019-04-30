@@ -37,6 +37,10 @@
 	<Compile Include="Incremental\ASet\cset.fs" />
 	<Compile Include="Incremental\ASet\mset.fs" />
 	<Compile Include="Incremental\ASet\aset.fs" />
+	<Compile Include="Incremental\AMap\amapcore.fs" />
+	<Compile Include="Incremental\AMap\mmap.fs" />
+	<Compile Include="Incremental\AMap\cmap.fs" />
+	<Compile Include="Incremental\AMap\amap.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

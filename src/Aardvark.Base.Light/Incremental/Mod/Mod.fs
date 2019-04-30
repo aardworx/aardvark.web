@@ -191,6 +191,13 @@ module Mod =
         
         override x.Kind = "Mod"
         abstract member Compute : AdaptiveToken -> 'a
+        
+        member x.GetValue(token) =
+            x.EvaluateAlways token (fun token ->
+                if x.OutOfDate then
+                    cache <- x.Compute(token)
+                cache
+            )
 
         interface IMod with
             member x.ValueType = valueType
