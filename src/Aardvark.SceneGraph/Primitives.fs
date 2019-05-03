@@ -9,6 +9,8 @@ type Box3d(bmin : V3d, bMax : V3d) =
     member x.Min = bmin
     member x.Max = bMax
 
+    member x.Center = 0.5 * (bmin + bMax)
+
     member x.Size = bMax - bmin
 
     static member FromMinAndSize(min : V3d, size : V3d) =

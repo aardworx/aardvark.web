@@ -51,11 +51,13 @@ module PrimitiveType =
         | Int(true, 8) -> "Int8"
         | Int(true, 16) -> "Int16"
         | Int(true, 32) -> "Int32"
+        | Vec(Int(false, 8), d) -> sprintf "C%db" d
         | Vec(Int _, d) -> sprintf "V%di" d
         | Vec(Float 32, d) -> sprintf "V%df" d
         | Vec(Float 64, d) -> sprintf "V%dd" d
         | Mat(Float 32, r, c) -> sprintf "M%d%df" r c
         | Mat(Float 64, r, c) -> sprintf "M%d%dd" r c
+        
         | _ -> failwith ""
 
     let toTypeName (t : PrimitiveType) =
@@ -67,6 +69,7 @@ module PrimitiveType =
         | Int(true, 8) -> "int8"
         | Int(true, 16) -> "int16"
         | Int(true, 32) -> "int32"
+        | Vec(Int(false, 8), d) -> sprintf "C%db" d
         | Vec(Int _, d) -> sprintf "V%di" d
         | Vec(Float _, d) -> sprintf "V%dd" d
         | Mat(Float _, r, c) -> sprintf "M%d%dd" r c
@@ -112,48 +115,55 @@ let run() =
         printfn "    static member PrimitiveType = %s" (PrimitiveType.toCtor t)
         printfn "    member x.Length = length"
 
+        let exists = 
+            match t with
+            | Vec(Int(false, _), _) -> false
+            | _ -> true
+
         let tt = PrimitiveType.toTypeName t
-        printfn "    member x.Item"
-        printfn "        with get(i : int) ="
-        if cnt = 1 then
-            printfn "            %s" (toPublic "store.[i]")
-        else
-            printfn "            let i = %d * i" cnt
-            printfn "            %s(%s)" tt (List.init cnt (fun i -> sprintf "store.[i + %d]" i |> toPublic) |> String.concat ", ")
+        if exists then
+            printfn "    member x.Item"
+            printfn "        with get(i : int) ="
+            if cnt = 1 then
+                printfn "            %s" (toPublic "store.[i]")
+            else
+                printfn "            let i = %d * i" cnt
+                printfn "            %s(%s)" tt (List.init cnt (fun i -> sprintf "store.[i + %d]" i |> toPublic) |> String.concat ", ")
         
-        printfn "        and set(i : int) (v : %s) =" tt
-        if cnt = 1 then
-            printfn "            store.[i] <- %s" (toInternal "v")
-        else
-            printfn "            let i = %d * i" cnt
-            for i in 0 .. cnt - 1 do
-                match PrimitiveType.item i t with
-                | Some f -> 
-                    printfn "            store.[i+%d] <- %s" i (toInternal (sprintf "v.%s" f))
-                | _ ->
-                    ()
+            printfn "        and set(i : int) (v : %s) =" tt
+            if cnt = 1 then
+                printfn "            store.[i] <- %s" (toInternal "v")
+            else
+                printfn "            let i = %d * i" cnt
+                for i in 0 .. cnt - 1 do
+                    match PrimitiveType.item i t with
+                    | Some f -> 
+                        printfn "            store.[i+%d] <- %s" i (toInternal (sprintf "v.%s" f))
+                    | _ ->
+                        ()
         
         printfn "    new(cnt : int) = %sBuffer(ArrayBuffer.Create((%d * cnt)), 0, cnt)" (PrimitiveType.toBufferPrefix t) byteSize
 
-
-        printfn "    static member init (cnt : int) (creator : int -> %s) = " tt
-        printfn "        let res = %sBuffer(cnt)" (PrimitiveType.toBufferPrefix t)
-        printfn "        for i in 0 .. cnt - 1 do res.[i] <- creator i"
-        printfn "        res"
-        printfn "    static member create (cnt : int) (value : %s) = " tt
-        printfn "        let res = %sBuffer(cnt)" (PrimitiveType.toBufferPrefix t)
-        printfn "        for i in 0 .. cnt - 1 do res.[i] <- value"
-        printfn "        res"
+        if exists then
+            printfn "    static member init (cnt : int) (creator : int -> %s) = " tt
+            printfn "        let res = %sBuffer(cnt)" (PrimitiveType.toBufferPrefix t)
+            printfn "        for i in 0 .. cnt - 1 do res.[i] <- creator i"
+            printfn "        res"
+            printfn "    static member create (cnt : int) (value : %s) = " tt
+            printfn "        let res = %sBuffer(cnt)" (PrimitiveType.toBufferPrefix t)
+            printfn "        for i in 0 .. cnt - 1 do res.[i] <- value"
+            printfn "        res"
         printfn "    static member zeroCreate (cnt : int) = "
         printfn "        %sBuffer(cnt)" (PrimitiveType.toBufferPrefix t)
         
-        printfn "    static member ofArray (arr : %s[]) = " tt
-        printfn "        let res = %sBuffer(arr.Length)" (PrimitiveType.toBufferPrefix t)
-        printfn "        for i in 0 .. arr.Length - 1 do res.[i] <- arr.[i]"
-        printfn "        res"
+        if exists then
+            printfn "    static member ofArray (arr : %s[]) = " tt
+            printfn "        let res = %sBuffer(arr.Length)" (PrimitiveType.toBufferPrefix t)
+            printfn "        for i in 0 .. arr.Length - 1 do res.[i] <- arr.[i]"
+            printfn "        res"
         
-        printfn "    static member ofSeq (arr : seq<%s>) = %sBuffer.ofArray (Seq.toArray arr)" tt (PrimitiveType.toBufferPrefix t)
-        printfn "    static member ofList (arr : list<%s>) = %sBuffer.ofArray (List.toArray arr)" tt (PrimitiveType.toBufferPrefix t)
+            printfn "    static member ofSeq (arr : seq<%s>) = %sBuffer.ofArray (Seq.toArray arr)" tt (PrimitiveType.toBufferPrefix t)
+            printfn "    static member ofList (arr : list<%s>) = %sBuffer.ofArray (List.toArray arr)" tt (PrimitiveType.toBufferPrefix t)
 
         printfn "    member x.Sub(start : int, count : int) = %sBuffer(arr, byteOffset + %d*start, count)" (PrimitiveType.toBufferPrefix t) byteSize
         
@@ -165,91 +175,92 @@ let run() =
         printfn "        member x.View = store |> unbox<ArrayBufferView>"
         printfn "        member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer"
         
-        printfn "    interface IArrayBuffer<%s> with" tt
-        printfn "        member x.Item"
-        printfn "            with get(i : int) = x.[i]"
-        printfn "            and set(i : int) (v : %s) = x.[i] <- v" tt
+        if exists then
+            printfn "    interface IArrayBuffer<%s> with" tt
+            printfn "        member x.Item"
+            printfn "            with get(i : int) = x.[i]"
+            printfn "            and set(i : int) (v : %s) = x.[i] <- v" tt
 
 
 
+        if exists then
+            printfn "type %sList(initialCapacity : int) ="  (PrimitiveType.toBufferPrefix t)
+            printfn "    let mutable store = %sArray.Create ((%d * initialCapacity))" arrName cnt
+            printfn "    let mutable capacity = initialCapacity"
+            printfn "    let mutable count = 0"
+            printfn "    let resize (newCap : int) ="
+            printfn "        if newCap > capacity then"
+            printfn "            let n = %sArray.Create ((%d * newCap))" arrName cnt
+            printfn "            %sArray.Create(n.buffer, 0, (%d * capacity)).set(unbox store)" arrName cnt
+            printfn "            store <- n"
+            printfn "            capacity <- newCap"
+            printfn "        elif newCap < capacity then"
+            printfn "            let n = %sArray.Create ((%d * newCap))" arrName cnt
+            printfn "            n.set(%sArray.Create(store.buffer, 0, (%d * newCap)) |> unbox)" arrName cnt
+            printfn "            store <- n"
+            printfn "            capacity <- newCap"
         
-        printfn "type %sList(initialCapacity : int) ="  (PrimitiveType.toBufferPrefix t)
-        printfn "    let mutable store = %sArray.Create ((%d * initialCapacity))" arrName cnt
-        printfn "    let mutable capacity = initialCapacity"
-        printfn "    let mutable count = 0"
-        printfn "    let resize (newCap : int) ="
-        printfn "        if newCap > capacity then"
-        printfn "            let n = %sArray.Create ((%d * newCap))" arrName cnt
-        printfn "            %sArray.Create(n.buffer, 0, (%d * capacity)).set(unbox store)" arrName cnt
-        printfn "            store <- n"
-        printfn "            capacity <- newCap"
-        printfn "        elif newCap < capacity then"
-        printfn "            let n = %sArray.Create ((%d * newCap))" arrName cnt
-        printfn "            n.set(%sArray.Create(store.buffer, 0, (%d * newCap)) |> unbox)" arrName cnt
-        printfn "            store <- n"
-        printfn "            capacity <- newCap"
-        
-        printfn "    static member ElementSize = %d" byteSize
-        printfn "    static member PrimitiveType = %s" (PrimitiveType.toCtor t)
-        printfn "    member x.Count = count"
-        printfn "    "
-        printfn "    member x.Add(value : %s) =" tt
-        printfn "        if count >= capacity then"
-        printfn "            resize (2 * capacity)"
-        if cnt = 1 then
-            printfn "        store.[count] <- %s" (toInternal "value")
-        else 
-            printfn "        let id = %d * count" cnt
-            for i in 0 .. cnt - 1 do
-                match PrimitiveType.item i t with
-                | Some item -> 
-                    printfn "        store.[id + %d] <- %s" i (toInternal (sprintf "value.%s" item))
-                | None ->
-                    ()
-        printfn "        count <- count + 1"
+            printfn "    static member ElementSize = %d" byteSize
+            printfn "    static member PrimitiveType = %s" (PrimitiveType.toCtor t)
+            printfn "    member x.Count = count"
+            printfn "    "
+            printfn "    member x.Add(value : %s) =" tt
+            printfn "        if count >= capacity then"
+            printfn "            resize (2 * capacity)"
+            if cnt = 1 then
+                printfn "        store.[count] <- %s" (toInternal "value")
+            else 
+                printfn "        let id = %d * count" cnt
+                for i in 0 .. cnt - 1 do
+                    match PrimitiveType.item i t with
+                    | Some item -> 
+                        printfn "        store.[id + %d] <- %s" i (toInternal (sprintf "value.%s" item))
+                    | None ->
+                        ()
+            printfn "        count <- count + 1"
 
         
-        printfn "    member x.RemoveAt(index : int) ="
-        printfn "        if index >= 0 && index < count then"
-        printfn "            if index = count - 1 then"
-        printfn "                count <- count - 1"
-        printfn "            else"
-        printfn "                for i in %d * index .. %d * (count - 2) do store.[i] <- store.[i+1]" cnt cnt
-        printfn "                count <- count - 1"
+            printfn "    member x.RemoveAt(index : int) ="
+            printfn "        if index >= 0 && index < count then"
+            printfn "            if index = count - 1 then"
+            printfn "                count <- count - 1"
+            printfn "            else"
+            printfn "                for i in %d * index .. %d * (count - 2) do store.[i] <- store.[i+1]" cnt cnt
+            printfn "                count <- count - 1"
         
-        printfn "    member x.Item"
-        printfn "        with get(i : int) ="
-        if cnt = 1 then
-            printfn "            %s" (toPublic "store.[i]")
-        else
-            printfn "            let i = %d * i" cnt
-            printfn "            %s(%s)" tt (List.init cnt (fun i -> sprintf "store.[i + %d]" i |> toPublic) |> String.concat ", ")
+            printfn "    member x.Item"
+            printfn "        with get(i : int) ="
+            if cnt = 1 then
+                printfn "            %s" (toPublic "store.[i]")
+            else
+                printfn "            let i = %d * i" cnt
+                printfn "            %s(%s)" tt (List.init cnt (fun i -> sprintf "store.[i + %d]" i |> toPublic) |> String.concat ", ")
         
-        printfn "        and set(i : int) (v : %s) =" tt
-        if cnt = 1 then
-            printfn "            store.[i] <- %s" (toInternal "v")
-        else
-            printfn "            let i = %d * i" cnt
-            for i in 0 .. cnt - 1 do
-                match PrimitiveType.item i t with
-                | Some f -> 
-                    printfn "            store.[i+%d] <- %s" i (toInternal (sprintf "v.%s" f))
-                | _ ->
-                    ()
+            printfn "        and set(i : int) (v : %s) =" tt
+            if cnt = 1 then
+                printfn "            store.[i] <- %s" (toInternal "v")
+            else
+                printfn "            let i = %d * i" cnt
+                for i in 0 .. cnt - 1 do
+                    match PrimitiveType.item i t with
+                    | Some f -> 
+                        printfn "            store.[i+%d] <- %s" i (toInternal (sprintf "v.%s" f))
+                    | _ ->
+                        ()
         
-        printfn "    interface IArrayBuffer with"
-        printfn "        member x.ElementType = %s" (PrimitiveType.toCtor t)
-        printfn "        member x.Length = count"
-        printfn "        member x.Buffer = store.buffer"
-        printfn "        member x.ByteOffset = 0"
-        printfn "        member x.Sub(start : int, count : int) = %sBuffer(store.buffer, %d * start, count) :> IArrayBuffer" arrName byteSize
-        printfn "        member x.View = %sArray.Create(store.buffer, 0, (%d * count)) |> unbox<ArrayBufferView>" arrName cnt
+            printfn "    interface IArrayBuffer with"
+            printfn "        member x.ElementType = %s" (PrimitiveType.toCtor t)
+            printfn "        member x.Length = count"
+            printfn "        member x.Buffer = store.buffer"
+            printfn "        member x.ByteOffset = 0"
+            printfn "        member x.Sub(start : int, count : int) = %sBuffer(store.buffer, %d * start, count) :> IArrayBuffer" arrName byteSize
+            printfn "        member x.View = %sArray.Create(store.buffer, 0, (%d * count)) |> unbox<ArrayBufferView>" arrName cnt
 
-        printfn "    interface IArrayBuffer<%s> with" tt
-        printfn "        member x.Item"
-        printfn "            with get(i : int) = x.[i]"
-        printfn "            and set(i : int) (v : %s) = x.[i] <- v" tt
-        printfn "    new() = %sList(8)" (PrimitiveType.toBufferPrefix t)
+            printfn "    interface IArrayBuffer<%s> with" tt
+            printfn "        member x.Item"
+            printfn "            with get(i : int) = x.[i]"
+            printfn "            and set(i : int) (v : %s) = x.[i] <- v" tt
+            printfn "    new() = %sList(8)" (PrimitiveType.toBufferPrefix t)
 
     let types =
     
@@ -265,12 +276,17 @@ let run() =
             Float 32
             Float 64
         
+            Vec(Int(false, 8), 3)
+            Vec(Int(false, 8), 4)
             Vec(Int(true, 32), 2)
             Vec(Int(true, 32), 3)
             Vec(Int(true, 32), 4)
             Vec(Float 32, 2)
             Vec(Float 32, 3)
             Vec(Float 32, 4)
+            Vec(Float 64, 2)
+            Vec(Float 64, 3)
+            Vec(Float 64, 4)
             Mat(Float 32, 2, 2)
             Mat(Float 32, 2, 3)
             Mat(Float 32, 3, 3)
