@@ -5,6 +5,8 @@
     <TargetFramework>netcoreapp2.2</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="DurableDataDefs.fs" />
+    <Compile Include="DurableDataCodec.fs" />
     <Compile Include="Sample.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

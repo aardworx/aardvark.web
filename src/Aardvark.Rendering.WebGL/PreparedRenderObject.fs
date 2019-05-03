@@ -165,6 +165,9 @@ module Resources =
             | PrimitiveType.Int(false, 32) -> [ { size = 1; typ = gl.UNSIGNED_INT; norm = false; stride = 0; offset = 0 } ]
             | PrimitiveType.Float(32)      -> [ { size = 1; typ = gl.FLOAT; norm = false; stride = 0; offset = 0 } ]
 
+            | PrimitiveType.Vec(Int(false, 8), 4) -> [ { size = 0x80E1; typ = gl.UNSIGNED_BYTE; norm = true; stride = 0; offset = 0 } ]
+            | PrimitiveType.Vec(Int(false, 8), 3) -> [ { size = 3; typ = gl.UNSIGNED_BYTE; norm = true; stride = 0; offset = 0 } ]
+
             | PrimitiveType.Vec(inner, d) ->
                 match ofType gl inner with
                 | [t] -> [ { t with size = d } ]
