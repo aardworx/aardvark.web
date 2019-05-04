@@ -1262,12 +1262,14 @@ module Lod =
 
         let mv = (Sg.(<*>) model view)
         
-        let cache = 
-            Cache<'a, Promise<IRenderObject>>(fun v -> 
-                let o = cfg.manager.Prepare(cfg.signature, cfg.render t v).Value 
-                PreparedRenderObject.acquire o
-                PreparedRenderObject.update AdaptiveToken.Top o |> Prom.map (fun () -> o :> IRenderObject)
-            )
+
+        let create (v : 'a) =
+            let o = cfg.manager.Prepare(cfg.signature, cfg.render t v).Value 
+            PreparedRenderObject.acquire o
+            o, PreparedRenderObject.update AdaptiveToken.Top o
+            
+
+        let cache = Dict<'a, PreparedRenderObject * Promise<unit>>(Unchecked.hash, Unchecked.equals)
 
         let mutable delayed = HDeltaSet.empty
 
@@ -1288,8 +1290,8 @@ module Lod =
 
             let mutable deltas = delayed
             delayed <- HDeltaSet.empty
-            let emit (ops : seq<SetOperation<IRenderObject>>) =
-                let ops = HDeltaSet.ofSeq ops
+            let emit (ops : seq<SetOperation<PreparedRenderObject>>) =
+                let ops = HDeltaSet.ofSeq (ops |> Seq.map (fun o -> SetOperation(o.Value :> IRenderObject, o.Count)))
 
                 if inEval then 
                     deltas <- HDeltaSet.combine deltas ops
@@ -1308,19 +1310,21 @@ module Lod =
                         | LodTreeHelpers.Nop ->    
                             None
                         | LodTreeHelpers.Deactivate ->
-                            match cache.TryRevoke el with
-                            | Some o -> o |> Prom.map Rem |> Some
+                            match cache.TryGetValue el with
+                            | Some (o, _) -> Prom.value (Rem o) |> Some
                             | None -> None
-                        | LodTreeHelpers.Free _ ->
-                            match cache.TryRevoke el with
-                            | Some o -> o |> Prom.map Rem |> Some
+                        | LodTreeHelpers.Free a ->
+                            match cache.TryRemove el with
+                            | Some(o, _) -> PreparedRenderObject.release o; Prom.value (Rem o) |> Some
                             | None -> None
                         | LodTreeHelpers.Activate ->
-                            let o = cache.Invoke el
-                            o |> Prom.map Add |> Some
-                        | LodTreeHelpers.Alloc (v,_) ->
-                            let o = cache.Invoke el
-                            o |> Prom.map Add |> Some
+                            match cache.TryGetValue el with
+                            | Some(o, p) -> p |> Prom.map (fun () -> Add o) |> Some
+                            | None -> None
+                        | LodTreeHelpers.Alloc (v,a) ->
+                            let (o, p) = cache.GetOrCreate(el, create)
+                            if a > 0 then p |> Prom.map (fun () -> Add o) |> Some
+                            else None
                     ) |> Prom.all
                 
                 ops.``then`` emit |> ignore
@@ -1434,8 +1438,22 @@ let main argv =
 
     //w.postMessage { id = 10; data = Load "blabla" }
 
+
+
+    let query = 
+        window.location.search.Split([| '&'; '?' |], StringSplitOptions.RemoveEmptyEntries)
+        |> Array.map (fun str -> str.Split([| '=' |]))
+        |> Array.choose (fun kvp -> if kvp.Length = 2 then Some (kvp.[0], kvp.[1]) else None)
+        |> Map.ofArray
+
+    let file =
+        match Map.tryFind "blob" query with
+        | Some id -> id
+        | None -> "jbs-haus"
+
     //Time.test()
-    let db = Database "https://aardworxblobtest.blob.core.windows.net/jbs-haus/{0}?sv=2018-03-28&ss=b&srt=sco&sp=r&se=2020-05-03T17:31:38Z&st=2019-05-03T09:31:38Z&spr=https&sig=akIsUao0LL4SMyvYeC9nXTtBKesxRIZh8cz%2BskBqN2U%3D&sr=b"
+    let url = "https://aardworxblobtest.blob.core.windows.net/" + file + "/{0}?sv=2018-03-28&ss=b&srt=sco&sp=r&se=2020-05-03T17:31:38Z&st=2019-05-03T09:31:38Z&spr=https&sig=akIsUao0LL4SMyvYeC9nXTtBKesxRIZh8cz%2BskBqN2U%3D&sr=b"
+    let db = Database url
     let tree = Octree db
 
     //let set = cset()
