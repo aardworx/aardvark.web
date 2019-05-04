@@ -42,6 +42,7 @@ type PreparedRenderObject =
         call                : IResource<DrawCall>
     }
 
+    interface IRenderObject
     override x.GetHashCode() = x.id
     override x.Equals o =
         match o with

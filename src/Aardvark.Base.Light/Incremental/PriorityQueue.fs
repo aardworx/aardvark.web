@@ -172,6 +172,21 @@ type Cache<'k, 'v>(creator : 'k -> 'v) =
         !res
 
 
+    member x.TryRevoke(k : 'k) =
+        let res = ref None
+        store <- 
+            store |> HMap.alter k (fun o ->
+                match o with
+                | Some (v,1) ->
+                    res := Some v
+                    None
+                | Some (v,r) -> 
+                    res := Some v
+                    Some (v, r - 1)
+                | None ->
+                    None
+            )
+        !res
 module ChangeTracker =
     let track<'a>() : 'a -> bool =
         let old = ref None
