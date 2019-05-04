@@ -8,21 +8,21 @@ var production = process.argv.indexOf("-p") >= 0;
 
 module.exports = {
     mode: production ? "production" : "development",
-    entry: "./src/Demo/Demo.fsproj",
+    entry: {
+		bundle: "./src/Demo/Demo.fsproj",
+		worker: "./src/Worker/Worker.fsproj"
+	},
     output: {
         path: path.join(__dirname, "./public"),
-        filename: "bundle.js",
+        filename: "[name].js",
     },
     devServer: {
         contentBase: "./public",
         port: 8080,
 		host: '0.0.0.0',
-		disableHostCheck: true,
-		historyApiFallback: true,
 		headers: {
-		  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-		  'Access-Control-Allow-Headers': '*',
 		  'Access-Control-Allow-Origin': '*',
+		  'Access-Control-Allow-Headers': '*',
 		},
 
     },

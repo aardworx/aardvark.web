@@ -65,7 +65,12 @@ type ResourceCache(ctx : Context) =
     member x.GetOrCreate<'a, 'b when 'a :> IResource<'b>>(deps : list<obj>, creator : IResourceToken -> 'a) =
         let resource = 
             store.GetOrCreate(deps, fun deps ->
-                creator(new ResourceCacheEntry(x, deps) :> IResourceToken) :> IResource
+                let r = creator(new ResourceCacheEntry(x, deps) :> IResourceToken) :> IResource
+                
+                // TODO: resource leak!!!!!
+                132421123
+                r.Acquire()
+                r
             )
 
         unbox<IResource<'b>> resource
@@ -155,7 +160,8 @@ type AbstractResource<'a>(entry : IDisposable) =
                         promise <- Some p
                         p
                     else
-                        failwith "strange"
+                        Prom.value ()
+                        //failwith "strange"
                 
 
 

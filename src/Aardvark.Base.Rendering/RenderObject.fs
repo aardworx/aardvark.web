@@ -10,6 +10,9 @@ type PipelineState =
         depthMode       : IMod<DepthTestMode>
         uniforms        : string -> Option<IMod>
     }
+
+type IRenderObject = interface end
+
 [<CustomEquality; CustomComparison>]
 type RenderObject =
     {
@@ -21,6 +24,7 @@ type RenderObject =
         call            : IMod<DrawCall>
     }
     
+    interface IRenderObject
     
     override x.GetHashCode() = x.id
     override x.Equals o =

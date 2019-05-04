@@ -413,10 +413,13 @@ type RenderObjectFragment(o : PreparedRenderObject) =
         
 
     member x.Run() =
+        let mutable count = 0
         let mutable c = x
         while unbox c do 
             c.RunSingle()
+            count <- count + 1
             c <- c.Next
+
 
     member x.Prev
         with get() = prev
@@ -459,7 +462,7 @@ module SymbolHelpers =
     [<Emit(@"delete $0[$1]")>]
     let delete (o : obj) (str : Symbol) : unit = jsNative
 
-type RenderTask(signature : FramebufferSignature, manager : ResourceManager, objects : aset<RenderObject>) =
+type RenderTask(signature : FramebufferSignature, manager : ResourceManager, objects : aset<IRenderObject>) =
     inherit DirtyTrackingAdaptiveObject<IResource>("Resource")
     
     let mutable inRender = true
@@ -472,7 +475,13 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
             o.id :> obj
         ]
 
-    let preparedObjects = objects |> ASet.choose (fun o -> manager.Prepare(signature, o))
+    let preparedObjects = 
+        objects |> ASet.choose (fun o -> 
+            match o with
+            | :? RenderObject as o -> manager.Prepare(signature, o)
+            | _ -> Some (unbox<PreparedRenderObject> o)
+        )
+
     let reader = preparedObjects.GetReader()
     let allResources = Dict<IResource, int>(Unchecked.hash, Unchecked.equals)
 
@@ -511,6 +520,8 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
         x.EvaluateAlways' token (fun token dirty ->
             let mutable dirty = HRefSet.ofSeq dirty
             let ops = reader.GetOperations token
+
+
             inRender <- true
             for o in ops do
                 match o with

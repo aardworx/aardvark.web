@@ -17,8 +17,10 @@ type TraversalState =
         depthMode           : IMod<DepthTestMode>
     }
 
+
+
 type ISg =
-    abstract member RenderObjects : TraversalState -> aset<RenderObject>
+    abstract member RenderObjects : TraversalState -> aset<IRenderObject>
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]    
 module Sg =
@@ -26,7 +28,7 @@ module Sg =
     let private cameraLocationCache : Aardvark.Import.JS.WeakMap<IMod, IMod<V3d>> = Aardvark.Import.JS.WeakMap.Create() |> unbox
 
 
-    let inline private (<*>) (l : IMod<Trafo3d>) (r : IMod<Trafo3d>) =
+    let (<*>) (l : IMod<Trafo3d>) (r : IMod<Trafo3d>) =
         if l.IsConstant && r.IsConstant then
             Mod.constant (l.GetValue(AdaptiveToken.Top) * r.GetValue(AdaptiveToken.Top))
         else
@@ -100,7 +102,7 @@ module Sg =
 
     [<AbstractClass>]
     type ASg() =
-        abstract member RenderObjects : TraversalState -> aset<RenderObject>
+        abstract member RenderObjects : TraversalState -> aset<IRenderObject>
         interface ISg with
             member x.RenderObjects s = x.RenderObjects s
 
@@ -144,14 +146,16 @@ module Sg =
                 |> Map.add "ViewTrafo" (state.viewTrafo :> IMod)
                 |> Map.add "ProjTrafo" (state.projTrafo :> IMod)
 
-            ASet.single {
-                id = newId()
-                pipeline = { shader = state.shader; uniforms = getUniform uniforms; depthMode = state.depthMode }
-                vertexBuffers = state.vertexAttriubtes
-                indexBuffer = state.indexBuffer
-                mode = mode
-                call = call
-            }
+            let o =
+                {
+                    id = newId()
+                    pipeline = { shader = state.shader; uniforms = getUniform uniforms; depthMode = state.depthMode }
+                    vertexBuffers = state.vertexAttriubtes
+                    indexBuffer = state.indexBuffer
+                    mode = mode
+                    call = call
+                } :> IRenderObject
+            ASet.single o
 
     type VertexAttributeApplicator(name : string, att : BufferView, sg : ISg) =
         inherit ASg()
