@@ -2,7 +2,7 @@
 setlocal enableextensions enabledelayedexpansion
 PUSHD %~dp0
 
-if NOT exist .paket\Paket.Restore.targets (
+if NOT exist .paket-files (
 	powershell write-host -fore Red paket restore
 	.paket\paket.exe restore
 	if errorlevel 1 (
