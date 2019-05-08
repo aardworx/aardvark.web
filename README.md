@@ -4,6 +4,7 @@ Aardvark.Web is an attempt to port Aardvarks core concepts to JavaScript using F
 This is a very early prototype and does not provide any documentation.
 
 Aardvark.Web is a project by [Aardworx](https://aardworx.com/).
+Works with [FShade](https://fshade.org/). Check it out at [FShade repl](https://fshade.org/repl).
 
 ## Building
 
