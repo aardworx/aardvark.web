@@ -215,9 +215,9 @@ module Compiler =
 
         | _ -> failwithf "bad uniform type : %A" typ
 
-    let compile (o : PreparedRenderObject) =
-        let gl = o.program.Context.GL
 
+    let setPipelineState (o : PreparedPipelineState) =
+        let gl = o.program.Context.GL
         [|
             //Log.start "init(%d)" o.id
             //Log.line "set program"
@@ -240,21 +240,7 @@ module Compiler =
                 yield fun () -> 
                     let b = b.Handle.Value
                     gl.bindBufferRange(gl.UNIFORM_BUFFER, float id, b.Handle, float b.Offset, float b.Size)
-
-            // bind buffers
-            for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
-                //Log.line "set VB %d" id
-                yield fun () -> 
-                    let b = b.Handle.Value
-                    gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
-                    let mutable mid = id
-                    for att in atts do
-                        let id = mid
-                        gl.enableVertexAttribArray(float id)
-                        gl.vertexAttribPointer(float id, float att.size, att.typ, att.norm, float att.stride, float att.offset)
-                        mid <- mid + 1
-                    gl.bindBuffer(gl.ARRAY_BUFFER, null)
-
+                    
             for (id, (loc, tex, sam)) in Map.toSeq o.samplers do
                 let r = tex.Handle
                 match sam with
@@ -274,26 +260,13 @@ module Compiler =
             for (loc, (typ,r)) in o.uniforms do
                 yield setUniform gl typ loc r.Handle
 
-            match o.indexBuffer with
-            | Some (ib, info) ->
-                yield fun () ->
-                    let call = o.call.Handle.Value
-                    let ib = ib.Handle.Value
-                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib.Handle)
-                    gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
-            | None ->
-                yield fun () ->
-                    let call = o.call.Handle.Value
-                    gl.drawArrays(o.mode, float call.first, float call.faceVertexCount)
-
-            //Log.stop()
+        
         |]
+        
 
-    let compileDiff (prev : PreparedRenderObject) (o : PreparedRenderObject) =
+
+    let updatePipelineState (prev : PreparedPipelineState) (o : PreparedPipelineState) =
         let gl = o.program.Context.GL
-
-        //compile o
-
         [|
             //Log.start "compile(%d, %d)" prev.id o.id
             if prev.program.Handle <> o.program.Handle then
@@ -309,7 +282,7 @@ module Compiler =
                         gl.depthFunc(m)
                     | None ->
                         gl.disable(gl.DEPTH_TEST)
-            
+                    
             // bind uniforms
             for (id, b) in Map.toSeq o.uniformBuffers do
                 match Map.tryFind id prev.uniformBuffers with
@@ -321,25 +294,6 @@ module Compiler =
                         let b = b.Handle.Value
                         gl.bindBufferRange(gl.UNIFORM_BUFFER, float id, b.Handle, float b.Offset, float b.Size)
 
-            // bind buffers
-            for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
-                match Map.tryFind id prev.vertexBuffers with
-                | Some (ob,oa) when ob.Handle = b.Handle && oa = atts ->
-                    ()
-                | _ -> 
-                    //Log.line "set VB %d" id
-                    yield fun () -> 
-                        let b = b.Handle.Value
-                        gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
-                        let mutable id = id
-                        for att in atts do
-                            gl.enableVertexAttribArray(float id)
-                            gl.vertexAttribPointer(float id, float att.size, att.typ, att.norm, float att.stride, float att.offset)
-                            id <- id + 1
-                        gl.bindBuffer(gl.ARRAY_BUFFER, null)
-
-
-            
             let eq (l : Option<IResource<Sampler>>) (r : Option<IResource<Sampler>>) =
                 match l, r with
                 | Some l, Some r -> l.Handle = r.Handle
@@ -365,7 +319,7 @@ module Compiler =
                             gl.activeTexture(gl.TEXTURE0 + float id)
                             gl.uniform1i(loc, float id)
                             gl.bindTexture(gl.TEXTURE_2D, r.Value.Handle)
-                        
+            
             for (loc, (typ,r)) in o.uniforms do
                 match HMap.tryFind loc prev.uniforms with
                 | Some (tt, tr) when typ = tt && tr.Handle = r.Handle ->
@@ -373,6 +327,80 @@ module Compiler =
                 | _ -> 
                     yield setUniform gl typ loc r.Handle
 
+        |]
+        
+
+    let render (o : PreparedRenderObject) =
+        let gl = o.pipeline.program.Context.GL
+
+        [|
+            // bind buffers
+            for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
+                //Log.line "set VB %d" id
+                yield fun () -> 
+                    let b = b.Handle.Value
+                    gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
+                    let mutable mid = id
+                    for att in atts do
+                        let id = mid
+                        gl.enableVertexAttribArray(float id)
+                        gl.vertexAttribPointer(float id, float att.size, att.typ, att.norm, float att.stride, float att.offset)
+                        mid <- mid + 1
+                    gl.bindBuffer(gl.ARRAY_BUFFER, null)
+
+            match o.indexBuffer with
+            | Some (ib, info) ->
+                let h = o.call.Handle
+                let ib = ib.Handle
+                yield fun () ->
+                    let call = h.Value
+                    let ib = ib.Value
+                    if unbox ib && unbox call then
+                        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib.Handle)
+                        gl.drawElements(o.mode, float call.faceVertexCount, info.typ, float (info.offset + call.first * info.size))
+            | None ->
+                let h = o.call.Handle
+                yield fun () ->
+                    let call = h.Value
+                    if unbox call then
+                        gl.drawArrays(o.mode, float call.first, float call.faceVertexCount)
+
+            //Log.stop()
+        |]
+
+    let compile (o : PreparedRenderObject) =
+        let gl = o.pipeline.program.Context.GL
+
+        [|
+            yield! setPipelineState o.pipeline
+            yield! render o
+        |]
+
+    let compileDiff (prev : PreparedRenderObject) (o : PreparedRenderObject) =
+        let gl = o.pipeline.program.Context.GL
+
+        [|
+            yield! updatePipelineState prev.pipeline o.pipeline
+          
+            // bind buffers
+            for (id, (b, atts)) in Map.toSeq o.vertexBuffers do
+                match Map.tryFind id prev.vertexBuffers with
+                | Some (ob,oa) when ob.Handle = b.Handle && oa = atts ->
+                    ()
+                | _ -> 
+                    //Log.line "set VB %d" id
+                    yield fun () -> 
+                        let b = b.Handle.Value
+                        gl.bindBuffer(gl.ARRAY_BUFFER, b.Handle)
+                        let mutable id = id
+                        for att in atts do
+                            gl.enableVertexAttribArray(float id)
+                            gl.vertexAttribPointer(float id, float att.size, att.typ, att.norm, float att.stride, float att.offset)
+                            id <- id + 1
+                        gl.bindBuffer(gl.ARRAY_BUFFER, null)
+
+
+            
             match prev.indexBuffer, o.indexBuffer with
             | Some (ob,oi), Some (ib, info) when ib.Handle = ob.Handle && oi = info ->
                 
@@ -398,8 +426,48 @@ module Compiler =
         |]
 
 
+type RenderObjectCommand(manager : ResourceManager, prep : PreparedRenderObject) =
+    inherit PreparedCommand(manager)
+
+    member x.Object = prep
+
+    override x.Resources = PreparedRenderObject.resources prep
+    override x.ExitState = prep.pipeline
+    override x.Acquire() = PreparedRenderObject.acquire prep
+    override x.Release() = PreparedRenderObject.release prep
+    override x.Update(token : AdaptiveToken) = PreparedRenderObject.update token prep
+    override x.Compile(prev : Option<PreparedCommand>) = 
+        match prev with
+        | Some prev ->
+            match prev with
+            | :? RenderObjectCommand as prev -> Compiler.compileDiff prev.Object prep
+            | _ -> 
+                FSharp.Collections.Array.append
+                    (Compiler.updatePipelineState prev.ExitState prep.pipeline)
+                    (Compiler.render prep)
+        | None ->
+            Compiler.compile prep
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module PreparedCommand =
+    let ofRenderObject (manager : ResourceManager) (signature : FramebufferSignature) (obj : IRenderObject) =
+        match obj with
+        | :? RenderObject as o ->
+            match manager.Prepare(signature, o) with
+            | Some p -> RenderObjectCommand(manager, p) :> PreparedCommand |> Some
+            | _ -> None
+        | :? PreparedRenderObject as o ->
+            RenderObjectCommand(manager, o) :> PreparedCommand |> Some
+
+        | :? PreparedCommand as o ->
+            o |> Some
+
+        | _ ->
+            failwithf "bad renderobject: %A" obj
+
+
 [<AllowNullLiteral>]
-type RenderObjectFragment(o : PreparedRenderObject) =
+type RenderObjectFragment(o : PreparedCommand) =
     let mutable prev : RenderObjectFragment = null
     let mutable next : RenderObjectFragment = null
     let mutable execute : array<unit -> unit> = [||]
@@ -437,9 +505,9 @@ type RenderObjectFragment(o : PreparedRenderObject) =
             prevChanged <- false
             if unbox prev then
                 let prev = prev.Object
-                execute <- Compiler.compileDiff prev o
+                execute <- o.Compile(Some prev)
             else
-                execute <- Compiler.compile o
+                execute <- o.Compile(None)
 
     interface ILinked with
         member x.Update(t) = 
@@ -466,20 +534,21 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
     inherit DirtyTrackingAdaptiveObject<IResource>("Resource")
     
     let mutable inRender = true
-    let trie = Trie<obj, PreparedRenderObject>(fun o -> RenderObjectFragment(o) :> ILinked)
+    let trie = Trie<obj, PreparedCommand>(fun o -> RenderObjectFragment(o) :> ILinked)
 
-    let getKey (o : PreparedRenderObject) =
+    let getKey (o : PreparedCommand) =
         [
-            o.vertexBuffers |> Map.toList |> List.map (fun (i,(b,d)) -> i, b.Handle, d) :> obj
-            o.program :> obj
-            o.id :> obj
+            o.ExitState.program :> obj
+            //o.vertexBuffers |> Map.toList |> List.map (fun (i,(b,d)) -> i, b.Handle, d) :> obj
+            o.Id :> obj
         ]
 
     let preparedObjects = 
         objects |> ASet.choose (fun o -> 
-            match o with
-            | :? RenderObject as o -> manager.Prepare(signature, o)
-            | _ -> Some (unbox<PreparedRenderObject> o)
+            PreparedCommand.ofRenderObject manager signature o
+            //match o with
+            //| :? RenderObject as o -> manager.Prepare(signature, o)
+            //| _ -> Some (unbox<PreparedRenderObject> o)
         )
 
     let reader = preparedObjects.GetReader()
@@ -526,27 +595,30 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
             for o in ops do
                 match o with
                 | Add(_,o) ->
-                    PreparedRenderObject.acquire o
-                    for r in PreparedRenderObject.resources o do
+                    o.Acquire()
+                    let res = System.Collections.Generic.List<IResource>()
+                    for r in o.Resources do
                         if addResource r then
+                            res.Add r
                             ()
                             //dirty <- HRefSet.add r dirty
 
                     o?(sym) <- true
 
-                    (PreparedRenderObject.update token o).``then``(fun () ->
+                    res |> Seq.map (fun r -> r.Update token) |> Prom.all |> Prom.map (fun _ ->
                         if o?(sym) then
                             trie.Add(getKey o, o) |> ignore
                             if not inRender then transact x.MarkOutdated
                     ) |> ignore
+
                     
                 | Rem(_,o) ->
                     delete o sym
                     trie.Remove(getKey o) |> ignore
-                    for r in PreparedRenderObject.resources o do
+                    for r in o.Resources do
                         if removeResource x r then
                             dirty <- HRefSet.remove r dirty
-                    PreparedRenderObject.release o
+                    o.Release()
 
             inRender <- false
 
@@ -566,7 +638,7 @@ type RenderTask(signature : FramebufferSignature, manager : ResourceManager, obj
 
     member x.Dispose() =
         for o in reader.State do
-            PreparedRenderObject.release o
+            o.Release()
 
         reader.Dispose()
         allResources.Clear()

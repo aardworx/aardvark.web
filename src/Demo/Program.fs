@@ -6,6 +6,9 @@ open Aardvark.Base.Incremental
 open Aardvark.SceneGraph
 open Aardvark.Rendering.WebGL
 open Aardvark.Import.Browser
+open Aardvark.Data
+open Microsoft.FSharp.Collections
+
 
 type RenderCommand =
     | Render of aset<RenderObject>
@@ -15,6 +18,17 @@ type RenderCommand =
 
 module FShadeTest =
     open FShade
+
+    
+    type SimpleVertex = 
+        { 
+            [<Position>] pos : V4d
+            [<Color>] c : V4d
+            [<Semantic("WorldPos")>] wp : V4d
+            [<Normal>] n : V3d 
+            [<TexCoord>] tc : V2d 
+        }
+
     type Vertex = 
         { 
             [<Position>] pos : V4d
@@ -24,6 +38,8 @@ module FShadeTest =
             [<TexCoord>] tc : V2d 
             [<PointSize>] s : float
             [<PointCoord>] pc : V2d
+            [<FragCoord>] fc : V4d
+            depthRange : float
         }
         
     type MyRecord = { ambient : float; diffuse : float }
@@ -34,6 +50,7 @@ module FShadeTest =
 
     type UniformScope with
         member x.Ambient : MyUnion = uniform?Ambient
+        member x.ShowColor : bool = uniform?ShowColor
 
     let sammy =
         sampler2d {
@@ -55,14 +72,81 @@ module FShadeTest =
     let trafo (v : Vertex) =
         vertex {
             let wp = uniform.ModelTrafo * v.pos
-            return { v with pos = uniform.ViewProjTrafo * wp; wp = wp; n = Vec.normalize (uniform.NormalMatrix * v.n); s = 10.0 }
+            return { 
+                v with 
+                    pos = uniform.ViewProjTrafo * wp
+                    wp = wp
+                    n = Vec.normalize (uniform.NormalMatrix * v.n)
+                    s = 1.0
+            }
         }
 
+    let depthVertex (v : Vertex) =
+        vertex {
+            
+            let wp = uniform.ModelTrafo * v.pos
+            let vp = uniform.ModelViewTrafo * v.pos
+            let pos = uniform.ProjTrafo * vp
+
+            let pixelSize = 9.0 * (float uniform.ViewportSize.X / 1300.0)
+            let ndcRadius = pixelSize / V2d uniform.ViewportSize
+
+            let pp = pos.XYZ / pos.W
+            let ppx = uniform.ProjTrafoInv * V4d(pp + V3d(ndcRadius.X, 0.0, 0.0), 1.0)
+            let ppy = uniform.ProjTrafoInv * V4d(pp + V3d(0.0, ndcRadius.Y, 0.0), 1.0)
+            let vpx = ppx / ppx.W
+            let vpy = ppy / ppy.W
+            let vr = 0.5 * (Vec.length (vpx - vp) + Vec.length (vpy - vp))
+
+            let ppz = uniform.ProjTrafo * (vp - V4d(0.0, 0.0, vr, 0.0))
+            let ppz = ppz.XYZ / ppz.W
+
+            let depthRange = abs (ppz.Z - pp.Z)
+
+            return {
+                v with
+                    pos = pos
+                    wp = wp
+                    depthRange = depthRange
+                    n = Vec.normalize (uniform.NormalMatrix * v.n)
+                    s = pixelSize
+            }
+        }
+
+    type Fragment =
+        {
+            [<Color>] c : V4d
+            [<Depth>] d : float
+        }
+
+
+
     let circularPoint (v : Vertex) =
-        fragment {
+        fragment {  
             let c = 2.0 * v.pc - V2d.II
-            if c.LengthSquared > 1.0 then discard()
-            return v.c
+            let f = Vec.dot c c - 1.0
+            if f > 0.0 then discard()
+
+            let z = sqrt (-f)
+            let n = V3d(c, z)
+
+            let newDepth = v.fc.Z - v.depthRange * z
+
+
+            let c =
+                if uniform.ShowColor then v.c.XYZ
+                else V3d.III
+
+            return { c = V4d(c * z, 1.0); d = newDepth }
+
+            //let sn = 0.5 * (V3d(c, sqrt (1.0 - l2)) + V3d.III)
+            //return V4d(sn, 1.0)
+
+            //let n = Vec.normalize v.n
+            //let c = uniform.CameraLocation - v.wp.XYZ |> Vec.normalize
+            //let d = abs (Vec.dot n c)
+
+            //return V4d((0.2 + 0.8 * d) * V3d.III, 1.0)
         }
 
     [<GLSLIntrinsic("mix({0}, {1}, {2})")>]
@@ -647,650 +731,55 @@ module Time =
                 iter
             )
 
-open Aardvark.Import.JS
-open Microsoft.FSharp.Collections
-open System
 
 
-
-type Database(urlFormat : string) =
-    
-    member x.GetString(file : string) =
-        let url = System.String.Format(urlFormat, file)
-        Prom.fetchBuffer url |> Prom.map (fun data ->
-            let arr = Uint8Array.Create(data, 0, data.byteLength)
-            System.Text.Encoding.UTF8.GetString (unbox<byte[]> arr)
-        )
-    member x.Get(file : string) =
-        let url = System.String.Format(urlFormat, file)
-        Prom.fetchBuffer url |> Prom.map (fun data ->
-            let s = Aardvark.Data.Stream(data)
-            Aardvark.Data.DurableDataCodec.decode s
-        )
-
-    member inline x.TryGet<'a>(file : string) =
-        x.Get(file) |> Prom.map (fun (def,o) ->
-            match o with
-            | :? 'a as o -> Some o
-            | _ -> None
-        )
-
-
-
-[<AutoOpen>]
-module Octree =
-    open Aardvark.Data
-    open Aardvark.Data.Durable
-
-    let inline private tryGet<'a> (def : Def) (m : Map<Def, obj>) =
-        match Map.tryFind def m with
-        | Some (:? 'a as o) -> Some o
-        | Some o -> Log.warn "bad type for %A %A" def o; None
-        | _ -> None
-        
-    let inline private get<'a> (def : Def) (m : Map<Def, obj>) =
-        match Map.tryFind def m with
-        | Some (:? 'a as o) -> o
-        | Some o -> Log.warn "bad type for %A %A" def o; failwithf "[Octree] could not get %s" def.Name
-        | _ -> failwithf "[Octree] could not get %s" def.Name
-            
-
-    type Octnode(db : Database, dbid : Guid, level : int, m : Map<Def, obj>) =
-        let mutable colorsRepaired = false
-        let mutable subNodes : Option<Promise<Octnode>>[] = null
-
-        let repairColors3 (b : C3bBuffer) =  
-            if not colorsRepaired then
-                colorsRepaired <- true
-                let rgbs = Uint8Array.Create((b :> IArrayBuffer).Buffer, (b :> IArrayBuffer).ByteOffset, b.Length * 3)
-                let mutable o = 0
-                for i in 0 .. b.Length - 1 do
-                    let b = rgbs.[o+0]
-                    rgbs.[o+0] <- rgbs.[o+2]
-                    rgbs.[o+2] <- b
-                    o <- o + 3
-            b
-
-        override x.GetHashCode() = dbid.GetHashCode()
-        override x.Equals o =
-            match o with
-            | :? Octnode as o -> dbid = o.Id
-            | _ -> false
-
-        override x.ToString() =
-            sprintf "%A(%d)" dbid level
-
-        member x.Id = dbid 
-
-        member x.TryPositionsLocal = tryGet<V3fBuffer> Octree.PositionsLocal3f m
-
-        member x.TryNormals = 
-            match tryGet<V3fBuffer> Octree.Normals3f m with
-            | Some v -> Some v
-            | None ->
-                match tryGet<Int8Buffer> Octree.Normals3sb m with
-                | Some b ->
-                    let v3 = V3fBuffer.init b.Length (fun i -> V3d(float b.[3*i+0] / 127.0, float b.[3*i+1] / 127.0, float b.[3*i+2] / 127.0))
-                    Some v3
-                | None ->
-                    None
-
-        member x.TryColors = tryGet<C3bBuffer> Octree.Colors3b m |> FSharp.Core.Option.map repairColors3
-
-        member x.TryMinTreeDepth = tryGet<int> Octree.MinTreeDepth m
-        member x.TryMaxTreeDepth = tryGet<int> Octree.MaxTreeDepth m
-        member x.TryAvgPointDistance = tryGet<float32> Octree.AveragePointDistance m
-        member x.TryAvgPointDistanceStdDev = tryGet<float32> Octree.AveragePointDistanceStdDev m
-        member x.TryPointCountCell = tryGet<int> Octree.PointCountCell m
-        member x.TryCell = tryGet<Cell> Octree.Cell m
-
-        member x.PositionsLocal =
-            match x.TryPositionsLocal with
-            | Some v -> v
-            | None -> failwith "[Octree] could not get positions"
-            
-        member x.Normals =
-            match x.TryNormals with
-            | Some v -> v
-            | None -> failwith "[Octree] could not get normals"
-            
-        member x.Colors =
-            match x.TryColors with
-            | Some c -> c
-            | None -> failwith "[Octree] could not get colors"
-
-
-        member x.MinTreeDepth = get<int> Octree.MinTreeDepth m
-        member x.MaxTreeDepth = get<int> Octree.MaxTreeDepth m
-        member x.AvgPointDistance = get<float32> Octree.AveragePointDistance m
-        member x.AvgPointDistanceStdDev = get<float32> Octree.AveragePointDistanceStdDev m
-        member x.PointCountCell = get<int> Octree.PointCountCell m
-        member x.Cell = get<Cell> Octree.Cell m
-        member x.BoundingBox = get<Box3d> Octree.BoundingBoxExactGlobal m
-        member x.SubNodeIds =
-            match tryGet<Guid[]> Octree.SubnodesGuids m with
-            | Some arr -> arr
-            | None -> [||]
-
-        member x.SubNodes =
-            match subNodes with
-            | null ->
-                let promises = 
-                    x.SubNodeIds |> Array.map (fun id ->
-                        if id <> Guid.Empty then
-                            let prom = 
-                                db.Get(string id) |> Prom.map (fun (def, data) ->
-                                    if def <> Octree.Node then 
-                                        Log.warn "unexpected data: %A" def
-                                        Unchecked.defaultof<_>
-                                    else
-                                        let d = unbox<Map<Def, obj>> data
-                                        Octnode(db, id, level + 1, d)
-                                )
-                            Some prom
-                        else
-                            None
-                    )
-                subNodes <- promises
-                promises
-            | ps ->
-                ps
-
-        member x.GetNodes(level : int) =
-            if level <= 0 then
-                Prom.value ([|x|])
-            elif x.SubNodeIds.Length > 0 then
-                x.SubNodes |> Array.choose id |> Prom.all |> Prom.bind (fun cs ->
-                    cs |> Seq.map (fun n -> n.GetNodes(level-1)) |> Prom.all |> Prom.map (Seq.concat >> Seq.toArray)
-                )
-            else
-                Prom.value ([|x|])
-                
-
-
-    type Octree(db : Database) =
-        let root = 
-            db.GetString("root.json") |> Prom.bind (fun str ->
-                let obj = JSON.parse str
-                console.warn obj
-                let id : Guid = Fable.Core.JsInterop.(?) obj "RootId"
-                db.Get(string id) |> Prom.map (fun (def, data) ->
-                    if def <> Octree.Node then 
-                        Log.warn "unexpected data: %A" def
-                        Unchecked.defaultof<_>
-                    else
-                        let d = unbox<Map<Def, obj>> data
-                        Octnode(db, id, 0, d)
-                )
-            )
-        member x.Root = root
-        
-        member x.GetNodes(level : int) =
-            root |> Prom.bind (fun r -> r.GetNodes(level))
-
-let render (rootCenter : V3d) (n : Octnode) =
-    let loc = n.PositionsLocal
-    let off = n.Cell.Center - rootCenter
-    Sg.draw PrimitiveTopology.PointList
-    |> Sg.vertexAttribute "Positions" (V3fBuffer.init loc.Length (fun i -> loc.[i] + off))
-    |> Sg.vertexAttribute "Colors" n.Colors
-
-
-type Config<'a> =
-    {
-        time        : IMod<float>
-        signature   : FramebufferSignature
-        manager     : ResourceManager
-        render      : TraversalState -> 'a -> RenderObject
-        quality     : Trafo3d -> 'a -> float
-        children    : 'a -> array<Promise<'a>>
-    }
 
 module Lod =
-    open System.Collections.Generic
-
-    [<AutoOpen>]
-    module LodTreeHelpers =
-    
-        module HMap =
-            let keys (m : hmap<'a, 'b>) =
-                HSet.ofSeq (Seq.map fst (HMap.toSeq m))
-    
-            let applySetDelta (set : hdeltaset<'a>) (value : 'b) (m : hmap<'a, 'b>) =
-                let delta = 
-                    set |> HDeltaSet.toHMap |> HMap.map (fun e r ->
-                        if r > 0 then ElementOperation.Set value
-                        else ElementOperation.Remove
-                    )
-                HMap.applyDelta m delta |> fst
-    
-    
-    
-        [<StructuredFormatDisplay("{AsString}")>]
-        type Operation<'a> =
-            {
-                alloc   : int
-                active  : int
-                value   : Option<'a>
-            }
-    
-    
-            member x.Inverse =
-                {
-                    alloc = -x.alloc
-                    active = -x.active
-                    value = x.value
-                }
-            
-            member x.ToString(name : string) =
-                if x.alloc > 0 then 
-                    if x.active > 0 then sprintf "alloc(%s, +1)" name
-                    elif x.active < 0 then sprintf "alloc(%s, -1)" name
-                    else sprintf "alloc(%s)" name
-                elif x.alloc < 0 then sprintf "free(%s)" name
-                elif x.active > 0 then sprintf "activate(%s)" name
-                elif x.active < 0 then sprintf "deactivate(%s)" name
-                else sprintf "nop(%s)" name
-    
-            override x.ToString() =
-                if x.alloc > 0 then 
-                    if x.active > 0 then sprintf "alloc(%A, +1)" x.value.Value
-                    elif x.active < 0 then sprintf "alloc(%A, -1)" x.value.Value
-                    else sprintf "alloc(%A)" x.value.Value
-                elif x.alloc < 0 then "free"
-                elif x.active > 0 then "activate"
-                elif x.active < 0 then "deactivate"
-                else "nop"
-    
-            member private x.AsString = x.ToString()
-    
-            static member Zero : Operation<'a> = { alloc = 0; active = 0; value = None }
-    
-            static member Nop : Operation<'a> = { alloc = 0; active = 0; value = None }
-            static member Alloc(value, active) : Operation<'a> = { alloc = 1; active = (if active then 1 else 0); value = Some value }
-            static member Free : Operation<'a> = { alloc = -1; active = -1; value = None }
-            static member Activate : Operation<'a> = { alloc = 0; active = 1; value = None }
-            static member Deactivate : Operation<'a> = { alloc = 0; active = -1; value = None }
-    
-            static member (+) (l : Operation<'a>, r : Operation<'a>) =
-                {
-                    alloc = l.alloc + r.alloc
-                    active = l.active + r.active
-                    value = match r.value with | Some v -> Some v | None -> l.value
-                }
-    
-        let Nop<'a> = Operation<'a>.Nop
-        let Alloc(v,a) = Operation.Alloc(v,a)
-        let Free<'a> = Operation<'a>.Free
-        let Activate<'a> = Operation<'a>.Activate
-        let Deactivate<'a> = Operation<'a>.Deactivate
-    
-        let (|Nop|Alloc|Free|Activate|Deactivate|) (o : Operation<'a>) =
-            if o.alloc > 0 then Alloc(o.value.Value, o.active)
-            elif o.alloc < 0 then Free(o.active)
-            elif o.active > 0 then Activate
-            elif o.active < 0 then Deactivate
-            else Nop
-            
-        [<StructuredFormatDisplay("{AsString}")>]
-        type AtomicOperation<'a, 'b> =
-            {
-                keys : hset<'a>
-                ops : hmap<'a, Operation<'b>>
-            }
-                
-            override x.ToString() =
-                x.ops 
-                |> Seq.map (fun (a, op) -> op.ToString(sprintf "%A" a)) 
-                |> String.concat "; " |> sprintf "atomic [%s]"
-    
-            member private x.AsString = x.ToString()
-    
-            member x.Inverse =
-                {
-                    keys = x.keys
-                    ops = x.ops |> HMap.map (fun _ o -> o.Inverse)
-                }
-    
-            static member Empty : AtomicOperation<'a, 'b> = { keys = HSet.empty; ops = HMap.empty }
-            static member Zero : AtomicOperation<'a, 'b> = { keys = HSet.empty; ops = HMap.empty }
-    
-            static member (+) (l : AtomicOperation<'a, 'b>, r : AtomicOperation<'a, 'b>) =
-                let merge (key : 'a) (l : Option<Operation<'b>>) (r : Option<Operation<'b>>) =
-                    match l with
-                    | None -> r
-                    | Some l ->
-                        match r with
-                        | None -> Some l
-                        | Some r -> 
-                            match l + r with
-                            | Nop -> None
-                            | op -> Some op
-    
-                let ops = HMap.choose2 merge l.ops r.ops 
-                let keys = HMap.keys ops
-                { ops = ops; keys = keys }
-                
-            member x.IsEmpty = HMap.isEmpty x.ops
-                
-        module AtomicOperation =
-    
-            let empty<'a, 'b> = AtomicOperation<'a, 'b>.Empty
-            
-            let ofHMap (ops : hmap<'a, Operation<'b>>) =
-                let keys = HMap.keys ops
-                { ops = ops; keys = keys }
-    
-            let ofSeq (s : seq<'a * Operation<'b>>) =
-                let ops = HMap.ofSeq s
-                let keys = HMap.keys ops
-                { ops = ops; keys = keys }
-                    
-            let ofList (l : list<'a * Operation<'b>>) = ofSeq l
-            let ofArray (a : array<'a * Operation<'b>>) = ofSeq a
-    
-        type AtomicQueue<'a, 'b> private(classId : uint32, classes : hmap<'a, uint32>, values : MapExt<uint32, AtomicOperation<'a, 'b>>) =
-            let classId = if HMap.isEmpty classes then 0u else classId
-    
-            static let empty = AtomicQueue<'a, 'b>(0u, HMap.empty, MapExt.empty)
-    
-            static member Empty = empty
-    
-            member x.Enqueue(op : AtomicOperation<'a, 'b>) =
-                if not op.IsEmpty then
-                    let clazzes = op.keys |> HSet.choose (fun k -> HMap.tryFind k classes)
-    
-                    if clazzes.Count = 0 then
-                        let id = classId
-                        let classId = id + 1u
-                        let classes = op.keys |> Seq.fold (fun c k -> HMap.add k id c) classes
-                        let values = MapExt.add id op values
-                        AtomicQueue(classId, classes, values)
-                            
-                    else
-                        let mutable values = values
-                        let mutable classes = classes
-                        let mutable result = AtomicOperation.empty
-                        for c in clazzes do
-                            match MapExt.tryRemove c values with
-                            | Some (o, rest) ->
-                                values <- rest
-                                classes <- op.keys |> HSet.fold (fun cs c -> HMap.remove c cs) classes
-                                // may not overlap here
-                                result <- { ops = HMap.union result.ops o.ops; keys = HSet.union result.keys o.keys } //result + o
-    
-                            | None ->
-                                ()
-    
-                        let result = result + op
-                        if result.IsEmpty then
-                            AtomicQueue(classId, classes, values)
-                        else
-                            let id = classId
-                            let classId = id + 1u
-    
-                            let classes = result.keys |> HSet.fold (fun cs c -> HMap.add c id cs) classes
-                            let values = MapExt.add id result values
-                            AtomicQueue(classId, classes, values)
-                                
-                else
-                    x
-                
-            member x.TryDequeue() =
-                match MapExt.tryMin values with
-                | None ->
-                    None
-                | Some clazz ->
-                    let v = values.[clazz]
-                    let values = MapExt.remove clazz values
-                    let classes = v.keys |> HSet.fold (fun cs c -> HMap.remove c cs) classes
-                    let newQueue = AtomicQueue(classId, classes, values)
-                    Some (v, newQueue)
-    
-            member x.Dequeue() =
-                match x.TryDequeue() with
-                | None -> failwith "empty AtomicQueue"
-                | Some t -> t
-    
-            member x.IsEmpty = MapExt.isEmpty values
-    
-            member x.Count = values.Count
-    
-            member x.UnionWith(other : AtomicQueue<'a, 'b>) =
-                if x.Count < other.Count then
-                    other.UnionWith x
-                else
-                    other |> Seq.fold (fun (s : AtomicQueue<_,_>) e -> s.Enqueue e) x
-    
-            static member (+) (s : AtomicQueue<'a, 'b>, a : AtomicOperation<'a, 'b>) = s.Enqueue a
-    
-            interface System.Collections.IEnumerable with
-                member x.GetEnumerator() = new AtomicQueueEnumerator<_,_>((values :> seq<_>).GetEnumerator()) :> _
-                    
-            interface IEnumerable<AtomicOperation<'a, 'b>> with
-                member x.GetEnumerator() = new AtomicQueueEnumerator<_,_>((values :> seq<_>).GetEnumerator()) :> _
-    
-        and private AtomicQueueEnumerator<'a, 'b>(e : IEnumerator<KeyValuePair<uint32, AtomicOperation<'a, 'b>>>) =
-            interface System.Collections.IEnumerator with
-                member x.MoveNext() = e.MoveNext()
-                member x.Current = e.Current.Value :> obj
-                member x.Reset() = e.Reset()
-    
-            interface IEnumerator<AtomicOperation<'a, 'b>> with
-                member x.Dispose() = e.Dispose()
-                member x.Current = e.Current.Value
-    
-        module AtomicQueue =
-    
-            [<GeneralizableValue>]
-            let empty<'a, 'b> = AtomicQueue<'a, 'b>.Empty
-    
-            let inline isEmpty (queue : AtomicQueue<'a, 'b>) = queue.IsEmpty
-            let inline count (queue : AtomicQueue<'a, 'b>) = queue.Count
-            let inline enqueue (v : AtomicOperation<'a, 'b>) (queue : AtomicQueue<'a, 'b>) = queue.Enqueue v
-            let inline tryDequeue (queue : AtomicQueue<'a, 'b>) = queue.TryDequeue()
-            let inline dequeue (queue : AtomicQueue<'a, 'b>) = queue.Dequeue()
-            let inline combine (l : AtomicQueue<'a, 'b>) (r : AtomicQueue<'a, 'b>) = l.UnionWith r
-                
-            let enqueueMany (v : #seq<AtomicOperation<'a, 'b>>) (queue : AtomicQueue<'a, 'b>) = v |> Seq.fold (fun s e -> enqueue e s) queue
-            let ofSeq (s : seq<AtomicOperation<'a, 'b>>) = s |> Seq.fold (fun q e -> enqueue e q) empty
-            let ofList (l : list<AtomicOperation<'a, 'b>>) = l |> List.fold (fun q e -> enqueue e q) empty
-            let ofArray (a : array<AtomicOperation<'a, 'b>>) = a |> Array.fold (fun q e -> enqueue e q) empty
-                    
-            let toSeq (queue : AtomicQueue<'a, 'b>) = queue :> seq<_>
-            let toList (queue : AtomicQueue<'a, 'b>) = queue |> Seq.toList
-            let toArray (queue : AtomicQueue<'a, 'b>) = queue |> Seq.toArray
-            
-            let toOperation (queue : AtomicQueue<'a, 'b>) =
-                queue |> Seq.sum
-    
-
-
-    type ImmutableTree<'a> =
-        {
-            original : 'a
-            children : list<ImmutableTree<'a>>
-        }
-
-    type MutableTree<'a> =
-        {
-            original    : 'a
-            kill        : ref<unit -> unit>
-            children    : ref<Option<ref<list<MutableTree<'a>>>>>
-        }
-
-    type State<'a> =
-        {
-            quality     : Trafo3d -> 'a -> float
-            children    : 'a -> array<Promise<'a>>
-            root        : MutableTree<'a>
-            running     : ref<int>
-        }
-
-
-    let updateMutableTree (state : State<'a>) (view : Trafo3d) =
-        let cmp (l, _) (r, _) = compare l r
-        let queue = List<float * MutableTree<'a>>()
-
-        let inline enqueue (node : MutableTree<'a>) =
-            let q = state.quality view node.original
-            queue.HeapEnqueue(cmp, (q, node))
-
-        let running = state.running
-        let inline inc v = running := !running + v
-        let inline dec v = running := !running - v
-
-        enqueue state.root
-        while !state.running < 12 && queue.Count > 0 do
-            //Log.line "running: %d" !state.running
-            let (q, e) = queue.HeapDequeue(cmp)
-            if q < 1.0 then
-                match !e.children with
-                | None ->
-                    Log.line "split %A; %.3f" e.original q
-                    let r = ref []
-                    let prom = state.children e.original
-                    let kill () = ()
-                    let prom = prom |> Array.map (fun p -> inc 1; p |> Prom.map (fun r -> dec 1; r))
-                    prom |> Prom.all |> Prom.map (fun v ->
-                        let children = Seq.toList v
-                        r := children |> List.map (fun c -> { original = c; kill = ref id; children = ref None })
-                    ) |> ignore
-                    e.kill := fun () -> kill(); r := []
-                    e.children := Some r
-                | Some cs -> 
-                    for c in !cs do enqueue c
-            else 
-                match !e.children with
-                | Some r ->
-                    Log.line "collapse %A" e.original
-                    let rec kill (node : MutableTree<'a>) =
-                        let cs = !node.children
-                        node.kill.Value()
-                        node.kill := id
-                        node.children := None
-                        match cs with
-                        | Some cs -> !cs |> List.iter kill
-                        | None -> ()
-
-                    kill e
-                | None ->
-                    ()
-
-            
-            
-            ()
-
-
-        ()
-
-    let computeDelta (l : Option<ImmutableTree<'a>>) (r : MutableTree<'a>) =
-        let rec alli (m : ImmutableTree<'a>) =
-            match m.children with
-            | [] -> Seq.singleton m.original
-            | cs -> cs |> Seq.collect (alli)
-
-        
-        let rec all (m : MutableTree<'a>) =
-            match !m.children with
-            | Some cs ->
-                match !cs with
-                | [] -> Seq.singleton m.original
-                | cs -> cs |> Seq.collect (all)
-            | None ->
-                Seq.singleton m.original
-
-        let rec computeDelta (parent : 'a) (deltas : ref<AtomicQueue<'a, 'a>>) (l : Option<ImmutableTree<'a>>) (r : Option<MutableTree<'a>>) =
-            let inline children (m : MutableTree<'a>) =
-                match !m.children with
-                | None -> []
-                | Some r -> !r
-            
-            match l, r with
-            | None, None -> 
-                None
-            | Some l, None ->
-                deltas := AtomicQueue.enqueue (AtomicOperation.ofList [parent, Operation.Activate; l.original, Operation.Free]) !deltas
-                None
-
-            | None, Some r ->
-                deltas := AtomicQueue.enqueue (AtomicOperation.ofList [parent, Operation.Deactivate; r.original, Operation.Alloc(r.original, true)]) !deltas
-                let cs = children r |> List.choose (fun r -> computeDelta r.original deltas None (Some r))
-                Some { ImmutableTree.original = r.original; ImmutableTree.children = cs }
-                
-            | Some l, Some r ->
-                match l.children, children r with
-                | [], [] -> 
-                    Some l
-                | lc, [] -> 
-                    deltas := AtomicQueue.enqueue (AtomicOperation.ofList [l.original, Operation.Activate]) !deltas
-                    lc |> List.iter (fun c -> computeDelta l.original deltas (Some c) None |> ignore)
-                    Some { l with children = [] }
-                | [], rc ->
-                    deltas := AtomicQueue.enqueue (AtomicOperation.ofList [l.original, Operation.Deactivate]) !deltas 
-                    let cs = rc |> List.choose (fun r -> computeDelta l.original deltas None (Some r))
-                    Some { l with children = cs }
-                | lc, rc ->
-                    let cs = 
-                        List.zip lc rc |> List.choose (fun (l,r) ->
-                            computeDelta l.original deltas (Some l) (Some r)
-                        )
-                    Some { l with children = cs }
-        
-        let delta = ref AtomicQueue.empty
-        let n = computeDelta r.original delta l (Some r)
-        n, !delta
-
-
-
-
-    type TreeReader<'a>(root : 'a, t : TraversalState, cfg : Config<'a>) =
+    type TreeReader2(url : string, t : TraversalState, time : IMod<float>, create : TraversalState -> Map<Durable.Def, obj> -> PreparedCommand * Aardvark.Import.JS.Promise<unit>) as this =
         inherit AbstractReader<hdeltaset<IRenderObject>>(HDeltaSet.monoid)
 
-        let state = 
-            { 
-                quality = cfg.quality
-                children = cfg.children
-                root = { MutableTree.original = root; MutableTree.kill = ref id; MutableTree.children = ref None } 
-                running = ref 0
-            }
-        let mutable last : Option<ImmutableTree<'a>> = None
-        let mutable pending = AtomicQueue.empty
-
-        let model = List.foldBack (Sg.(<*>)) t.trafos (Mod.constant Trafo3d.Identity)
-        let view = t.viewTrafo
-
-        let mv = (Sg.(<*>) model view)
+        let cache = Dict<System.Guid, PreparedCommand * Aardvark.Import.JS.Promise<unit>>(Unchecked.hash, Unchecked.equals)
         
-
-        let create (v : 'a) =
-            let o = cfg.manager.Prepare(cfg.signature, cfg.render t v).Value 
-            PreparedRenderObject.acquire o
-            o, PreparedRenderObject.update AdaptiveToken.Top o
-            
-
-        let cache = Dict<'a, PreparedRenderObject * Promise<unit>>(Unchecked.hash, Unchecked.equals)
-
+        let mutable queue = AtomicQueue.empty
         let mutable delayed = HDeltaSet.empty
 
+        let w = Worker.Create "worker.js"
+
+        let rec sendCam() =
+            let view = Mod.force t.viewTrafo
+            let proj = Mod.force t.projTrafo
+            w.postMessage (Command.UpdateCamera(view, proj))
+            Aardvark.Import.JS.setTimeout sendCam 50 |> ignore
+
+        do sendCam()
+        do w.onmessage <- fun e ->
+            let msg = unbox<Reply> e.data
+            match msg with
+            | Reply.Perform (ops) ->
+                let test = 
+                    ops 
+                    |> Seq.map (fun (k,vs) -> k, Operation.map (fun kvs -> DurableDataCodec.decodeMap (Stream(kvs)) |> snd) vs)
+                    |> AtomicOperation.ofSeq
+
+                queue <- AtomicQueue.enqueue test queue
+                transact (fun () -> this.MarkOutdated())
+            | _ ->
+                ()
+
+        do w.postMessage (Command.Add(0, url))
 
         override x.Kind = "SetReader"
 
         override x.Compute(token : AdaptiveToken) =
-            
             let start = performance.now()
             let elapsed() = performance.now() - start
-            let mv = mv.GetValue token
 
-            updateMutableTree state mv
-            let n, deltas = computeDelta last state.root
-            pending <- AtomicQueue.combine pending deltas
-            last <- n
+       
             let mutable inEval = true
 
             let mutable deltas = delayed
             delayed <- HDeltaSet.empty
-            let emit (ops : seq<SetOperation<PreparedRenderObject>>) =
+            let emit (ops : seq<SetOperation<PreparedCommand>>) =
                 let ops = HDeltaSet.ofSeq (ops |> Seq.map (fun o -> SetOperation(o.Value :> IRenderObject, o.Count)))
 
                 if inEval then 
@@ -1298,41 +787,50 @@ module Lod =
                 else
                     delayed <- HDeltaSet.combine delayed ops
                     transact (fun () -> x.MarkOutdated())
-                    
-            while elapsed() < 50.0 && not (AtomicQueue.isEmpty pending) do
-                let op, rest = AtomicQueue.dequeue pending
-                pending <- rest
-                
-                
+            
+            while elapsed() < 16.0 && not (AtomicQueue.isEmpty queue) do
+                let op, rest = AtomicQueue.dequeue queue
+                queue <- rest
+        
+        
                 let ops = 
                     op.ops |> Seq.choose (fun (el, op) ->
                         match op with
-                        | LodTreeHelpers.Nop ->    
+                        | Nop ->    
                             None
-                        | LodTreeHelpers.Deactivate ->
+                        | Deactivate ->
                             match cache.TryGetValue el with
                             | Some (o, _) -> Prom.value (Rem o) |> Some
                             | None -> None
-                        | LodTreeHelpers.Free a ->
+                        | Free a ->
                             match cache.TryRemove el with
-                            | Some(o, _) -> PreparedRenderObject.release o; Prom.value (Rem o) |> Some
+                            | Some(o, _) -> o.Release(); Prom.value (Rem o) |> Some
                             | None -> None
-                        | LodTreeHelpers.Activate ->
+                        | Activate ->
                             match cache.TryGetValue el with
                             | Some(o, p) -> p |> Prom.map (fun () -> Add o) |> Some
                             | None -> None
-                        | LodTreeHelpers.Alloc (v,a) ->
-                            let (o, p) = cache.GetOrCreate(el, create)
-                            if a > 0 then p |> Prom.map (fun () -> Add o) |> Some
-                            else None
+                        | Alloc (v,a) ->
+                            match cache.TryGetValue el with
+                            | Some (o, p) -> 
+                                if a > 0 then p |> Prom.map (fun () -> Add o) |> Some
+                                else None
+                            | None ->
+                                let (o,p) = create t v
+                                cache.[el] <- (o,p)
+                                if a > 0 then p |> Prom.map (fun () -> Add o) |> Some
+                                else None
+                            //let (o, p) = cache.GetOrCreate(el, create)
+                            //if a > 0 then p |> Prom.map (fun () -> Add o) |> Some
+                            //else None
                     ) |> Prom.all
-                
+        
                 ops.``then`` emit |> ignore
 
-            if not (AtomicQueue.isEmpty pending) || !state.running > 0 then
-                let _ = cfg.time.GetValue token
+            if not (AtomicQueue.isEmpty queue) then
+                let _ = time.GetValue token
                 ()
-                
+        
 
             inEval <- false
 
@@ -1341,88 +839,78 @@ module Lod =
         override x.Release() =
             ()
 
-
-    type TreeSg<'a>(cfg : Config<'a>, root : 'a) =
+    type TreeSg(time : IMod<float>, render : TraversalState -> Map<Durable.Def, obj> -> _, url : string) =
         interface ISg with
             member x.RenderObjects(state) =
-                ASet.create (fun () -> new TreeReader<'a>(root, state, cfg))
+                ASet.create (fun () -> new TreeReader2(url, state, time, render))
 
 
-    let sg<'a> (cfg : Config<'a>) (root : 'a) : ISg =
-        TreeSg(cfg, root) :> ISg
+    let sg<'a> time render (url : string) : ISg =
+        TreeSg(time, render, url) :> ISg
 
 
 [<EntryPoint>]
 let main argv =
-
-    let minDist (b : Box3d) (v : V3d) =
-        let x = 
-            if v.X > b.Max.X then b.Max.X
-            elif v.X < b.Min.X then b.Min.X
-            else v.X
-            
-        let y = 
-            if v.Y > b.Max.Y then b.Max.Y
-            elif v.Y < b.Min.Y then b.Min.Y
-            else v.Y
-            
-        let z = 
-            if v.Z > b.Max.Z then b.Max.Z
-            elif v.Z < b.Min.Z then b.Min.Z
-            else v.Z
-
-        let c = V3d(x,y,z)
-        //Log.line "%A %A -> %A" b v c
-        v - V3d(x,y,z) |> Vec.length
-
-    let angle (localBounds : Box3d) (view : Trafo3d) (avgPointDistance : float) =
-        let cam = view.Backward.C3.XYZ
-        let minDist = minDist localBounds cam
-        let minDist = max 0.01 minDist
-        let angle = Constant.DegreesPerRadian * atan2 avgPointDistance minDist
-
-        let factor = 1.0 //(minDist / 0.01) ** 0.05
-        angle / factor
-
-    let renderobj (rootCenter : V3d) (state : TraversalState) (n : Octnode) =
+    let renderobj (control : Aardvark.Application.RenderControl) (rootCenter : V3d) (state : TraversalState) (n : Map<Durable.Def, obj>) =
+        let n = Octnode(Unchecked.defaultof<_>, false, System.Guid.Empty, 0, n)
         let loc = n.PositionsLocal
-        let off = n.Cell.Center - rootCenter
+        let manager = control.Manager
+
+        let globalBounds = n.BoundingBox
+        let localBounds = Box3d(globalBounds.Min - rootCenter, globalBounds.Max - rootCenter)
+        let intersects (viewProj : Trafo3d) (b : Box3d) =
+            true
+            //b.IntersectsViewProj viewProj
+
+
         let sg =
             Sg.draw PrimitiveTopology.PointList
-            |> Sg.vertexAttribute "Positions" (V3fBuffer.init loc.Length (fun i -> loc.[i] + off))
+            |> Sg.vertexAttribute "Positions" loc
             |> Sg.vertexAttribute "Colors" n.Colors
+            //|> Sg.vertexAttribute "Normals" n.Normals
         
-        sg.RenderObjects state |> ASet.toList |> List.head |> unbox<RenderObject>
+        let obj = sg.RenderObjects state |> ASet.toList |> List.head |> unbox<IRenderObject>
+        let cmd = PreparedCommand.ofRenderObject control.Manager control.FramebufferSignature obj
+        let cmd = cmd.Value 
+        cmd.Acquire()
+        let mutable fst = false
+        let kinds = 
+            Set.ofList [
+                "Texture"
+                "Sampler"
+                "UniformBuffer"
+                "UniformBufferSlot"
+                "UniformLocation"
+                "DepthTestMode"
+                "DrawCall"
+            ]
+        let res = 
+            { new PreparedCommand(manager) with
+                member x.Compile(prev) = 
+                    let mvp = (obj |> unbox<RenderObject>).pipeline.uniforms "ModelViewProjTrafo" |> unbox<IMod<Trafo3d>>
+                    let arr = cmd.Compile prev
+                    [|
+                        fun () ->
+                            let vp = Mod.force mvp
+                            if intersects vp localBounds then
+                                for a in arr do a()
+                    |]
+                member x.ExitState = cmd.ExitState
+                member x.Acquire() = 
+                    if fst then fst <- false
+                    else cmd.Acquire()
+                member x.Release() = cmd.Release()
+                member x.Resources = 
+                    cmd.Resources |> Seq.filter (fun r -> Set.contains r.ResourceKind kinds)
+                member x.Update(t) = 
+                    Prom.value ()
+            }
 
-    let quality (rootCenter : V3d) (view : Trafo3d) (n : Octnode) =
-        if n.SubNodeIds.Length > 0 then 
-            let localBounds = n.Cell.BoundingBox
-            let localBounds = Box3d(localBounds.Min - rootCenter, localBounds.Max - rootCenter)
+        res, cmd.Update(AdaptiveToken.Top)
 
-            let dist  =
-                match n.TryAvgPointDistance with
-                | Some d -> float d
-                | None -> 
-                    let normMax = max (max (abs localBounds.Size.X) (abs localBounds.Size.Y)) (abs localBounds.Size.Z)
-                    normMax / 40.0
-            let q = 
-                0.01 / angle localBounds view dist
-            q
-        else 
-            1.0
-
-    let octcfg (rootCenter : V3d) (control : Aardvark.Application.RenderControl) =
-        {
-            time = control.Time
-            signature = control.FramebufferSignature
-            manager = control.Manager
-            render = renderobj rootCenter
-            quality = quality rootCenter
-            children = fun n -> (Array.choose (fun a -> a) n.SubNodes)
-        }
 
     let query = 
-        window.location.search.Split([| '&'; '?' |], StringSplitOptions.RemoveEmptyEntries)
+        window.location.search.Split([| '&'; '?' |], System.StringSplitOptions.RemoveEmptyEntries)
         |> Array.map (fun str -> str.Split([| '=' |]))
         |> Array.choose (fun kvp -> if kvp.Length = 2 then Some (kvp.[0], kvp.[1]) else None)
         |> Map.ofArray
@@ -1432,13 +920,10 @@ let main argv =
         | Some id -> id
         | None -> "jbs-haus"
 
-    let url = "https://aardworxblobtest.blob.core.windows.net/" + file + "/{0}?sv=2018-03-28&ss=b&srt=sco&sp=r&se=2020-05-03T17:31:38Z&st=2019-05-03T09:31:38Z&spr=https&sig=akIsUao0LL4SMyvYeC9nXTtBKesxRIZh8cz%2BskBqN2U%3D&sr=b"
+    let url = "./" + file + "/{0}"
+
     let db = Database url
     let tree = Octree db
-
-
-
-
    
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
@@ -1451,30 +936,33 @@ let main argv =
             canvas.style.width <- "100%"
             canvas.style.height <- "100%"
             
-            let control = new Aardvark.Application.RenderControl(canvas, true)
+            let control = new Aardvark.Application.RenderControl(canvas, false)
 
             let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
             let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
-            let anim = Mod.constant true //control.Keyboard.IsDown(Aardvark.Application.Keys.Space)
-            let angle =
-                Mod.integrate 0.0 control.Time [
-                    anim |> Mod.map (fun a ->
-                        if a then 
-                            control.Time |> Mod.stepTime (fun _ dt o -> o + 0.1 * dt)
-                        else
-                            AFun.create id
-                    )
-                ]
-
-
-            let view = cam |> Mod.map CameraView.viewTrafo
+            let color = Mod.init true
+            let view = 
+                cam |> Mod.map (fun v -> 
+                    let res = v |> CameraView.viewTrafo
+                    //w.postMessage(Command.UpdateCamera(res, Trafo3d.Identity))
+                    res
+                )
             let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 0.1 1000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
+
+
+            control.Keyboard.DownWithRepeats.Add (fun k ->
+                match k with
+                | Aardvark.Application.Keys.V -> transact (fun () -> color.Value <- not color.Value)
+                | _ -> ()
+            )
 
             tree.Root.``then``(fun root ->
 
             
-                let center =  root.Cell.Center
-                let sg = Lod.sg (octcfg center control) root
+                let center =  tree.Center
+                
+                let scale = 1.0 // 35.0 / root.BoundingBox.Size.Length
+                let sg = Lod.sg control.Time (renderobj control center) url
 
                 //let nodes = tree.GetNodes 1
                 //nodes.``then``(fun nodes ->
@@ -1487,11 +975,11 @@ let main argv =
                     sg 
                     //|> ASet.map (render center) 
                     //|> Sg.set
-                    //|> Sg.trafo (Mod.constant (Trafo3d.Scale 0.05))
-                    |> Sg.trafo (Mod.constant (Trafo3d.Translation (V3d(-20.0, -20.0, 300.0))))
+                    |> Sg.trafo (Mod.constant (Trafo3d.Scale scale))
+                    //|> Sg.trafo (Mod.constant (Trafo3d.Translation (V3d(-20.0, -20.0, 300.0))))
                     |> Sg.effect [
                         //FShade.Effect.ofFunction (FShadeTest.constantColor V4d.IIII)
-                        FShade.Effect.ofFunction FShadeTest.trafo
+                        FShade.Effect.ofFunction FShadeTest.depthVertex
                         FShade.Effect.ofFunction FShadeTest.circularPoint
 
                         //FShade.Effect.ofFunction FShadeTest.diffuseTexture
@@ -1499,8 +987,8 @@ let main argv =
                     ]
                     |> Sg.viewTrafo view
                     |> Sg.projTrafo proj
-
-
+                    |> Sg.uniform "ViewportSize" control.Size
+                    |> Sg.uniform "ShowColor" color
                 let objects = sg.RenderObjects()
                 let task() = new RenderTask(control.FramebufferSignature, control.Manager, objects) :> IRenderTask
 
