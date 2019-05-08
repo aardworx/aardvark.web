@@ -96,7 +96,7 @@ type AdaptiveToken =
             AdaptiveToken(x.Caller, x.Tag)
 
         static member inline Top = AdaptiveToken(null, null)
-        static member inline Empty = Unchecked.defaultof<AdaptiveToken>
+        static member inline Empty = AdaptiveToken(null, null)
 
         new(caller : IAdaptiveObject, tag : obj) =
             {

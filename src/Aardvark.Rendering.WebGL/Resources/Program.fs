@@ -147,9 +147,14 @@ module ProgramImpl =
 
     type WebGL2RenderingContext with
         member x.IsGL2 = 
+            
             let v = unbox<string> (x.getParameter(x.VERSION)) 
             //Log.error "VERSION: %A" v
-            v.Contains "WebGL 2.0"
+            if v.Contains "WebGL 2.0" then  
+                true
+            else
+                x.getExtension("EXT_frag_depth") |> ignore
+                false
         member x.GetAttributes(p : WebGLProgram) =
             Map.ofList [
                 let cnt = x.getProgramParameter(p, x.ACTIVE_ATTRIBUTES) |> unbox<int>
