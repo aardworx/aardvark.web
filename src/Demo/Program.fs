@@ -1406,20 +1406,10 @@ let main argv =
                     let normMax = max (max (abs localBounds.Size.X) (abs localBounds.Size.Y)) (abs localBounds.Size.Z)
                     normMax / 40.0
             let q = 
-                //let cam = view.Backward.C3.XYZ // + rootCenter
-                //let s = max (max (abs localBounds.Size.X) (abs localBounds.Size.Y)) (abs localBounds.Size.Z)
-                //let d = minDist localBounds cam
-                ////Log.line "%.3f %.3f %.3f" s d  (Constant.RadiansPerDegree * atan2 s (max 0.01 d))
-                //5.0 / (Constant.RadiansPerDegree * atan2 s (max 0.01 d))
-
-
                 0.01 / angle localBounds view dist
-            //Log.line "%A: %.3f" n q
             q
         else 
             1.0
-        //n.Cell.BoundingBox
-        //failwith ""
 
     let octcfg (rootCenter : V3d) (control : Aardvark.Application.RenderControl) =
         {
@@ -1430,15 +1420,6 @@ let main argv =
             quality = quality rootCenter
             children = fun n -> (Array.choose (fun a -> a) n.SubNodes)
         }
-
-    //let w = Worker.Create "worker.js"
-    //w.onmessage <- fun e ->
-    //    let msg = unbox<Message> e.data
-    //    console.error (sprintf "got: %A %A" msg.id msg.data)
-
-    //w.postMessage { id = 10; data = Load "blabla" }
-
-
 
     let query = 
         window.location.search.Split([| '&'; '?' |], StringSplitOptions.RemoveEmptyEntries)
@@ -1451,14 +1432,9 @@ let main argv =
         | Some id -> id
         | None -> "jbs-haus"
 
-    //Time.test()
     let url = "https://aardworxblobtest.blob.core.windows.net/" + file + "/{0}?sv=2018-03-28&ss=b&srt=sco&sp=r&se=2020-05-03T17:31:38Z&st=2019-05-03T09:31:38Z&spr=https&sig=akIsUao0LL4SMyvYeC9nXTtBKesxRIZh8cz%2BskBqN2U%3D&sr=b"
     let db = Database url
     let tree = Octree db
-
-    //let set = cset()
-
-
 
 
 
