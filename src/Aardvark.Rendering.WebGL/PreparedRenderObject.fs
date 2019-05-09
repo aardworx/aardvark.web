@@ -153,7 +153,7 @@ module Resources =
             | PrimitiveType.Int(false, 32) -> [ { size = 1; typ = gl.UNSIGNED_INT; norm = false; stride = 0; offset = 0 } ]
             | PrimitiveType.Float(32)      -> [ { size = 1; typ = gl.FLOAT; norm = false; stride = 0; offset = 0 } ]
 
-            | PrimitiveType.Vec(Int(false, 8), 4) -> [ { size = 0x80E1; typ = gl.UNSIGNED_BYTE; norm = true; stride = 0; offset = 0 } ]
+            | PrimitiveType.Vec(Int(false, 8), 4) -> [ { size = 4; typ = gl.UNSIGNED_BYTE; norm = true; stride = 0; offset = 0 } ]
             | PrimitiveType.Vec(Int(false, 8), 3) -> [ { size = 3; typ = gl.UNSIGNED_BYTE; norm = true; stride = 0; offset = 0 } ]
 
             | PrimitiveType.Vec(inner, d) ->
@@ -386,11 +386,12 @@ module Resources =
 
 
     type ResourceManager with
-        member x.Prepare(signature : FramebufferSignature, o : RenderObject) =
+
+        member x.PreparePipeline(signature : FramebufferSignature, o : PipelineState) =
             let gl = x.Context.GL
             let mutable failed = false
 
-            let shader = ShaderCompiler.compile gl.IsGL2 signature o.pipeline.shader
+            let shader = ShaderCompiler.compile gl.IsGL2 signature o.shader
 
 
             let program = x.CreateProgram(signature, shader.code)
@@ -398,21 +399,7 @@ module Resources =
 
             let uniformBuffers = 
                 program.Interface.uniformBlocks |> Map.map (fun index block ->
-                    x.CreateUniformBuffer(block, o.pipeline.uniforms)
-                )
-
-            let vertexBuffers =
-                program.Interface.attributes |> Map.choose (fun index p ->
-                    match Map.tryFind p.name o.vertexBuffers with
-                    | Some b ->
-                        let buffer = x.CreateBuffer(b.buffer)
-                        let atts = VertexAttrib.ofType gl b.typ |> List.map (fun a -> { a with offset = a.offset + b.offset })
-
-                        Some (buffer, atts)
-
-                    | None ->
-                        Log.error "[GL] could not get vertex attribute %s" p.name
-                        None
+                    x.CreateUniformBuffer(block, o.uniforms)
                 )
 
             let samplers =
@@ -427,7 +414,7 @@ module Resources =
                                 name, FShade.SamplerState.empty
                         | None ->
                             name, FShade.SamplerState.empty
-                    match o.pipeline.uniforms semantic with
+                    match o.uniforms semantic with
                     | Some m ->
                         if x.IsGL2 then
                             let anisotropic = match samplerState.MaxAnisotropy with | Some a -> a > 1 | None -> false
@@ -450,7 +437,7 @@ module Resources =
 
             let uniforms =
                 program.Interface.uniforms |> Map.toSeq |> Seq.choose (fun (name, (location, typ)) ->
-                    match o.pipeline.uniforms name with
+                    match o.uniforms name with
                     | Some m ->
                         let l = x.CreateUniformLocation(typ, m)
                         Some (location, (typ, l))
@@ -459,6 +446,37 @@ module Resources =
                 )
                 |> HMap.ofSeq
 
+            let depthMode = x.CreateDepthMode(o.depthMode)
+
+            {
+                program             = program
+                uniformBuffers      = uniformBuffers
+                uniforms            = uniforms
+                samplers            = samplers
+                depthMode           = depthMode
+            }
+
+        member x.Prepare(signature : FramebufferSignature, o : RenderObject) =
+            let gl = x.Context.GL
+            let mutable failed = false
+
+            let pipeline = x.PreparePipeline(signature, o.pipeline)
+            let program = pipeline.program
+
+
+            let vertexBuffers =
+                program.Interface.attributes |> Map.choose (fun index p ->
+                    match Map.tryFind p.name o.vertexBuffers with
+                    | Some b ->
+                        let buffer = x.CreateBuffer(b.buffer)
+                        let atts = VertexAttrib.ofType gl b.typ |> List.map (fun a -> { a with offset = a.offset + b.offset })
+
+                        Some (buffer, atts)
+
+                    | None ->
+                        Log.error "[GL] could not get vertex attribute %s" p.name
+                        None
+                )
 
             let indexBuffer =
                 match o.indexBuffer with
@@ -486,19 +504,10 @@ module Resources =
                 | PrimitiveTopology.TriangleStrip -> gl.TRIANGLE_STRIP
                 | _ -> gl.POINTS
 
-            let depthMode = x.CreateDepthMode(o.pipeline.depthMode)
-
             if not failed then
                 Some {
                     id                  = newId()
-                    pipeline = 
-                        {
-                            program             = program
-                            uniformBuffers      = uniformBuffers
-                            uniforms            = uniforms
-                            samplers            = samplers
-                            depthMode           = depthMode
-                        }
+                    pipeline            = pipeline
                     indexBuffer         = indexBuffer
                     vertexBuffers       = vertexBuffers
                     mode                = mode

@@ -88,7 +88,7 @@ module FShadeTest =
             let vp = uniform.ModelViewTrafo * v.pos
             let pos = uniform.ProjTrafo * vp
 
-            let pixelSize = 9.0 * (float uniform.ViewportSize.X / 1300.0)
+            let pixelSize = 7.0 * (float uniform.ViewportSize.X / 1300.0)
             let ndcRadius = pixelSize / V2d uniform.ViewportSize
 
             let pp = pos.XYZ / pos.W
@@ -137,7 +137,8 @@ module FShadeTest =
                 if uniform.ShowColor then v.c.XYZ
                 else V3d.III
 
-            return { c = V4d(c * z, 1.0); d = newDepth }
+            let c = V4d((0.6 + 0.4 * z) * c, 1.0)
+            return c //{ c = c; d = newDepth }
 
             //let sn = 0.5 * (V3d(c, sqrt (1.0 - l2)) + V3d.III)
             //return V4d(sn, 1.0)
@@ -735,11 +736,21 @@ module Time =
 
 
 module Lod =
-    type TreeReader2(url : string, t : TraversalState, time : IMod<float>, create : TraversalState -> Map<Durable.Def, obj> -> PreparedCommand * Aardvark.Import.JS.Promise<unit>) as this =
+    type TreeReader2(url : string, control : Aardvark.Application.RenderControl, t : TraversalState, time : IMod<float>, create : TraversalState -> PreparedPipelineState -> Map<Durable.Def, obj> -> PreparedCommand * Aardvark.Import.JS.Promise<unit>) as this =
         inherit AbstractReader<hdeltaset<IRenderObject>>(HDeltaSet.monoid)
 
         let cache = Dict<System.Guid, PreparedCommand * Aardvark.Import.JS.Promise<unit>>(Unchecked.hash, Unchecked.equals)
-        
+        let manager = control.Manager
+
+        let pipeline = 
+            let template = 
+                Sg.draw PrimitiveTopology.PointList
+                |> Sg.vertexAttribute DefaultSemantic.Positions (V3fBuffer.zeroCreate 1)
+                |> Sg.vertexAttribute DefaultSemantic.Colors (C3bBuffer.zeroCreate 1)
+            let obj = template.RenderObjects t |> ASet.toList |> List.head |> unbox<RenderObject>
+            manager.PreparePipeline(control.FramebufferSignature, obj.pipeline)
+
+
         let mutable queue = AtomicQueue.empty
         let mutable delayed = HDeltaSet.empty
 
@@ -750,6 +761,28 @@ module Lod =
             let proj = Mod.force t.projTrafo
             w.postMessage (Command.UpdateCamera(view, proj))
             Aardvark.Import.JS.setTimeout sendCam 50 |> ignore
+
+        let mutable state = HRefSet.empty
+        let mutable initial = true
+        let command =
+            { new PreparedCommand(manager) with
+                member x.Compile(t) =
+                    [|
+                        match t with
+                        | Some prev -> yield! Compiler.updatePipelineState prev.ExitState pipeline
+                        | None ->  yield! Compiler.setPipelineState pipeline
+
+                        yield fun () ->
+                            for (cmd : PreparedCommand) in state do
+                                for a in cmd.Compile(None) do a()
+                    |]
+                    
+                member x.ExitState = pipeline
+                member x.Acquire() = ()
+                member x.Release() = ()
+                member x.Update t = PreparedPipelineState.update t pipeline
+                member x.Resources = PreparedPipelineState.resources pipeline
+            }
 
         do sendCam()
         do w.onmessage <- fun e ->
@@ -780,7 +813,7 @@ module Lod =
             let mutable deltas = delayed
             delayed <- HDeltaSet.empty
             let emit (ops : seq<SetOperation<PreparedCommand>>) =
-                let ops = HDeltaSet.ofSeq (ops |> Seq.map (fun o -> SetOperation(o.Value :> IRenderObject, o.Count)))
+                let ops = HDeltaSet.ofSeq ops //(ops |> Seq.map (fun o -> SetOperation(o.Value :> IRenderObject, o.Count)))
 
                 if inEval then 
                     deltas <- HDeltaSet.combine deltas ops
@@ -816,7 +849,7 @@ module Lod =
                                 if a > 0 then p |> Prom.map (fun () -> Add o) |> Some
                                 else None
                             | None ->
-                                let (o,p) = create t v
+                                let (o,p) = create t pipeline v
                                 cache.[el] <- (o,p)
                                 if a > 0 then p |> Prom.map (fun () -> Add o) |> Some
                                 else None
@@ -833,16 +866,22 @@ module Lod =
         
 
             inEval <- false
-
-            deltas
+            let s, _ = HRefSet.applyDelta state deltas
+            state <- s
+            if initial then
+                initial <- false
+                command :> IRenderObject |> Add |> HDeltaSet.single
+            else
+                HDeltaSet.empty
+            //deltas
 
         override x.Release() =
             ()
 
-    type TreeSg(time : IMod<float>, render : TraversalState -> Map<Durable.Def, obj> -> _, url : string) =
+    type TreeSg(ctrl : Aardvark.Application.RenderControl, render : TraversalState -> PreparedPipelineState -> Map<Durable.Def, obj> -> _, url : string) =
         interface ISg with
             member x.RenderObjects(state) =
-                ASet.create (fun () -> new TreeReader2(url, state, time, render))
+                ASet.create (fun () -> new TreeReader2(url, ctrl, state, ctrl.Time, render))
 
 
     let sg<'a> time render (url : string) : ISg =
@@ -851,62 +890,120 @@ module Lod =
 
 [<EntryPoint>]
 let main argv =
-    let renderobj (control : Aardvark.Application.RenderControl) (rootCenter : V3d) (state : TraversalState) (n : Map<Durable.Def, obj>) =
+    let renderobj (control : Aardvark.Application.RenderControl) (rootCenter : V3d) (state : TraversalState) (pipe : PreparedPipelineState) (n : Map<Durable.Def, obj>) =
         let n = Octnode(Unchecked.defaultof<_>, false, System.Guid.Empty, 0, n)
-        let loc = n.PositionsLocal
         let manager = control.Manager
+        let ctx = manager.Context
 
-        let globalBounds = n.BoundingBox
-        let localBounds = Box3d(globalBounds.Min - rootCenter, globalBounds.Max - rootCenter)
-        let intersects (viewProj : Trafo3d) (b : Box3d) =
-            true
-            //b.IntersectsViewProj viewProj
+        let mvp = TraversalState.modelViewProjTrafo state
 
+        let localBounds = 
+            let bb = n.BoundingBox
+            Box3d(bb.Min - rootCenter, bb.Max - rootCenter)
 
-        let sg =
-            Sg.draw PrimitiveTopology.PointList
-            |> Sg.vertexAttribute "Positions" loc
-            |> Sg.vertexAttribute "Colors" n.Colors
-            //|> Sg.vertexAttribute "Normals" n.Normals
-        
-        let obj = sg.RenderObjects state |> ASet.toList |> List.head |> unbox<IRenderObject>
-        let cmd = PreparedCommand.ofRenderObject control.Manager control.FramebufferSignature obj
-        let cmd = cmd.Value 
-        cmd.Acquire()
-        let mutable fst = false
-        let kinds = 
-            Set.ofList [
-                "Texture"
-                "Sampler"
-                "UniformBuffer"
-                "UniformBufferSlot"
-                "UniformLocation"
-                "DepthTestMode"
-                "DrawCall"
-            ]
-        let res = 
+        let iface = pipe.program.Interface
+        let resources = System.Collections.Generic.List<IResource>()
+        let code =
+            let gl = manager.Context.GL
+            let pos = n.PositionsLocal
+            [|  
+                if pos.Length > 0 then
+                    for (slot, att) in Map.toSeq iface.attributes do
+                        //let o = iface.attributes |> Map.toSeq |> Seq.map (fun (slot, att) -> string slot, att.name :> obj) |> Fable.Core.JsInterop.createObj
+                        //console.error(o)
+                        let b =
+                            if att.name = DefaultSemantic.Positions then HostBuffer pos
+                            elif att.name = DefaultSemantic.Colors then HostBuffer n.Colors
+                            else failwithf "unknown %A" att.name
+
+                        let res = manager.CreateBuffer(Mod.constant (b :> IBuffer))
+                        let atts = VertexAttrib.ofType gl b.Data.ElementType
+                        resources.Add res
+                        res.Acquire()
+                        let hh = res.Handle
+                        yield fun () -> 
+                            gl.bindBuffer(gl.ARRAY_BUFFER, hh.Value.Handle)
+                            let mutable mid = slot
+                            for att in atts do
+                                gl.enableVertexAttribArray(float mid)
+                                gl.vertexAttribPointer(float mid, float att.size, att.typ, att.norm, float att.stride, float att.offset)
+                                mid <- mid + 1
+                            gl.bindBuffer(gl.ARRAY_BUFFER, null)
+                    
+                    yield fun () ->
+                        let mvp = Mod.force mvp
+                        //let mvp = mvp * Trafo3d.Scale(2.0)
+                        if localBounds.IntersectsViewProj mvp then
+                            gl.drawArrays(gl.POINTS, 0.0, float pos.Length)
+
+            |]
+
+        let cmd =
             { new PreparedCommand(manager) with
-                member x.Compile(prev) = 
-                    let mvp = (obj |> unbox<RenderObject>).pipeline.uniforms "ModelViewProjTrafo" |> unbox<IMod<Trafo3d>>
-                    let arr = cmd.Compile prev
-                    [|
-                        fun () ->
-                            let vp = Mod.force mvp
-                            if intersects vp localBounds then
-                                for a in arr do a()
-                    |]
-                member x.ExitState = cmd.ExitState
-                member x.Acquire() = 
-                    if fst then fst <- false
-                    else cmd.Acquire()
-                member x.Release() = cmd.Release()
-                member x.Resources = 
-                    cmd.Resources |> Seq.filter (fun r -> Set.contains r.ResourceKind kinds)
-                member x.Update(t) = 
-                    Prom.value ()
+                member x.Compile(_) = code
+                member x.ExitState = pipe
+                member x.Acquire() = ()
+                member x.Release() = ()
+                member x.Resources = Seq.empty
+                member x.Update(t) = Prom.value ()
             }
 
-        res, cmd.Update(AdaptiveToken.Top)
+        let update =
+            resources |> Seq.map (fun r -> r.Update(AdaptiveToken.Top)) |> Prom.all |> Prom.map (fun _ -> ())
+
+        cmd, update
+
+        //let globalBounds = n.BoundingBox
+        //let localBounds = Box3d(globalBounds.Min - rootCenter, globalBounds.Max - rootCenter)
+        //let intersects (viewProj : Trafo3d) (b : Box3d) =
+        //    true
+        //    //b.IntersectsViewProj viewProj
+
+
+        //let sg =
+        //    Sg.draw PrimitiveTopology.PointList
+        //    |> Sg.vertexAttribute "Positions" loc
+        //    |> Sg.vertexAttribute "Colors" n.Colors
+        //    //|> Sg.vertexAttribute "Normals" n.Normals
+        
+        //let obj = sg.RenderObjects state |> ASet.toList |> List.head |> unbox<IRenderObject>
+        //let cmd = PreparedCommand.ofRenderObject control.Manager control.FramebufferSignature obj
+        //let cmd = cmd.Value 
+        //cmd.Acquire()
+        //let mutable fst = false
+        //let kinds = 
+        //    Set.ofList [
+        //        "Texture"
+        //        "Sampler"
+        //        "UniformBuffer"
+        //        "UniformBufferSlot"
+        //        "UniformLocation"
+        //        "DepthTestMode"
+        //        "DrawCall"
+        //    ]
+        //let res = 
+        //    { new PreparedCommand(manager) with
+        //        member x.Compile(prev) = 
+        //            let mvp = (obj |> unbox<RenderObject>).pipeline.uniforms "ModelViewProjTrafo" |> unbox<IMod<Trafo3d>>
+        //            let arr = cmd.Compile prev
+        //            [|
+        //                fun () ->
+        //                    let vp = Mod.force mvp
+        //                    if intersects vp localBounds then
+        //                        for a in arr do a()
+        //            |]
+        //        member x.ExitState = cmd.ExitState
+        //        member x.Acquire() = 
+        //            if fst then fst <- false
+        //            else cmd.Acquire()
+        //        member x.Release() = cmd.Release()
+        //        member x.Resources = 
+        //            cmd.Resources |> Seq.filter (fun r -> Set.contains r.ResourceKind kinds)
+        //        member x.Update(t) = 
+        //            Prom.value ()
+        //    }
+
+        //res, cmd.Update(AdaptiveToken.Top)
 
 
     let query = 
@@ -928,16 +1025,17 @@ let main argv =
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
 
-            let canvas = document.createElement_canvas()
+            //let canvas = document.createElement_canvas()
+            let canvas = document.getElementById "target" |> unbox<HTMLCanvasElement>
             canvas.tabIndex <- 1.0
-            document.body.appendChild(canvas) |> ignore
-            document.body.style.margin <- "0"
-            document.body.style.padding <- "0"
-            canvas.style.width <- "100%"
-            canvas.style.height <- "100%"
+            //document.body.appendChild(canvas) |> ignore
+            //document.body.style.margin <- "0"
+            //document.body.style.padding <- "0"
+            //canvas.style.width <- "100%"
+            //canvas.style.height <- "100%"
             
-            let control = new Aardvark.Application.RenderControl(canvas, false)
-
+            let control = new Aardvark.Application.RenderControl(canvas, false, true)
+            control.ClearColor <- V4d.OOOO
             let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
             let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
             let color = Mod.init true
@@ -959,10 +1057,8 @@ let main argv =
             tree.Root.``then``(fun root ->
 
             
-                let center =  tree.Center
-                
                 let scale = 1.0 // 35.0 / root.BoundingBox.Size.Length
-                let sg = Lod.sg control.Time (renderobj control center) url
+                let sg = Lod.sg control (renderobj control tree.Center) url
 
                 //let nodes = tree.GetNodes 1
                 //nodes.``then``(fun nodes ->
