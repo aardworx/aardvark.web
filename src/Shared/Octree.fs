@@ -81,12 +81,39 @@ module private OctHelpers =
         //| Some (:? 'a as o) -> o
         //| Some o -> Log.warn "bad type for %A %A" def o; failwithf "[Octree] could not get %s" def.Name
         | _ -> failwithf "[Octree] could not get %s" def.Name
-        
-type Octnode(db : Database, gzip: bool, dbid : Guid, level : int, m : Map<Def, obj>) =
-    let mutable colorsRepaired = false
-    let mutable currentOffset = V3d.Zero
-    let mutable subNodes : Option<Promise<Octnode>>[] = null
-    
+     
+     
+    let repair (offset : V3d) (def : Durable.Def) (o : obj) =
+        if def = Durable.Octree.Node then
+            let o = unbox<Map<Durable.Def, obj>> o
+
+
+            match Map.tryFind Durable.Octree.PositionsLocal3f o with
+            | Some pos -> 
+                let cell = o.[Durable.Octree.Cell] |> unbox<Cell>
+                let offset = cell.Center - offset
+                let pos = unbox<V3fBuffer> pos
+                let float = Float32Array.Create((pos :> IArrayBuffer).Buffer, (pos :> IArrayBuffer).ByteOffset, pos.Length * 3)
+                for i in 0 .. 3 .. float.length - 3 do
+                    float.[i+0] <- float.[i+0] + float32 offset.X
+                    float.[i+1] <- float.[i+1] + float32 offset.Y
+                    float.[i+2] <- float.[i+2] + float32 offset.Z
+            | None ->
+                ()
+                
+            match Map.tryFind Durable.Octree.Colors3b o with
+            | Some col -> 
+                let col = unbox<C3bBuffer> col
+                let rgb = Uint8Array.Create((col :> IArrayBuffer).Buffer, (col :> IArrayBuffer).ByteOffset, col.Length * 3)
+                for i in 0 .. 3 .. rgb.length - 3 do
+                    let t = rgb.[i+0]
+                    rgb.[i+0] <- rgb.[i+2]
+                    rgb.[i+2] <- t
+            | None ->
+                ()
+        o
+
+type Octnode(db : Database, gzip: bool, dbid : Guid, level : int, offset : V3d, m : Map<Def, obj>) =
     let bounds =
         match tryGet<Box3d> Octree.BoundingBoxExactGlobal m with
         | Some box -> box
@@ -95,19 +122,6 @@ type Octnode(db : Database, gzip: bool, dbid : Guid, level : int, m : Map<Def, o
             match tryGet<Box3d> Octree.BoundingBoxExactLocal m with
             | Some box -> Box3d(box.Min + cell.Center, box.Max + cell.Center)
             | None -> cell.BoundingBox
-
-
-    let repairColors3 (b : C3bBuffer) =  
-        if not colorsRepaired then
-            colorsRepaired <- true
-            let rgbs = Uint8Array.Create((b :> IArrayBuffer).Buffer, (b :> IArrayBuffer).ByteOffset, b.Length * 3)
-            let mutable o = 0
-            for i in 0 .. b.Length - 1 do
-                let b = rgbs.[o+0]
-                rgbs.[o+0] <- rgbs.[o+2]
-                rgbs.[o+2] <- b
-                o <- o + 3
-        b
 
     member x.Data = m
 
@@ -135,7 +149,7 @@ type Octnode(db : Database, gzip: bool, dbid : Guid, level : int, m : Map<Def, o
             | None ->
                 None
 
-    member x.TryColors = tryGet<C3bBuffer> Octree.Colors3b m |> FSharp.Core.Option.map repairColors3
+    member x.TryColors = tryGet<C3bBuffer> Octree.Colors3b m 
 
     member x.TryMinTreeDepth = tryGet<int> Octree.MinTreeDepth m
     member x.TryMaxTreeDepth = tryGet<int> Octree.MaxTreeDepth m
@@ -144,16 +158,16 @@ type Octnode(db : Database, gzip: bool, dbid : Guid, level : int, m : Map<Def, o
     member x.TryPointCountCell = tryGet<int> Octree.PointCountCell m
     member x.TryCell = tryGet<Cell> Octree.Cell m
 
-    member x.SetOffset(offset : V3d) =
-        //if currentOffset <> offset then
-        let off = offset - currentOffset
-        currentOffset <- offset
-        let pos : V3fBuffer = x.PositionsLocal
-        let float = Float32Array.Create((pos :> IArrayBuffer).Buffer, (pos :> IArrayBuffer).ByteOffset, pos.Length * 3)
-        for i in 0 .. 3 .. float.length - 3 do
-            float.[i+0] <- float.[i+0] + float32 off.X
-            float.[i+1] <- float.[i+1] + float32 off.Y
-            float.[i+2] <- float.[i+2] + float32 off.Z
+    //member x.SetOffset(offset : V3d) =
+    //    //if currentOffset <> offset then
+    //    let off = offset - currentOffset
+    //    currentOffset <- offset
+    //    let pos : V3fBuffer = x.PositionsLocal
+    //    let float = Float32Array.Create((pos :> IArrayBuffer).Buffer, (pos :> IArrayBuffer).ByteOffset, pos.Length * 3)
+    //    for i in 0 .. 3 .. float.length - 3 do
+    //        float.[i+0] <- float.[i+0] + float32 off.X
+    //        float.[i+1] <- float.[i+1] + float32 off.Y
+    //        float.[i+2] <- float.[i+2] + float32 off.Z
 
 
     member x.PositionsLocal =
@@ -202,28 +216,23 @@ type Octnode(db : Database, gzip: bool, dbid : Guid, level : int, m : Map<Def, o
         | None -> [||]
 
     member x.SubNodes =
-        match subNodes with
-        | null ->
-            let promises = 
-                x.SubNodeIds |> Array.map (fun id ->
-                    if id <> Guid.Empty then
-                        let prom = 
-                            db.Get(string id, gzip) |> Prom.map (fun (def, data) ->
-                                if def <> Octree.Node then 
-                                    Log.warn "unexpected data: %A" def
-                                    Unchecked.defaultof<_>
-                                else
-                                    let d = unbox<Map<Def, obj>> data
-                                    Octnode(db, gzip, id, level + 1, d)
-                            )
-                        Some prom
-                    else
-                        None
-                )
-            subNodes <- promises
-            promises
-        | ps ->
-            ps
+        let promises = 
+            x.SubNodeIds |> Array.map (fun id ->
+                if id <> Guid.Empty then
+                    let prom = 
+                        db.Get(string id, gzip, repair offset) |> Prom.map (fun (def, data) ->
+                            if def <> Octree.Node then 
+                                Log.warn "unexpected data: %A" def
+                                Unchecked.defaultof<_>
+                            else
+                                let d = unbox<Map<Def, obj>> data
+                                Octnode(db, gzip, id, level + 1, offset, d)
+                        )
+                    Some prom
+                else
+                    None
+            )
+        promises
 
     member x.GetNodes(level : int) =
         if level <= 0 then
@@ -250,13 +259,13 @@ type Octree(db : Database) =
             let centroidDev = Fable.Core.JsInterop.(?) obj "CentroidStdDev"
 
 
-            db.Get(string id, gzip) |> Prom.map (fun (def, data) ->
+            db.Get(string id, gzip, fun _ o -> o) |> Prom.map (fun (def, data) ->
                 if def <> Octree.Node then 
                     Log.warn "unexpected data: %A" def
                     Unchecked.defaultof<_>
                 else
                     let d = unbox<Map<Def, obj>> data
-                    let root = Octnode(db, gzip, id, 0, d)
+                    let root = Octnode(db, gzip, id, 0, V3d.Zero, d)
 
                     
                     if unbox cent then
@@ -266,6 +275,11 @@ type Octree(db : Database) =
                         let s = (root.BoundingBox.Size.X + root.BoundingBox.Size.Y + root.BoundingBox.Size.Z) / 3.0
                         center <- root.BoundingBox.Center
                         stddev <- s / 2.0
+
+                    
+                    let d = repair center def d |> unbox
+                    let root = Octnode(db, gzip, id, 0, center, d)
+
                     root
 
             )

@@ -249,7 +249,9 @@ let main _ =
     let cache = Dict<int, Octree>(Unchecked.hash, Unchecked.equals)
 
     let create (url : string) =
-        let db = Database(url)
+        let avgSize = 300.0 * 1024.0
+        let totalMem = 512.0 * 1024.0 * 1024.0
+        let db = Database(url, totalMem / avgSize)
         Octree(db)
 
     let mutable states : hmap<int, State<Octnode>> = HMap.empty
@@ -270,7 +272,6 @@ let main _ =
                     op.ops |> Seq.map (fun (n,o) -> 
                         match o.value with
                         | Some v -> 
-                            n.SetOffset(n.Cell.Center - center)
                             n.Id, { alloc = o.alloc; active = o.active; value = Some (v.Data.[Octree.Buffer] |> unbox<_>) }
                         | None -> n.Id, { alloc = o.alloc; active = o.active; value = None }
                     ) |> Seq.toArray
