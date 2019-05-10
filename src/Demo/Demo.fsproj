@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Sample.fs" />
+    <Compile Include="ElmishTest.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

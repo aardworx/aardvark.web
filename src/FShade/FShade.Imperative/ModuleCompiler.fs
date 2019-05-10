@@ -73,11 +73,11 @@ module SimpleOrder =
                     | :? SortKey as o -> x.CompareTo(o)
                     | _ -> failwithf "cannot compare time with %A" o
 
-        interface IComparable<ISortKey> with
-            member x.CompareTo o =
-                match o with
-                    | :? SortKey as o -> x.CompareTo o
-                    | _ -> failwithf "cannot compare time with %A" o
+        //interface IComparable<ISortKey> with
+        //    member x.CompareTo o =
+        //        match o with
+        //            | :? SortKey as o -> x.CompareTo o
+        //            | _ -> failwithf "cannot compare time with %A" o
 
         override x.GetHashCode() = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(x)
         override x.Equals o = System.Object.ReferenceEquals(x,o)
