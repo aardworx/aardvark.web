@@ -1352,8 +1352,7 @@ module Lod =
         TreeSg(cfg, root) :> ISg
 
 
-[<EntryPoint>]
-let main argv =
+let run argv =
 
     let minDist (b : Box3d) (v : V3d) =
         let x = 
@@ -1532,3 +1531,12 @@ let main argv =
             )  |> ignore
     )
     0
+
+
+
+[<EntryPoint>]
+let main argv =
+    run argv
+    //ElmTest.run ()
+    
+
