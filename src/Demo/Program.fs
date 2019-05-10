@@ -1220,7 +1220,7 @@ let main argv =
     let file =
         match Map.tryFind "blob" query with
         | Some id -> id
-        | None -> "jbs-haus"
+        | None -> "rolli"
 
     let url = "./" + file + "/{0}"
 
