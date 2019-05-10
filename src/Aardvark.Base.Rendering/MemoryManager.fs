@@ -153,9 +153,7 @@ module Management =
                     | :? nref<'a> as o -> compare id o.Id
                     | _ -> failwith "uncomparable"
 
-                    
-        interface IComparable<nref<'a>> with
-            member x.CompareTo o = compare id o.Id
+                   
 
     let inline private (!) (r : nref<'a>) =
         r.Value
