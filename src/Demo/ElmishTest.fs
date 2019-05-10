@@ -5,8 +5,8 @@ open Elmish
 open Elmish.React
 open Fable.React
 
-open Fable.Helpers.React
-open Fable.Helpers.React.Props
+//open Fable.Helpers.React
+//open Fable.Helpers.React.Props
 
 // MODEL
 
