@@ -10640,6 +10640,8 @@ module Browser =
         abstract member waitSync : WebGLSync * float * float -> unit
         abstract member getSyncParameter : WebGLSync * float -> float
     
+    and [<AllowNullLiteral>] WEBGL_multi_draw_instanced =
+        abstract member multiDrawArraysInstancedWEBGL : mode : float * firstsList : int[] * firstsOffset : int * countsList : int[] * countsOffset : int * instanceCountsList : int[] * instanceCountsOffset : int * drawcount : int -> unit
 
     and [<AllowNullLiteral>] WebGLShader =
         inherit WebGLObject

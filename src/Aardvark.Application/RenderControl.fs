@@ -189,7 +189,7 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool, alpha : bool) =
         
 
         let ctrl = keyboard.IsDown(Keys.LeftCtrl)
-        keyboard.KeyDown(Keys.End).Add (fun () ->
+        keyboard.KeyDown(Keys.Space).Add (fun () ->
             if ctrl.GetValue(AdaptiveToken.Top) then
                 if not rafap then transact caller.MarkOutdated
                 rafap <- not rafap
