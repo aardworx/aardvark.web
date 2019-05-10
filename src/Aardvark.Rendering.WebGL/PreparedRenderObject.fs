@@ -530,4 +530,8 @@ type PreparedCommand(manager : ResourceManager) =
     abstract member ExitState : PreparedPipelineState
     abstract member Compile : Option<PreparedCommand> -> array<unit -> unit>
 
-    
+    override x.GetHashCode() = id
+    override x.Equals o =
+        match o with
+        | :? PreparedCommand as o -> id = o.Id
+        | _ -> false
