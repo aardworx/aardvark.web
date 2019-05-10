@@ -973,7 +973,7 @@ let main argv =
     let mutable existing = 0.0
 
     let renderobj (control : Aardvark.Application.RenderControl) (rootCenter : V3d) (state : TraversalState) (pipe : PreparedPipelineState) (n : Map<Durable.Def, obj>) =
-        let n = Octnode(Unchecked.defaultof<_>, false, System.Guid.Empty, 0, n)
+        let n = Octnode(Unchecked.defaultof<_>, false, System.Guid.Empty, 0, rootCenter, n)
         let manager = control.Manager
         let ctx = manager.Context
 
@@ -1153,7 +1153,7 @@ let main argv =
 
     let url = "./" + file + "/{0}"
 
-    let db = Database url
+    let db = Database(url, 1024.0)
     let tree = Octree db
    
     document.addEventListener_readystatechange(fun e ->
