@@ -244,6 +244,14 @@ module Durable =
         addDef C3bArray
    
     module Octree =
+        /// Octree. An octree node. DurableMap.
+        let Buffer = {
+            Id = Guid("e72d4eb6-4060-4d87-8877-bfce1e9f6a30")
+            Name = "Octree.Buffer"
+            Description = "Original data DurableMap."
+            Type = Primitives.Unit.Id
+            }
+        addDef Buffer
 
         /// Octree. An octree node. DurableMap.
         let Node = {

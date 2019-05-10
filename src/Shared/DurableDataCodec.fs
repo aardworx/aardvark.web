@@ -1,8 +1,8 @@
 ﻿namespace Aardvark.Data
 
 open Aardvark.Base
-open Aardvark.Base.Rendering
 open Aardvark.Data
+open Aardvark.Base.Rendering
 open System
 open Aardvark.Import.JS
 open Microsoft.FSharp.Collections
@@ -51,10 +51,10 @@ type Stream (data : ArrayBuffer) =
         res
 
     member x.ReadInt64() =
-        let l = view.getInt32(offset, true) |> int64
-        let h = view.getInt32(offset+4, true) |> int64
+        let l = view.getUint32(offset, true)    |> uint64
+        let h = view.getUint32(offset+4, true)  |> uint64
         offset <- offset + 8
-        (h <<< 32) ||| l
+        (h <<< 32) ||| l |> int64
             
         
     member x.ReadFloat32() =

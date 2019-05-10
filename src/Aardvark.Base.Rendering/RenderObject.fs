@@ -13,6 +13,13 @@ type PipelineState =
 
 type IRenderObject = interface end
 
+[<AbstractClass>]
+type PreparedRenderCommand () =
+    abstract member Update : AdaptiveToken -> Aardvark.Import.JS.Promise<unit>
+    abstract member Acquire : unit -> unit
+    abstract member Release : unit -> unit
+    interface IRenderObject
+
 [<CustomEquality; CustomComparison>]
 type RenderObject =
     {

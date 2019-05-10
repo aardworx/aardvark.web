@@ -10,7 +10,7 @@ module Backends =
 
     let gles300 =
         Backend.Create {
-            version                 = GLSLVersion(3,0,0, "es")
+            version                 = GLSLVersion(3,0,0,"es")
             precision               = ["precision highp float;"; "precision highp int;"]
             inOut                   = InOutMode.InOut
             createInternalLocations = false
@@ -31,7 +31,7 @@ module Backends =
             inOut                   = InOutMode.AttributeVarying
             createInternalLocations = false
             stdLayout               = false
-            enabledExtensions       = Set.ofList [ ]
+            enabledExtensions       = Set.ofList [ "GL_EXT_frag_depth" ]
             createUniformBuffers    = false
             bindingMode             = BindingMode.None
             createDescriptorSets    = false
