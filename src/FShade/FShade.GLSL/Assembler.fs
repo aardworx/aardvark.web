@@ -262,7 +262,9 @@ module AssemblerState =
                         match stages.next, inOut with
                         | None, InOutMode.AttributeVarying ->
                             if name = Intrinsics.Color then return Some "gl_FragColor"
-                            elif name = Intrinsics.Depth then return Some "gl_FragDepth"
+                            elif name = Intrinsics.Depth then 
+                                if s.config.version.Major > 1 then return Some "gl_FragDepth"
+                                else return Some "gl_FragDepthEXT"
                             else return None
                         | _ -> 
                             return Map.tryFind name IntrinsicParameters.builtInOutputs.[stages.self]
@@ -1436,7 +1438,7 @@ module Assembler =
                         else
                             None
 
-                    if name = "gl_FragDepth" && depthWrite <> DepthWriteMode.None then
+                    if false && name = "gl_FragDepth" && depthWrite <> DepthWriteMode.None then
                         let mode = assembleDepthWriteMode depthWrite
                         return Some (sprintf "layout(%s) out float gl_FragDepth;" mode)
                     else
@@ -1814,8 +1816,8 @@ module Assembler =
                 return 
                     List.concat [
                         [sprintf "#version %s" versionstr ]
-                        c.precision
                         [ extensions |> Seq.map (sprintf "#extension %s : enable") |> Seq.toList |> String.concat "\r\n" ]
+                        c.precision
                         types
                         uniforms
                         values

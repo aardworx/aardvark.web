@@ -491,7 +491,7 @@ type ResourceManager(ctx : Context) =
             member x.UpdateRes(t,_) = call.GetValue t |> Prom.value
             member x.CreateRes(t) = call.GetValue t |> Prom.value
             member x.DestroyRes(_) = ()
-        }
+        } :> IResource<_>
 
 
     member x.CreateProgram(signature : FramebufferSignature, code : string) =

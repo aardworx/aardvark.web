@@ -27,7 +27,7 @@ module Utilities =
                 canvas.style.width <- "100%"
                 canvas.style.height <- "100%"
         
-                let control = new Aardvark.Application.RenderControl(canvas, config.antialias)
+                let control = new Aardvark.Application.RenderControl(canvas, config.antialias, false)
 
                 let initial = CameraView.lookAt (V3d(6.0, 5.0, 4.0)) V3d.Zero V3d.OOI
                 let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial

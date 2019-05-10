@@ -31,11 +31,11 @@ module Exts =
     [<Emit("Element.ALLOW_KEYBOARD_INPUT")>]
     let ALLOW_KEYBOARD_INPUT : float = jsNative
 
-type RenderControl(canvas : HTMLCanvasElement, antialias : bool) =
+type RenderControl(canvas : HTMLCanvasElement, antialias : bool, alpha : bool) =
 
     let config =
         {
-            alpha = false
+            alpha = alpha
             antialias = antialias
             depth = true
             powerPreference = "high-performance"
@@ -205,6 +205,7 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool) =
             )
         setTimeout checkSize 100 |> ignore
             
+    let mutable clearColor = V4d.OOOI
 
     do 
         checkSize()
@@ -220,7 +221,7 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool) =
                     if canvas.height <> rect.height then canvas.height <- rect.height
                     //console.log(sprintf "%.0fx%.0f" rect.width rect.height)
                     gl.viewport(0.0, 0.0, rect.width, rect.height)
-                    gl.clearColor(0.0, 0.0, 0.0, 1.0)
+                    gl.clearColor(clearColor.X, clearColor.Y, clearColor.Z, clearColor.W)
                     gl.clearDepth(1.0)
                     gl.clear(float (int gl.COLOR_BUFFER_BIT ||| int gl.DEPTH_BUFFER_BIT))
                     let p = task.Run(token)
@@ -254,6 +255,9 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool) =
         !render 0.0
 
 
+    member x.ClearColor
+        with get() = clearColor
+        and set c = clearColor <- c
     member x.Context = ctx
     member x.Manager = manager
     member x.FramebufferSignature = signature
