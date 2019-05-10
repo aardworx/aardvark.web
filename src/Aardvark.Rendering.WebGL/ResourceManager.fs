@@ -66,10 +66,6 @@ type ResourceCache(ctx : Context) =
         let resource = 
             store.GetOrCreate(deps, fun deps ->
                 let r = creator(new ResourceCacheEntry(x, deps) :> IResourceToken) :> IResource
-                
-                // TODO: resource leak!!!!!
-                132421123
-                r.Acquire()
                 r
             )
 
@@ -122,6 +118,7 @@ type AbstractResource<'a>(entry : IDisposable) =
     member x.Release() =
         refCount <- refCount - 1
         if refCount = 0 then
+            entry.Dispose()
             match promise with
             | Some p ->
                 p.``then``(fun () ->

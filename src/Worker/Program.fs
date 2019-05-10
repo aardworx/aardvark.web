@@ -65,7 +65,7 @@ module Lod =
             if q <= 1.0 then
                 match !e.children with
                 | None ->
-                    Log.line "split %A; %.3f" e.original q
+                    Log.debug "split %A; %.3f" e.original q
                     let r = ref []
                     let prom = state.children e.original
                     let kill () = ()
@@ -87,7 +87,7 @@ module Lod =
                         e.kill := (fun () -> ())
                         e.children := None
                     | _ -> 
-                        Log.line "collapse %A" e.original
+                        Log.debug "collapse %A" e.original
                         let rec kill (node : MutableTree<'a>) =
                             let cs = !node.children
                             node.kill.Value()
@@ -227,7 +227,7 @@ let quality (rootCenter : V3d) (view : Trafo3d) (n : Octnode) =
             let normMax = max (max (abs localBounds.Size.X) (abs localBounds.Size.Y)) (abs localBounds.Size.Z)
             normMax / 40.0
 
-        let q = 0.8 / angle localBounds view dist
+        let q = 1.0 / angle localBounds view dist
         q
     else 
         System.Double.PositiveInfinity

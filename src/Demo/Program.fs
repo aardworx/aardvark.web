@@ -577,6 +577,31 @@ type System.Numerics.BigInteger with
 
 type bla = largeuint32
 
+module Normal16 =
+    let sgn (v : V2d) = V2d((if v.X >= 0.0 then 1.0 else -1.0), (if v.Y >= 0.0 then 1.0 else -1.0))
+    let clamp (v : V2d) =
+        V2d(
+            (if v.X < -1.0 then -1.0 elif v.X > 1.0 then 1.0 else v.X),
+            (if v.Y < -1.0 then -1.0 elif v.Y > 1.0 then 1.0 else v.Y)
+        )
+    let encode (v : V3d) : uint16 =
+        let p = v.XY * (1.0 / (abs v.X + abs v.Y + abs v.Z))
+        let p = 
+            if v.Z <= 0.0 then clamp (V2d(1.0 - abs p.Y, 1.0 - abs p.X) * sgn p)
+            else clamp p
+        
+        (uint16 ((p.X * 0.5 + 0.5) * 255.0) <<< 8) |||
+        (uint16 ((p.Y * 0.5 + 0.5) * 255.0))
+
+
+    let decode (v : uint16) : V3d =
+        let e = V2d(float (v >>> 8) / 255.0, float (v &&& 0xFFus) / 255.0) * 2.0 - V2d.II
+        let v = V3d(e, 1.0 - abs e.X - abs e.Y)
+        if v.Z < 0.0 then V3d(V2d(1.0 - abs v.Y, 1.0 - abs v.X) * sgn v.XY, v.Z) |> Vec.normalize
+        else v |> Vec.normalize
+
+
+
 [<Struct; CustomEquality; CustomComparison>]
 type Time private(number : bla, dexp : int) =
     
@@ -736,6 +761,7 @@ module Time =
 
 
 module Lod =
+
     type TreeReader2(url : string, control : Aardvark.Application.RenderControl, t : TraversalState, time : IMod<float>, create : TraversalState -> PreparedPipelineState -> Map<Durable.Def, obj> -> PreparedCommand * Aardvark.Import.JS.Promise<unit>) as this =
         inherit AbstractReader<hdeltaset<IRenderObject>>(HDeltaSet.monoid)
 
@@ -750,19 +776,22 @@ module Lod =
             let obj = template.RenderObjects t |> ASet.toList |> List.head |> unbox<RenderObject>
             manager.PreparePipeline(control.FramebufferSignature, obj.pipeline)
 
-
+        let mutable alive = true
         let mutable queue = AtomicQueue.empty
         let mutable delayed = HDeltaSet.empty
+
+        let commandCache = Dict<PreparedCommand, array<unit -> unit>>(Unchecked.hash, Unchecked.equals)
 
         let w = Worker.Create "worker.js"
 
         let rec sendCam() =
-            let view = Mod.force t.viewTrafo
-            let proj = Mod.force t.projTrafo
-            w.postMessage (Command.UpdateCamera(view, proj))
-            Aardvark.Import.JS.setTimeout sendCam 50 |> ignore
+            if alive then 
+                let view = Mod.force t.viewTrafo
+                let proj = Mod.force t.projTrafo
+                w.postMessage (Command.UpdateCamera(view, proj))
+                Aardvark.Import.JS.setTimeout sendCam 50 |> ignore
 
-        let mutable state = HRefSet.empty
+        let mutable state : hrefset<array<unit -> unit>> = HRefSet.empty
         let mutable initial = true
         let command =
             { new PreparedCommand(manager) with
@@ -773,13 +802,13 @@ module Lod =
                         | None ->  yield! Compiler.setPipelineState pipeline
 
                         yield fun () ->
-                            for (cmd : PreparedCommand) in state do
-                                for a in cmd.Compile(None) do a()
+                            for cmd in state do
+                                for a in cmd do a()
                     |]
                     
                 member x.ExitState = pipeline
-                member x.Acquire() = ()
-                member x.Release() = ()
+                member x.Acquire() = PreparedPipelineState.acquire pipeline
+                member x.Release() = PreparedPipelineState.release pipeline
                 member x.Update t = PreparedPipelineState.update t pipeline
                 member x.Resources = PreparedPipelineState.resources pipeline
             }
@@ -812,7 +841,7 @@ module Lod =
 
             let mutable deltas = delayed
             delayed <- HDeltaSet.empty
-            let emit (ops : seq<SetOperation<PreparedCommand>>) =
+            let emit (ops : seq<SetOperation<(unit -> unit) * array<unit -> unit>>>) =
                 let ops = HDeltaSet.ofSeq ops //(ops |> Seq.map (fun o -> SetOperation(o.Value :> IRenderObject, o.Count)))
 
                 if inEval then 
@@ -824,8 +853,9 @@ module Lod =
             while elapsed() < 16.0 && not (AtomicQueue.isEmpty queue) do
                 let op, rest = AtomicQueue.dequeue queue
                 queue <- rest
-        
-        
+                
+                let nop = fun () -> ()
+                //let release = System.Collections.Generic.List<PreparedCommand>()
                 let ops = 
                     op.ops |> Seq.choose (fun (el, op) ->
                         match op with
@@ -833,29 +863,49 @@ module Lod =
                             None
                         | Deactivate ->
                             match cache.TryGetValue el with
-                            | Some (o, _) -> Prom.value (Rem o) |> Some
+                            | Some (o, _) -> 
+                                let v = commandCache.[o]
+                                Prom.value (Rem(nop,v)) |> Some
                             | None -> None
                         | Free a ->
                             match cache.TryRemove el with
-                            | Some(o, _) -> o.Release(); Prom.value (Rem o) |> Some
-                            | None -> None
+                            | Some(o, _) -> 
+                                match commandCache.TryRemove o with
+                                | Some v ->
+                                    let destroy() = o.Release()
+                                    Prom.value (Rem(destroy, v)) |> Some
+                                | None ->
+                                    Log.warn "komisch"
+                                    None
+                            | None -> 
+                                None
                         | Activate ->
                             match cache.TryGetValue el with
-                            | Some(o, p) -> p |> Prom.map (fun () -> Add o) |> Some
-                            | None -> None
+                            | Some(o, p) -> 
+                                match commandCache.TryGetValue o with
+                                | Some v ->
+                                    p |> Prom.map (fun () -> Add(nop, v)) |> Some
+                                | None ->
+                                    Log.warn "komisch"
+                                    None
+                            | None -> 
+                                None
+
                         | Alloc (v,a) ->
                             match cache.TryGetValue el with
                             | Some (o, p) -> 
-                                if a > 0 then p |> Prom.map (fun () -> Add o) |> Some
+                                o.Acquire()
+                                let v = commandCache.GetOrCreate(o, fun c -> c.Compile None)
+                                if a > 0 then p |> Prom.map (fun () -> Add(nop, v)) |> Some
                                 else None
                             | None ->
                                 let (o,p) = create t pipeline v
                                 cache.[el] <- (o,p)
-                                if a > 0 then p |> Prom.map (fun () -> Add o) |> Some
+                                o.Acquire()
+                                let v = commandCache.GetOrCreate(o, fun c -> c.Compile None)
+                                if a > 0 then p |> Prom.map (fun () -> Add(nop,v)) |> Some
                                 else None
-                            //let (o, p) = cache.GetOrCreate(el, create)
-                            //if a > 0 then p |> Prom.map (fun () -> Add o) |> Some
-                            //else None
+
                     ) |> Prom.all
         
                 ops.``then`` emit |> ignore
@@ -866,7 +916,9 @@ module Lod =
         
 
             inEval <- false
-            let s, _ = HRefSet.applyDelta state deltas
+
+            let d = deltas |> HDeltaSet.map (SetOperation.map (fun (f,v) -> f(); v))
+            let s, _ = HRefSet.applyDelta state d
             state <- s
             if initial then
                 initial <- false
@@ -876,6 +928,16 @@ module Lod =
             //deltas
 
         override x.Release() =
+            alive <- false
+            w.terminate()
+            commandCache |> Seq.iter (fun (cmd,_) -> cmd.Release())
+            commandCache.Clear()
+            cache.Clear()
+            delayed <- HDeltaSet.empty
+            state <- HRefSet.empty
+            initial <- true
+            queue <- AtomicQueue.empty
+            PreparedPipelineState.release pipeline
             ()
 
     type TreeSg(ctrl : Aardvark.Application.RenderControl, render : TraversalState -> PreparedPipelineState -> Map<Durable.Def, obj> -> _, url : string) =
@@ -888,8 +950,28 @@ module Lod =
         TreeSg(time, render, url) :> ISg
 
 
+open Aardvark.Base.Management
+open Fable.Core
+
+
 [<EntryPoint>]
 let main argv =
+
+    //let man = new ChunkedMemoryManager<_>(Memory.arrayBuffer, 512)
+
+    //let a = man.Alloc(16)
+    //let b = man.Alloc(16)
+    //let c = man.Alloc(16)
+    //let d = man.Alloc(16)
+
+    //Log.line "%A" a
+    //Log.line "%A" b
+    //Log.line "%A" c
+    //Log.line "%A" d
+
+
+    let mutable existing = 0.0
+
     let renderobj (control : Aardvark.Application.RenderControl) (rootCenter : V3d) (state : TraversalState) (pipe : PreparedPipelineState) (n : Map<Durable.Def, obj>) =
         let n = Octnode(Unchecked.defaultof<_>, false, System.Guid.Empty, 0, n)
         let manager = control.Manager
@@ -903,14 +985,16 @@ let main argv =
 
         let iface = pipe.program.Interface
         let resources = System.Collections.Generic.List<IResource>()
+        let cleanup = System.Collections.Generic.List<unit -> unit>()
+        let pos = n.PositionsLocal
         let code =
             let gl = manager.Context.GL
-            let pos = n.PositionsLocal
-            [|  
-                if pos.Length > 0 then
-                    for (slot, att) in Map.toSeq iface.attributes do
-                        //let o = iface.attributes |> Map.toSeq |> Seq.map (fun (slot, att) -> string slot, att.name :> obj) |> Fable.Core.JsInterop.createObj
-                        //console.error(o)
+
+            if gl.IsGL2 then
+                let bindings = 
+                    iface.attributes
+                    |> Map.toArray
+                    |> Array.map (fun (slot, att) ->
                         let b =
                             if att.name = DefaultSemantic.Positions then HostBuffer pos
                             elif att.name = DefaultSemantic.Colors then HostBuffer n.Colors
@@ -918,36 +1002,82 @@ let main argv =
 
                         let res = manager.CreateBuffer(Mod.constant (b :> IBuffer))
                         let atts = VertexAttrib.ofType gl b.Data.ElementType
+                        cleanup.Add (fun () -> res.Release())
                         resources.Add res
                         res.Acquire()
-                        let hh = res.Handle
-                        yield fun () -> 
-                            gl.bindBuffer(gl.ARRAY_BUFFER, hh.Value.Handle)
+                        slot, atts, res
+                    )
+                let vao = 
+                    lazy (
+                        let vao = gl.createVertexArray()
+                        gl.bindVertexArray(vao)
+                        for (slot, atts, res) in bindings do   
+                            gl.bindBuffer(gl.ARRAY_BUFFER, res.Handle.Value.Handle)
                             let mutable mid = slot
                             for att in atts do
                                 gl.enableVertexAttribArray(float mid)
                                 gl.vertexAttribPointer(float mid, float att.size, att.typ, att.norm, float att.stride, float att.offset)
                                 mid <- mid + 1
                             gl.bindBuffer(gl.ARRAY_BUFFER, null)
-                    
-                    yield fun () ->
-                        let mvp = Mod.force mvp
-                        //let mvp = mvp * Trafo3d.Scale(2.0)
-                        if localBounds.IntersectsViewProj mvp then
-                            gl.drawArrays(gl.POINTS, 0.0, float pos.Length)
+                        gl.bindVertexArray(null)
+                        cleanup.Add (fun () -> gl.deleteVertexArray vao)
+                        vao
+                    )
 
-            |]
+                [|
+                    if pos.Length > 0 then
+                        yield fun () -> 
+                            let mvp = Mod.force mvp
+                            if localBounds.IntersectsViewProj mvp then
+                                gl.bindVertexArray(vao.Value)
+                                gl.drawArrays(gl.POINTS, 0.0, float pos.Length)
+                |]
+            else
+                [|  
+                    if pos.Length > 0 then
+                        for (slot, att) in Map.toSeq iface.attributes do
+                            //let o = iface.attributes |> Map.toSeq |> Seq.map (fun (slot, att) -> string slot, att.name :> obj) |> Fable.Core.JsInterop.createObj
+                            //console.error(o)
+                            let b =
+                                if att.name = DefaultSemantic.Positions then HostBuffer pos
+                                elif att.name = DefaultSemantic.Colors then HostBuffer n.Colors
+                                else failwithf "unknown %A" att.name
+
+                            let res = manager.CreateBuffer(Mod.constant (b :> IBuffer))
+                            let atts = VertexAttrib.ofType gl b.Data.ElementType
+                            cleanup.Add (fun () -> res.Release())
+                            resources.Add res
+                            res.Acquire()
+                            let hh = res.Handle
+                            yield fun () -> 
+                                gl.bindBuffer(gl.ARRAY_BUFFER, hh.Value.Handle)
+                                let mutable mid = slot
+                                for att in atts do
+                                    gl.enableVertexAttribArray(float mid)
+                                    gl.vertexAttribPointer(float mid, float att.size, att.typ, att.norm, float att.stride, float att.offset)
+                                    mid <- mid + 1
+                                gl.bindBuffer(gl.ARRAY_BUFFER, null)
+                    
+                        yield fun () ->
+                            let mvp = Mod.force mvp
+                            if localBounds.IntersectsViewProj mvp then
+                                gl.drawArrays(gl.POINTS, 0.0, float pos.Length)
+
+                |]
 
         let cmd =
             { new PreparedCommand(manager) with
                 member x.Compile(_) = code
                 member x.ExitState = pipe
-                member x.Acquire() = ()
-                member x.Release() = ()
+                member x.Acquire() =
+                    existing <- existing + float pos.Length
+                member x.Release() = 
+                    existing <- existing - float pos.Length
+                    cleanup |> Seq.iter (fun f -> f ())
                 member x.Resources = Seq.empty
                 member x.Update(t) = Prom.value ()
             }
-
+        
         let update =
             resources |> Seq.map (fun r -> r.Update(AdaptiveToken.Top)) |> Prom.all |> Prom.map (fun _ -> ())
 
@@ -1005,6 +1135,10 @@ let main argv =
 
         //res, cmd.Update(AdaptiveToken.Top)
 
+    let rec logUsage() =
+        Log.line "existing: %.0f" existing
+        Aardvark.Import.JS.setTimeout  logUsage 1000 |> ignore
+    logUsage()
 
     let query = 
         window.location.search.Split([| '&'; '?' |], System.StringSplitOptions.RemoveEmptyEntries)

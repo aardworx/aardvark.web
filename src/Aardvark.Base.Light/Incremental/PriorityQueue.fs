@@ -114,6 +114,11 @@ type Cache<'k, 'v>(creator : 'k -> 'v) =
                     Some (v, 1)
             )
         !res
+        
+        
+    member x.ClearWithKeys(dispose : 'k -> 'v -> unit) =
+        store |> HMap.iter (fun k (v,_) -> dispose k v)
+        store <- HMap.empty
 
     member x.Clear(dispose : 'v -> unit) =
         store |> HMap.iter (fun _ (v,_) -> dispose v)
