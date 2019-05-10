@@ -3,6 +3,7 @@ storage:none
 
 clitool dotnet-fable
 nuget Fable.Core ~> 3.0.0
-
+nuget Fable.Elmish
+nuget Fable.Elmish.React
 
 github fable-compiler/Fable:quotations
