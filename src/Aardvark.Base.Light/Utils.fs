@@ -264,6 +264,20 @@ type ArrayExtensions private() =
 
 [<AbstractClass; Sealed; Extension>]
 type Fun private() =    
+
+    [<Extension>]
+    static member NextPowerOfTwo(v : int) =
+        if v <= 0 then 
+            1
+        else
+            let mutable x = v - 1
+            x <- x ||| (x >>> 1)
+            x <- x ||| (x >>> 2)
+            x <- x ||| (x >>> 4)
+            x <- x ||| (x >>> 8)
+            x <- x ||| (x >>> 16)
+            x + 1
+
     [<Extension>]
     static member IsTiny (v : float) = v >= -1E-16 && v <= 1E-16
     [<Extension>]
@@ -468,7 +482,7 @@ type Conversion private() =
 module Prom = 
     open Aardvark.Import.Browser
 
-    let fetchString (url : string) =
+    let inline  fetchString (url : string) =
         Promise.Create(fun fin err ->
             let r = XMLHttpRequest.Create()
             r.addEventListener_load(fun e -> fin r.responseText)
@@ -479,7 +493,7 @@ module Prom =
         ) |> unbox<Promise<string>>
 
     
-    let fetchBuffer (url : string) =
+    let inline fetchBuffer (url : string) =
         Promise.Create(fun fin err ->
             let r = XMLHttpRequest.Create()
             r.responseType <- "arraybuffer"
@@ -491,37 +505,35 @@ module Prom =
         ) |> unbox<Promise<ArrayBuffer>>
 
 
-    let create (conts : ('a -> unit) -> (obj -> unit) -> unit) : Promise<'a> =
+    let inline create (conts : ('a -> unit) -> (obj -> unit) -> unit) : Promise<'a> =
         Promise.Create(fun s e ->
             conts (unbox s) e
         ) |> unbox<Promise<'a>>
         
-    let delay (time : int) =
-        create (fun ok error ->
+    let inline delay (time : int) =
+        Promise.Create (fun ok error ->
             setTimeout ok time |> ignore
-        )
+        ) |> unbox<Promise<unit>>
 
-    let value (v : 'a) =
-        Promise.resolve v
+    let inline value (v : 'a) =
+        let res = Promise.resolve v
+        Fable.Core.JsInterop.(?<-) res "resolved" v
+        res
 
-    let map (f : 'a -> 'b) (p : Promise<'a>) =
-        create (fun s e ->
-            p.``then``(
-                (fun v -> s (f v)),
-                (fun str -> e str)
-            ) |> ignore
-        )
+    let inline map (f : 'a -> 'b) (p : Promise<'a>) =
+        p.``then`` f
 
-    let all (ps : seq<Promise<'a>>) =
+    let inline all (ps : seq<Promise<'a>>) =
         Promise.all(Seq.toArray ps) |> unbox<Promise<seq<'a>>>
 
-    let bind (f : 'a -> Promise<'b>) (m : Promise<'a>) =
-        create (fun s e ->
-            m.``then``(
-                (fun v -> (f v).``then``(s, e) |> ignore),
-                (fun err -> e err)
-            ) |> ignore
-        )
+    let inline bind (f : 'a -> Promise<'b>) (m : Promise<'a>) =
+        m.``then``(f) |> unbox<Promise<'b>>
+        //create (fun s e ->
+        //    m.``then``(
+        //        (fun v -> (f v).``then``(s, e) |> ignore),
+        //        (fun err -> e err)
+        //    ) |> ignore
+        //)
 
 type Status =
     | Waiting   = 0
@@ -788,28 +800,42 @@ module PromiseMonad =
 
 
     type PromiseBuilder() =
-        member x.Return v = Prom.value v
-        member x.Bind(m : Promise<'a>, mapping : 'a -> Promise<'b>) = Prom.bind mapping m
-        member x.Delay (f : unit -> Promise<'a>) = f
+        member inline x.ReturnFrom (p : Promise<'a>) = p
+        member inline x.Return v = Prom.value v
+        member inline x.Bind(m : Promise<'a>, mapping : 'a -> Promise<'b>) = Prom.bind mapping m
+        member inline x.Delay (f : unit -> Promise<'a>) = f
 
-        member x.For(s : seq<'a>, f : 'a -> Promise<unit>) =
-            s |> Seq.map f |> Seq.toArray |> Prom.all |> unbox<Promise<unit>>
+        member inline x.For(s : seq<'a>, f : 'a -> Promise<unit>) =
+            let l = Seq.toArray s
+            let rec run (i : int) (l : array<'a>) =
+                if i >= l.Length then
+                    Prom.value ()
+                else
+                    f l.[i] |> Prom.bind (fun () ->
+                        run (i+1) l
+                    )
+            run 0 l
 
-        member x.Zero() = Prom.value ()
-        member x.Combine(l : Promise<unit>, r : unit -> Promise<'a>) = Prom.bind r l
+        member x.While(guard : unit -> bool, body : unit -> Promise<unit>) =
+            if guard() then body() |> Prom.bind (fun () -> x.While(guard, body))
+            else Prom.value()
 
-        member x.TryWith (f : unit -> Promise<'a>, err : obj -> Promise<'a>) =
-            Prom.create (fun s realError ->
-                try 
-                    f().``then``(
-                        (fun v -> try s v with e -> err(e).``then``(s, realError) |> ignore),
-                        (fun e -> err(e).``then``(s, realError) |> ignore)
-                    ) |> ignore
-                with e ->
-                    err(e).``then``(s, realError) |> ignore
-            )
+        member inline x.Zero() = Prom.value ()
+        member inline x.Combine(l : Promise<unit>, r : unit -> Promise<'a>) = Prom.bind r l
 
-        member x.Run(f : unit -> Promise<'a>) = f()
+        member inline x.TryWith (f : unit -> Promise<'a>, err : obj -> Promise<'a>) =
+            f().catch(fun e -> unbox (err e))
+            //Prom.create (fun s realError ->
+            //    try 
+            //        f().``then``(
+            //            (fun v -> try s v with e -> err(e).``then``(s, realError) |> ignore),
+            //            (fun e -> err(e).``then``(s, realError) |> ignore)
+            //        ) |> ignore
+            //    with e ->
+            //        err(e).``then``(s, realError) |> ignore
+            //)
+
+        member inline x.Run(f : unit -> Promise<'a>) = f()
 
     let promise = PromiseBuilder()
 

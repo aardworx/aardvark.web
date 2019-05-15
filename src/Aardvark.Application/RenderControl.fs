@@ -60,9 +60,12 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool, alpha : bool) =
         canvas.addEventListener("webglcontextrestored", EventListenerOrEventListenerObject.Case1 (fun _ -> Log.warn "context restored"))
         let dbgRenderInfo = gl.getExtension("WEBGL_debug_renderer_info") |> unbox<WEBGL_debug_renderer_info>
         if unbox dbgRenderInfo then
-          let name = gl.getParameter(dbgRenderInfo.UNMASKED_RENDERER_WEBGL) |> unbox<string>
-          let vendor = gl.getParameter(dbgRenderInfo.UNMASKED_VENDOR_WEBGL) |> unbox<string>
-          Log.line "%s %s" vendor name
+            let name = gl.getParameter(dbgRenderInfo.UNMASKED_RENDERER_WEBGL) |> unbox<string>
+            let vendor = gl.getParameter(dbgRenderInfo.UNMASKED_VENDOR_WEBGL) |> unbox<string>
+            Log.startCollapsed "[GL] renderer"
+            Log.line "vendor:   %s" vendor
+            Log.line "renderer: %s" name
+            Log.stop()
 
     let signature = ctx.DefaultFramebufferSignature
 
@@ -72,7 +75,9 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool, alpha : bool) =
         let rect = canvas.getBoundingClientRect()
         Mod.init (V2i(int rect.width, int rect.height))
 
-    let time = Mod.custom (fun _ -> performance.now() / 1000.0)
+    let timeMod = 
+        Mod.init (performance.now() / 1000.0)
+        //Mod.custom (fun _ -> performance.now() / 1000.0)
 
     let mutable task = RenderTask.empty
     let mutable showFps = true
@@ -244,7 +249,7 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool, alpha : bool) =
 
                 )
             pp.``then``(fun () ->
-                transact (fun () -> time.MarkOutdated())
+                transact (fun () -> timeMod.Value <- performance.now() / 1000.0)
                 inRender <- false
                 clearTimeout hide
                 hide <- setTimeout hideOverlay 300
@@ -264,7 +269,7 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool, alpha : bool) =
     member x.Keyboard = keyboard :> IKeyboard
     member x.Mouse = mouse :> IMouse
     member x.Size = size :> IMod<_>
-    member x.Time = time 
+    member x.Time = timeMod :> IMod<_>
 
     member x.ShowFps
         with get() = showFps

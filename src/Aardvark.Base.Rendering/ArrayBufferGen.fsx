@@ -101,6 +101,7 @@ let run() =
             printfn "    let store = %sArray.Create(arr, byteOffset, (%d * length))" arrName cnt
         
         let ut = PrimitiveType.underlyingType t
+        let utn = PrimitiveType.toTypeName ut
         let toPublic =
             match ut with
             | Float 32 -> sprintf "float(%s)"
@@ -153,6 +154,17 @@ let run() =
             printfn "        let res = %sBuffer(cnt)" (PrimitiveType.toBufferPrefix t)
             printfn "        for i in 0 .. cnt - 1 do res.[i] <- value"
             printfn "        res"
+
+            
+            printfn "    static member filter (predicate : %s -> bool) (x : %sBuffer) = " tt (PrimitiveType.toBufferPrefix t)
+            printfn "        let res = %sBuffer(x.Length)" (PrimitiveType.toBufferPrefix t)
+            printfn "        let mutable o = 0"
+            printfn "        for i in 0 .. x.Length - 1 do"
+            printfn "            if predicate x.[i] then"
+            printfn "                res.[o] <- x.[i]"
+            printfn "                o <- o + 1"
+            printfn "        res.Sub(0, o)"
+
         printfn "    static member zeroCreate (cnt : int) = "
         printfn "        %sBuffer(cnt)" (PrimitiveType.toBufferPrefix t)
         
@@ -177,14 +189,14 @@ let run() =
         
         if exists then
             printfn "    interface IArrayBuffer<%s> with" tt
-            printfn "        member x.Item"
-            printfn "            with get(i : int) = x.[i]"
-            printfn "            and set(i : int) (v : %s) = x.[i] <- v" tt
+            printfn "        member x.Get(i : int) = x.[i]"
+            printfn "        member x.Set(i : int, v : %s) = x.[i] <- v" tt
 
 
 
         if exists then
             printfn "type %sList(initialCapacity : int) ="  (PrimitiveType.toBufferPrefix t)
+            printfn "    let initialCapacity = max 16 initialCapacity" 
             printfn "    let mutable store = %sArray.Create ((%d * initialCapacity))" arrName cnt
             printfn "    let mutable capacity = initialCapacity"
             printfn "    let mutable count = 0"
@@ -218,6 +230,24 @@ let run() =
                     | None ->
                         ()
             printfn "        count <- count + 1"
+
+            if cnt > 1 then
+                let args = List.init cnt (sprintf "arg%d")
+                printfn "    member x.Add(%s) =" (args |> List.map (fun n -> sprintf "%s : %s" n utn) |> String.concat ", ")
+                printfn "        if count >= capacity then"
+                printfn "            resize (2 * capacity)"
+                printfn "        let mutable id = %d * count" cnt
+                for a in args do
+                    printfn "        store.[id] <- %s" (toInternal a)
+                    printfn "        id <- id + 1"
+                printfn "        count <- count + 1"
+                    
+            printfn "    member x.AddRange(b : IArrayBuffer<%s>) =" tt
+            printfn "        let newCount = count + b.Length"
+            printfn "        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)"
+            printfn "        for i in 0 .. b.Length - 1 do"
+            printfn "            x.[count] <- b.Get i"
+            printfn "            count <- count + 1"
 
         
             printfn "    member x.RemoveAt(index : int) ="
@@ -257,9 +287,8 @@ let run() =
             printfn "        member x.View = %sArray.Create(store.buffer, 0, (%d * count)) |> unbox<ArrayBufferView>" arrName cnt
 
             printfn "    interface IArrayBuffer<%s> with" tt
-            printfn "        member x.Item"
-            printfn "            with get(i : int) = x.[i]"
-            printfn "            and set(i : int) (v : %s) = x.[i] <- v" tt
+            printfn "        member x.Get(i : int) = x.[i]"
+            printfn "        member x.Set(i : int, v : %s) = x.[i] <- v" tt
             printfn "    new() = %sList(8)" (PrimitiveType.toBufferPrefix t)
 
     let types =

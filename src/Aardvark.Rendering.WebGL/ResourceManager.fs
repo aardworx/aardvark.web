@@ -491,10 +491,10 @@ type ResourceManager(ctx : Context) =
         } :> IResource<_>
 
 
-    member x.CreateProgram(signature : FramebufferSignature, code : string) =
+    member x.CreateProgram(signature : FramebufferSignature, code : string, iface : FShade.GLSL.GLSLProgramInterface) =
         let program = 
             programCache.GetOrCreate((signature, code), fun (signature, code) ->
-                let program = ctx.CreateProgram(signature, code)
+                let program = ctx.CreateProgram(signature, code, iface)
                 match program with
                 | Some p -> p.Acquire()
                 | None -> ()

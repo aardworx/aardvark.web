@@ -268,4 +268,5 @@ module SgExtensions =
 module TraversalState =
     let modelTrafo (s : TraversalState) = List.foldBack (Sg.(<*>)) s.trafos (Mod.constant Trafo3d.Identity)
     let modelViewTrafo (s : TraversalState) = (Sg.(<*>)) (modelTrafo s) s.viewTrafo
+    let viewProjTrafo (s : TraversalState) = (Sg.(<*>)) s.viewTrafo s.projTrafo
     let modelViewProjTrafo (s : TraversalState) = (Sg.(<*>)) (modelViewTrafo s) s.projTrafo

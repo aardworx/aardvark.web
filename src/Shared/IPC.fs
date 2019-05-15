@@ -12,5 +12,6 @@ type Command =
     
 [<RequireQualifiedAccess>]
 type Reply =
+    | SetRootCenter of id : int * center : V3d
     | Perform of array<Guid * Operation<Aardvark.Import.JS.ArrayBuffer>> //AtomicOperation<Guid, Map<Def, obj>>
     | Info of string

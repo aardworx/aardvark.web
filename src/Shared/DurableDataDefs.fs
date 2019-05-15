@@ -325,6 +325,16 @@ module Durable =
             }
         addDef PointCountCell
 
+        
+        /// Octree. Total Number of points in this cell. double.
+        let TotalPointCount = {
+            Id = Guid("6bef7603-47fa-405f-a330-a1ac1b09c475")
+            Name = "Octree.TotalPointCount"
+            Description = "Octree. Number of points in this subtree. double."
+            Type = Primitives.Float64.Id
+            }
+        addDef TotalPointCount
+
         /// Octree. Average distance of each point to its nearest neighbour. float32.
         let AveragePointDistance = {
             Id = Guid("39c21132-4570-4624-afae-6304851567d7")

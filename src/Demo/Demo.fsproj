@@ -5,6 +5,7 @@
     <TargetFramework>netcoreapp2.2</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Future.fs" />
     <Compile Include="Sample.fs" />
     <Compile Include="ElmishTest.fs" />
     <Compile Include="Program.fs" />

@@ -375,7 +375,7 @@ module Resources =
 
 
                 let str = if glsl300 then "GLES300" else "GLES100"
-                Log.start "compiled %s (%d)" str glsl.code.Length
+                Log.startCollapsed "[GL] compiled %s (%d)" str glsl.code.Length
                 printShader glsl
                 Log.stop()
 
@@ -394,7 +394,7 @@ module Resources =
             let shader = ShaderCompiler.compile gl.IsGL2 signature o.shader
 
 
-            let program = x.CreateProgram(signature, shader.code)
+            let program = x.CreateProgram(signature, shader.code, shader.iface)
 
 
             let uniformBuffers = 

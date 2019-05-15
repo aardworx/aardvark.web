@@ -6,12 +6,24 @@ open Aardvark.Base.Rendering
 open Aardvark.Base.Incremental
 
 type Box3d(bmin : V3d, bmax : V3d) =
+    let mutable bmin = bmin
+    let mutable bmax = bmax
+
     member x.Min = bmin
     member x.Max = bmax
 
     member x.Center = 0.5 * (bmin + bmax)
 
     member x.Size = bmax - bmin
+
+    member x.ExtendBy(v : V3d) =
+        bmin <- V3d(min bmin.X v.X, min bmin.Y v.Y, min bmin.Z v.Z)
+        bmax <- V3d(max bmax.X v.X, max bmax.Y v.Y, max bmax.Z v.Z)
+
+        
+    member __.ExtendBy(x : float, y : float, z : float) =
+        bmin <- V3d(min bmin.X x, min bmin.Y y, min bmin.Z z)
+        bmax <- V3d(max bmax.X x, max bmax.Y y, max bmax.Z z)
 
     member x.GetMinMaxInDirection(dir : V3d) =
         let mutable xmin = System.Double.NegativeInfinity
@@ -43,6 +55,42 @@ type Box3d(bmin : V3d, bmax : V3d) =
             zmax <- bmin.Z
 
         V3d(xmin, ymin, zmin), V3d(xmax, ymax, zmax)
+        
+    member x.GetMinInDirection(dir : V3d) =
+        V3d(
+            (if dir.X >= 0.0 then bmin.X else bmax.X),
+            (if dir.Y >= 0.0 then bmin.Y else bmax.Y),
+            (if dir.Z >= 0.0 then bmin.Z else bmax.Z)
+        )
+    member x.GetMaxInDirection(dir : V3d) =
+        V3d(
+            (if dir.X >= 0.0 then bmax.X else bmin.X),
+            (if dir.Y >= 0.0 then bmax.Y else bmin.Y),
+            (if dir.Z >= 0.0 then bmax.Z else bmin.Z)
+        )
+        
+    member internal x.GetMinInDirection4(dir : V3d) =
+        V4d(
+            (if dir.X >= 0.0 then bmin.X else bmax.X),
+            (if dir.Y >= 0.0 then bmin.Y else bmax.Y),
+            (if dir.Z >= 0.0 then bmin.Z else bmax.Z),
+            1.0
+        )
+    member internal x.GetMaxInDirection4(dir : V3d) =
+        V4d(
+            (if dir.X >= 0.0 then bmax.X else bmin.X),
+            (if dir.Y >= 0.0 then bmax.Y else bmin.Y),
+            (if dir.Z >= 0.0 then bmax.Z else bmin.Z),
+            1.0
+        )
+
+    member x.GetMaxPlaneHeight(plane : V4d) =
+        (if plane.X >= 0.0 then bmax.X else bmin.X) * plane.X +
+        (if plane.Y >= 0.0 then bmax.Y else bmin.Y) * plane.Y +
+        (if plane.Z >= 0.0 then bmax.Z else bmin.Z) * plane.Z +
+        plane.W
+
+
 
     member x.IntersectsViewProj (vp : Trafo3d) =
         let r0 = vp.Forward.R0
@@ -50,52 +98,85 @@ type Box3d(bmin : V3d, bmax : V3d) =
         let r2 = vp.Forward.R2
         let r3 = vp.Forward.R3
 
-        let mutable plane = V4d.Zero
-        let mutable n = V3d.Zero
+        let inline plane (v : V4d) = v / v.XYZ.Length
 
-        //left
-        plane <- r3 + r0
-        n <- plane.XYZ
-        let (min, max) = x.GetMinMaxInDirection(n)
-        if (min.Dot(n) + plane.W < 0.0 && max.Dot(n) + plane.W < 0.0) then false
-        else
-            //right
-            plane <- r3 - r0;
-            n <- plane.XYZ
-            let (min, max) = x.GetMinMaxInDirection(n)
-            if (min.Dot(n) + plane.W < 0.0 && max.Dot(n) + plane.W < 0.0) then false
-            else
-                //top
-                plane <- r3 + r1
-                n <- plane.XYZ
-                let (min, max) = x.GetMinMaxInDirection(n)
-                if (min.Dot(n) + plane.W < 0.0 && max.Dot(n) + plane.W < 0.0) then false
-                else
-                    //bottom
-                    plane <- r3 - r1
-                    n <- plane.XYZ
-                    let (min, max) = x.GetMinMaxInDirection(n)
-                    if (min.Dot(n) + plane.W < 0.0 && max.Dot(n) + plane.W < 0.0) then false
-                    else
-                        //near
-                        plane <- r2;
-                        n <- plane.XYZ
-                        let (min, max) = x.GetMinMaxInDirection(n)
-                        if (min.Dot(n) + plane.W < 0.0 && max.Dot(n) + plane.W < 0.0) then false
-                        else
+        let planes =
+            [|
+                plane (r3 + r0)
+                plane (r3 - r0)
+                plane (r3 + r1)
+                plane (r3 - r1)
+                plane (r3 + r2)
+                plane (r3 - r2)
+            |]
 
-                            //far
-                            plane <- r3 - r2
-                            n <- plane.XYZ
-                            let (min, max) = x.GetMinMaxInDirection(n)
-                            if (min.Dot(n) + plane.W < 0.0 && max.Dot(n) + plane.W < 0.0) then false
-                            else true
+        planes |> Array.forall (fun plane ->
+            x.GetMaxPlaneHeight(plane) >= 0.0
+        )
+
+        ////left
+        //let plane = r3 + r0
+        //let max = x.GetMaxInDirection4(plane.XYZ)
+        //if (max.Dot(plane) < 0.0) then false
+        //else
+        //    //right
+        //    let plane = r3 - r0
+        //    let max = x.GetMaxInDirection4(plane.XYZ)
+        //    if (max.Dot(plane) < 0.0) then false
+        //    else
+        //        //top
+        //        let plane = r3 + r1
+        //        let max = x.GetMaxInDirection4(plane.XYZ)
+        //        if (max.Dot(plane) < 0.0) then false
+        //        else
+        //            //bottom
+        //            let plane = r3 - r1
+        //            let max = x.GetMaxInDirection4(plane.XYZ)
+        //            if (max.Dot(plane) < 0.0) then false
+        //            else
+        //                //near
+        //                let plane = r3 + r2;
+        //                let max = x.GetMaxInDirection4(plane.XYZ)
+        //                if (max.Dot(plane) < 0.0) then false
+        //                else
+        //                    //far
+        //                    let plane = r3 - r2
+        //                    let max = x.GetMaxInDirection4(plane.XYZ)
+        //                    if (max.Dot(plane) < 0.0) then false
+        //                    else true
+
+    member x.Contains(v : V3d) =
+        v.AllGreaterOrEqual x.Min && v.AllSmallerOrEqual x.Max
+
+    member x.Contains(b : Box3d) =
+        x.Contains b.Min && x.Contains b.Max
+
+    member x.Volume =
+        let s = x.Size
+        s.X * s.Y * s.Z
 
     static member FromMinAndSize(min : V3d, size : V3d) =
         Box3d(min, min + size)
 
     static member Unit =
         Box3d(V3d.Zero, V3d.III)
+        
+    static member Invalid =
+        Box3d(V3d(System.Double.PositiveInfinity, System.Double.PositiveInfinity, System.Double.PositiveInfinity), V3d(System.Double.NegativeInfinity, System.Double.NegativeInfinity, System.Double.NegativeInfinity) )
+    static member Union(l : Box3d, r : Box3d) =
+        Box3d(
+            V3d(min l.Min.X r.Min.X, min l.Min.Y r.Min.Y, min l.Min.Z r.Min.Z),
+            V3d(max l.Max.X r.Max.X, max l.Max.Y r.Max.Y, max l.Max.Z r.Max.Z)
+        )
+            
+    new (ps : IArrayBuffer<V3d>) =
+        let mutable bmin = V3d(System.Double.PositiveInfinity, System.Double.PositiveInfinity, System.Double.PositiveInfinity)
+        let mutable bmax = V3d(System.Double.NegativeInfinity, System.Double.NegativeInfinity, System.Double.NegativeInfinity)
+        for i in 0 .. ps.Length - 1 do
+            let p = ps.Get i
+            bmin <- V3d(min bmin.X p.X, min bmin.Y p.Y, min bmin.Z p.Z)
+            bmax <- V3d(max bmax.X p.X, max bmax.Y p.Y, max bmax.Z p.Z)
+        Box3d(bmin, bmax)
 
 type Triangle3d(p0 : V3d, p1 : V3d, p2 : V3d) =
     member x.P0 = p0

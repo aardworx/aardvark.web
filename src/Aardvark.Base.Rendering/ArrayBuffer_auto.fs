@@ -21,6 +21,14 @@ type Int8Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = Int8Buffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : int8 -> bool) (x : Int8Buffer) = 
+        let res = Int8Buffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         Int8Buffer(cnt)
     static member ofArray (arr : int8[]) = 
@@ -38,10 +46,10 @@ type Int8Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<int8> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : int8) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : int8) = x.[i] <- v
 type Int8List(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Int8Array.Create ((1 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -65,6 +73,12 @@ type Int8List(initialCapacity : int) =
             resize (2 * capacity)
         store.[count] <- value
         count <- count + 1
+    member x.AddRange(b : IArrayBuffer<int8>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -85,9 +99,8 @@ type Int8List(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Int8Buffer(store.buffer, 1 * start, count) :> IArrayBuffer
         member x.View = Int8Array.Create(store.buffer, 0, (1 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<int8> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : int8) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : int8) = x.[i] <- v
     new() = Int8List(8)
 type Int16Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Int16Array.Create(arr, byteOffset, length)
@@ -108,6 +121,14 @@ type Int16Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = Int16Buffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : int16 -> bool) (x : Int16Buffer) = 
+        let res = Int16Buffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         Int16Buffer(cnt)
     static member ofArray (arr : int16[]) = 
@@ -125,10 +146,10 @@ type Int16Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<int16> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : int16) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : int16) = x.[i] <- v
 type Int16List(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Int16Array.Create ((1 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -152,6 +173,12 @@ type Int16List(initialCapacity : int) =
             resize (2 * capacity)
         store.[count] <- value
         count <- count + 1
+    member x.AddRange(b : IArrayBuffer<int16>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -172,9 +199,8 @@ type Int16List(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Int16Buffer(store.buffer, 2 * start, count) :> IArrayBuffer
         member x.View = Int16Array.Create(store.buffer, 0, (1 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<int16> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : int16) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : int16) = x.[i] <- v
     new() = Int16List(8)
 type Int32Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Int32Array.Create(arr, byteOffset, length)
@@ -195,6 +221,14 @@ type Int32Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = Int32Buffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : int32 -> bool) (x : Int32Buffer) = 
+        let res = Int32Buffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         Int32Buffer(cnt)
     static member ofArray (arr : int32[]) = 
@@ -212,10 +246,10 @@ type Int32Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<int32> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : int32) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : int32) = x.[i] <- v
 type Int32List(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Int32Array.Create ((1 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -239,6 +273,12 @@ type Int32List(initialCapacity : int) =
             resize (2 * capacity)
         store.[count] <- value
         count <- count + 1
+    member x.AddRange(b : IArrayBuffer<int32>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -259,9 +299,8 @@ type Int32List(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Int32Buffer(store.buffer, 4 * start, count) :> IArrayBuffer
         member x.View = Int32Array.Create(store.buffer, 0, (1 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<int32> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : int32) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : int32) = x.[i] <- v
     new() = Int32List(8)
 type Uint8Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Uint8Array.Create(arr, byteOffset, length)
@@ -282,6 +321,14 @@ type Uint8Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = Uint8Buffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : uint8 -> bool) (x : Uint8Buffer) = 
+        let res = Uint8Buffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         Uint8Buffer(cnt)
     static member ofArray (arr : uint8[]) = 
@@ -299,10 +346,10 @@ type Uint8Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<uint8> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : uint8) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : uint8) = x.[i] <- v
 type Uint8List(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Uint8Array.Create ((1 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -326,6 +373,12 @@ type Uint8List(initialCapacity : int) =
             resize (2 * capacity)
         store.[count] <- value
         count <- count + 1
+    member x.AddRange(b : IArrayBuffer<uint8>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -346,9 +399,8 @@ type Uint8List(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Uint8Buffer(store.buffer, 1 * start, count) :> IArrayBuffer
         member x.View = Uint8Array.Create(store.buffer, 0, (1 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<uint8> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : uint8) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : uint8) = x.[i] <- v
     new() = Uint8List(8)
 type Uint16Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Uint16Array.Create(arr, byteOffset, length)
@@ -369,6 +421,14 @@ type Uint16Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = Uint16Buffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : uint16 -> bool) (x : Uint16Buffer) = 
+        let res = Uint16Buffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         Uint16Buffer(cnt)
     static member ofArray (arr : uint16[]) = 
@@ -386,10 +446,10 @@ type Uint16Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<uint16> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : uint16) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : uint16) = x.[i] <- v
 type Uint16List(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Uint16Array.Create ((1 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -413,6 +473,12 @@ type Uint16List(initialCapacity : int) =
             resize (2 * capacity)
         store.[count] <- value
         count <- count + 1
+    member x.AddRange(b : IArrayBuffer<uint16>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -433,9 +499,8 @@ type Uint16List(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Uint16Buffer(store.buffer, 2 * start, count) :> IArrayBuffer
         member x.View = Uint16Array.Create(store.buffer, 0, (1 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<uint16> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : uint16) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : uint16) = x.[i] <- v
     new() = Uint16List(8)
 type Uint32Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Uint32Array.Create(arr, byteOffset, length)
@@ -456,6 +521,14 @@ type Uint32Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = Uint32Buffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : uint32 -> bool) (x : Uint32Buffer) = 
+        let res = Uint32Buffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         Uint32Buffer(cnt)
     static member ofArray (arr : uint32[]) = 
@@ -473,10 +546,10 @@ type Uint32Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<uint32> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : uint32) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : uint32) = x.[i] <- v
 type Uint32List(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Uint32Array.Create ((1 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -500,6 +573,12 @@ type Uint32List(initialCapacity : int) =
             resize (2 * capacity)
         store.[count] <- value
         count <- count + 1
+    member x.AddRange(b : IArrayBuffer<uint32>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -520,9 +599,8 @@ type Uint32List(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Uint32Buffer(store.buffer, 4 * start, count) :> IArrayBuffer
         member x.View = Uint32Array.Create(store.buffer, 0, (1 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<uint32> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : uint32) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : uint32) = x.[i] <- v
     new() = Uint32List(8)
 type Float32Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Float32Array.Create(arr, byteOffset, length)
@@ -543,6 +621,14 @@ type Float32Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = Float32Buffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : float -> bool) (x : Float32Buffer) = 
+        let res = Float32Buffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         Float32Buffer(cnt)
     static member ofArray (arr : float[]) = 
@@ -560,10 +646,10 @@ type Float32Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<float> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : float) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : float) = x.[i] <- v
 type Float32List(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Float32Array.Create ((1 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -587,6 +673,12 @@ type Float32List(initialCapacity : int) =
             resize (2 * capacity)
         store.[count] <- float32(value)
         count <- count + 1
+    member x.AddRange(b : IArrayBuffer<float>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -607,9 +699,8 @@ type Float32List(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Float32Buffer(store.buffer, 4 * start, count) :> IArrayBuffer
         member x.View = Float32Array.Create(store.buffer, 0, (1 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<float> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : float) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : float) = x.[i] <- v
     new() = Float32List(8)
 type Float64Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Float64Array.Create(arr, byteOffset, length)
@@ -630,6 +721,14 @@ type Float64Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = Float64Buffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : float -> bool) (x : Float64Buffer) = 
+        let res = Float64Buffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         Float64Buffer(cnt)
     static member ofArray (arr : float[]) = 
@@ -647,10 +746,10 @@ type Float64Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<float> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : float) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : float) = x.[i] <- v
 type Float64List(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Float64Array.Create ((1 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -674,6 +773,12 @@ type Float64List(initialCapacity : int) =
             resize (2 * capacity)
         store.[count] <- value
         count <- count + 1
+    member x.AddRange(b : IArrayBuffer<float>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -694,9 +799,8 @@ type Float64List(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Float64Buffer(store.buffer, 8 * start, count) :> IArrayBuffer
         member x.View = Float64Array.Create(store.buffer, 0, (1 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<float> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : float) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : float) = x.[i] <- v
     new() = Float64List(8)
 type C3bBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Uint8Array.Create(arr, byteOffset, (3 * length))
@@ -752,6 +856,14 @@ type V2iBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = V2iBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : V2i -> bool) (x : V2iBuffer) = 
+        let res = V2iBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         V2iBuffer(cnt)
     static member ofArray (arr : V2i[]) = 
@@ -769,10 +881,10 @@ type V2iBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<V2i> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V2i) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V2i) = x.[i] <- v
 type V2iList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Int32Array.Create ((2 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -798,6 +910,21 @@ type V2iList(initialCapacity : int) =
         store.[id + 0] <- value.X
         store.[id + 1] <- value.Y
         count <- count + 1
+    member x.Add(arg0 : int32, arg1 : int32) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 2 * count
+        store.[id] <- arg0
+        id <- id + 1
+        store.[id] <- arg1
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<V2i>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -821,9 +948,8 @@ type V2iList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Int32Buffer(store.buffer, 8 * start, count) :> IArrayBuffer
         member x.View = Int32Array.Create(store.buffer, 0, (2 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<V2i> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V2i) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V2i) = x.[i] <- v
     new() = V2iList(8)
 type V3iBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Int32Array.Create(arr, byteOffset, (3 * length))
@@ -848,6 +974,14 @@ type V3iBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = V3iBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : V3i -> bool) (x : V3iBuffer) = 
+        let res = V3iBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         V3iBuffer(cnt)
     static member ofArray (arr : V3i[]) = 
@@ -865,10 +999,10 @@ type V3iBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<V3i> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V3i) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V3i) = x.[i] <- v
 type V3iList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Int32Array.Create ((3 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -895,6 +1029,23 @@ type V3iList(initialCapacity : int) =
         store.[id + 1] <- value.Y
         store.[id + 2] <- value.Z
         count <- count + 1
+    member x.Add(arg0 : int32, arg1 : int32, arg2 : int32) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 3 * count
+        store.[id] <- arg0
+        id <- id + 1
+        store.[id] <- arg1
+        id <- id + 1
+        store.[id] <- arg2
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<V3i>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -919,9 +1070,8 @@ type V3iList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Int32Buffer(store.buffer, 12 * start, count) :> IArrayBuffer
         member x.View = Int32Array.Create(store.buffer, 0, (3 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<V3i> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V3i) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V3i) = x.[i] <- v
     new() = V3iList(8)
 type V4iBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Int32Array.Create(arr, byteOffset, (4 * length))
@@ -947,6 +1097,14 @@ type V4iBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = V4iBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : V4i -> bool) (x : V4iBuffer) = 
+        let res = V4iBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         V4iBuffer(cnt)
     static member ofArray (arr : V4i[]) = 
@@ -964,10 +1122,10 @@ type V4iBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<V4i> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V4i) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V4i) = x.[i] <- v
 type V4iList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Int32Array.Create ((4 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -995,6 +1153,25 @@ type V4iList(initialCapacity : int) =
         store.[id + 2] <- value.Z
         store.[id + 3] <- value.W
         count <- count + 1
+    member x.Add(arg0 : int32, arg1 : int32, arg2 : int32, arg3 : int32) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 4 * count
+        store.[id] <- arg0
+        id <- id + 1
+        store.[id] <- arg1
+        id <- id + 1
+        store.[id] <- arg2
+        id <- id + 1
+        store.[id] <- arg3
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<V4i>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -1020,9 +1197,8 @@ type V4iList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Int32Buffer(store.buffer, 16 * start, count) :> IArrayBuffer
         member x.View = Int32Array.Create(store.buffer, 0, (4 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<V4i> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V4i) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V4i) = x.[i] <- v
     new() = V4iList(8)
 type V2fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Float32Array.Create(arr, byteOffset, (2 * length))
@@ -1046,6 +1222,14 @@ type V2fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = V2fBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : V2d -> bool) (x : V2fBuffer) = 
+        let res = V2fBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         V2fBuffer(cnt)
     static member ofArray (arr : V2d[]) = 
@@ -1063,10 +1247,10 @@ type V2fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<V2d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V2d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V2d) = x.[i] <- v
 type V2fList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Float32Array.Create ((2 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -1092,6 +1276,21 @@ type V2fList(initialCapacity : int) =
         store.[id + 0] <- float32(value.X)
         store.[id + 1] <- float32(value.Y)
         count <- count + 1
+    member x.Add(arg0 : float, arg1 : float) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 2 * count
+        store.[id] <- float32(arg0)
+        id <- id + 1
+        store.[id] <- float32(arg1)
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<V2d>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -1115,9 +1314,8 @@ type V2fList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Float32Buffer(store.buffer, 8 * start, count) :> IArrayBuffer
         member x.View = Float32Array.Create(store.buffer, 0, (2 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<V2d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V2d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V2d) = x.[i] <- v
     new() = V2fList(8)
 type V3fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Float32Array.Create(arr, byteOffset, (3 * length))
@@ -1142,6 +1340,14 @@ type V3fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = V3fBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : V3d -> bool) (x : V3fBuffer) = 
+        let res = V3fBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         V3fBuffer(cnt)
     static member ofArray (arr : V3d[]) = 
@@ -1159,10 +1365,10 @@ type V3fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<V3d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V3d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V3d) = x.[i] <- v
 type V3fList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Float32Array.Create ((3 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -1189,6 +1395,23 @@ type V3fList(initialCapacity : int) =
         store.[id + 1] <- float32(value.Y)
         store.[id + 2] <- float32(value.Z)
         count <- count + 1
+    member x.Add(arg0 : float, arg1 : float, arg2 : float) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 3 * count
+        store.[id] <- float32(arg0)
+        id <- id + 1
+        store.[id] <- float32(arg1)
+        id <- id + 1
+        store.[id] <- float32(arg2)
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<V3d>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -1213,9 +1436,8 @@ type V3fList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Float32Buffer(store.buffer, 12 * start, count) :> IArrayBuffer
         member x.View = Float32Array.Create(store.buffer, 0, (3 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<V3d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V3d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V3d) = x.[i] <- v
     new() = V3fList(8)
 type V4fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Float32Array.Create(arr, byteOffset, (4 * length))
@@ -1241,6 +1463,14 @@ type V4fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = V4fBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : V4d -> bool) (x : V4fBuffer) = 
+        let res = V4fBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         V4fBuffer(cnt)
     static member ofArray (arr : V4d[]) = 
@@ -1258,10 +1488,10 @@ type V4fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<V4d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V4d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V4d) = x.[i] <- v
 type V4fList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Float32Array.Create ((4 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -1289,6 +1519,25 @@ type V4fList(initialCapacity : int) =
         store.[id + 2] <- float32(value.Z)
         store.[id + 3] <- float32(value.W)
         count <- count + 1
+    member x.Add(arg0 : float, arg1 : float, arg2 : float, arg3 : float) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 4 * count
+        store.[id] <- float32(arg0)
+        id <- id + 1
+        store.[id] <- float32(arg1)
+        id <- id + 1
+        store.[id] <- float32(arg2)
+        id <- id + 1
+        store.[id] <- float32(arg3)
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<V4d>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -1314,9 +1563,8 @@ type V4fList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Float32Buffer(store.buffer, 16 * start, count) :> IArrayBuffer
         member x.View = Float32Array.Create(store.buffer, 0, (4 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<V4d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V4d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V4d) = x.[i] <- v
     new() = V4fList(8)
 type V2dBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Float64Array.Create(arr, byteOffset, (2 * length))
@@ -1340,6 +1588,14 @@ type V2dBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = V2dBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : V2d -> bool) (x : V2dBuffer) = 
+        let res = V2dBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         V2dBuffer(cnt)
     static member ofArray (arr : V2d[]) = 
@@ -1357,10 +1613,10 @@ type V2dBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<V2d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V2d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V2d) = x.[i] <- v
 type V2dList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Float64Array.Create ((2 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -1386,6 +1642,21 @@ type V2dList(initialCapacity : int) =
         store.[id + 0] <- value.X
         store.[id + 1] <- value.Y
         count <- count + 1
+    member x.Add(arg0 : float, arg1 : float) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 2 * count
+        store.[id] <- arg0
+        id <- id + 1
+        store.[id] <- arg1
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<V2d>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -1409,9 +1680,8 @@ type V2dList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Float64Buffer(store.buffer, 16 * start, count) :> IArrayBuffer
         member x.View = Float64Array.Create(store.buffer, 0, (2 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<V2d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V2d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V2d) = x.[i] <- v
     new() = V2dList(8)
 type V3dBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Float64Array.Create(arr, byteOffset, (3 * length))
@@ -1436,6 +1706,14 @@ type V3dBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = V3dBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : V3d -> bool) (x : V3dBuffer) = 
+        let res = V3dBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         V3dBuffer(cnt)
     static member ofArray (arr : V3d[]) = 
@@ -1453,10 +1731,10 @@ type V3dBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<V3d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V3d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V3d) = x.[i] <- v
 type V3dList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Float64Array.Create ((3 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -1483,6 +1761,23 @@ type V3dList(initialCapacity : int) =
         store.[id + 1] <- value.Y
         store.[id + 2] <- value.Z
         count <- count + 1
+    member x.Add(arg0 : float, arg1 : float, arg2 : float) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 3 * count
+        store.[id] <- arg0
+        id <- id + 1
+        store.[id] <- arg1
+        id <- id + 1
+        store.[id] <- arg2
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<V3d>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -1507,9 +1802,8 @@ type V3dList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Float64Buffer(store.buffer, 24 * start, count) :> IArrayBuffer
         member x.View = Float64Array.Create(store.buffer, 0, (3 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<V3d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V3d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V3d) = x.[i] <- v
     new() = V3dList(8)
 type V4dBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Float64Array.Create(arr, byteOffset, (4 * length))
@@ -1535,6 +1829,14 @@ type V4dBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = V4dBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : V4d -> bool) (x : V4dBuffer) = 
+        let res = V4dBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         V4dBuffer(cnt)
     static member ofArray (arr : V4d[]) = 
@@ -1552,10 +1854,10 @@ type V4dBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<V4d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V4d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V4d) = x.[i] <- v
 type V4dList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Float64Array.Create ((4 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -1583,6 +1885,25 @@ type V4dList(initialCapacity : int) =
         store.[id + 2] <- value.Z
         store.[id + 3] <- value.W
         count <- count + 1
+    member x.Add(arg0 : float, arg1 : float, arg2 : float, arg3 : float) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 4 * count
+        store.[id] <- arg0
+        id <- id + 1
+        store.[id] <- arg1
+        id <- id + 1
+        store.[id] <- arg2
+        id <- id + 1
+        store.[id] <- arg3
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<V4d>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -1608,9 +1929,8 @@ type V4dList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Float64Buffer(store.buffer, 32 * start, count) :> IArrayBuffer
         member x.View = Float64Array.Create(store.buffer, 0, (4 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<V4d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : V4d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : V4d) = x.[i] <- v
     new() = V4dList(8)
 type M22fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Float32Array.Create(arr, byteOffset, (4 * length))
@@ -1636,6 +1956,14 @@ type M22fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = M22fBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : M22d -> bool) (x : M22fBuffer) = 
+        let res = M22fBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         M22fBuffer(cnt)
     static member ofArray (arr : M22d[]) = 
@@ -1653,10 +1981,10 @@ type M22fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<M22d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : M22d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : M22d) = x.[i] <- v
 type M22fList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Float32Array.Create ((4 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -1684,6 +2012,25 @@ type M22fList(initialCapacity : int) =
         store.[id + 2] <- float32(value.M10)
         store.[id + 3] <- float32(value.M11)
         count <- count + 1
+    member x.Add(arg0 : float, arg1 : float, arg2 : float, arg3 : float) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 4 * count
+        store.[id] <- float32(arg0)
+        id <- id + 1
+        store.[id] <- float32(arg1)
+        id <- id + 1
+        store.[id] <- float32(arg2)
+        id <- id + 1
+        store.[id] <- float32(arg3)
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<M22d>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -1709,9 +2056,8 @@ type M22fList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Float32Buffer(store.buffer, 16 * start, count) :> IArrayBuffer
         member x.View = Float32Array.Create(store.buffer, 0, (4 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<M22d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : M22d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : M22d) = x.[i] <- v
     new() = M22fList(8)
 type M23fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Float32Array.Create(arr, byteOffset, (6 * length))
@@ -1739,6 +2085,14 @@ type M23fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = M23fBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : M23d -> bool) (x : M23fBuffer) = 
+        let res = M23fBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         M23fBuffer(cnt)
     static member ofArray (arr : M23d[]) = 
@@ -1756,10 +2110,10 @@ type M23fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<M23d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : M23d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : M23d) = x.[i] <- v
 type M23fList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Float32Array.Create ((6 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -1789,6 +2143,29 @@ type M23fList(initialCapacity : int) =
         store.[id + 4] <- float32(value.M11)
         store.[id + 5] <- float32(value.M12)
         count <- count + 1
+    member x.Add(arg0 : float, arg1 : float, arg2 : float, arg3 : float, arg4 : float, arg5 : float) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 6 * count
+        store.[id] <- float32(arg0)
+        id <- id + 1
+        store.[id] <- float32(arg1)
+        id <- id + 1
+        store.[id] <- float32(arg2)
+        id <- id + 1
+        store.[id] <- float32(arg3)
+        id <- id + 1
+        store.[id] <- float32(arg4)
+        id <- id + 1
+        store.[id] <- float32(arg5)
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<M23d>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -1816,9 +2193,8 @@ type M23fList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Float32Buffer(store.buffer, 24 * start, count) :> IArrayBuffer
         member x.View = Float32Array.Create(store.buffer, 0, (6 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<M23d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : M23d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : M23d) = x.[i] <- v
     new() = M23fList(8)
 type M33fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Float32Array.Create(arr, byteOffset, (9 * length))
@@ -1849,6 +2225,14 @@ type M33fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = M33fBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : M33d -> bool) (x : M33fBuffer) = 
+        let res = M33fBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         M33fBuffer(cnt)
     static member ofArray (arr : M33d[]) = 
@@ -1866,10 +2250,10 @@ type M33fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<M33d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : M33d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : M33d) = x.[i] <- v
 type M33fList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Float32Array.Create ((9 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -1902,6 +2286,35 @@ type M33fList(initialCapacity : int) =
         store.[id + 7] <- float32(value.M21)
         store.[id + 8] <- float32(value.M22)
         count <- count + 1
+    member x.Add(arg0 : float, arg1 : float, arg2 : float, arg3 : float, arg4 : float, arg5 : float, arg6 : float, arg7 : float, arg8 : float) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 9 * count
+        store.[id] <- float32(arg0)
+        id <- id + 1
+        store.[id] <- float32(arg1)
+        id <- id + 1
+        store.[id] <- float32(arg2)
+        id <- id + 1
+        store.[id] <- float32(arg3)
+        id <- id + 1
+        store.[id] <- float32(arg4)
+        id <- id + 1
+        store.[id] <- float32(arg5)
+        id <- id + 1
+        store.[id] <- float32(arg6)
+        id <- id + 1
+        store.[id] <- float32(arg7)
+        id <- id + 1
+        store.[id] <- float32(arg8)
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<M33d>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -1932,9 +2345,8 @@ type M33fList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Float32Buffer(store.buffer, 36 * start, count) :> IArrayBuffer
         member x.View = Float32Array.Create(store.buffer, 0, (9 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<M33d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : M33d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : M33d) = x.[i] <- v
     new() = M33fList(8)
 type M34fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Float32Array.Create(arr, byteOffset, (12 * length))
@@ -1968,6 +2380,14 @@ type M34fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = M34fBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : M34d -> bool) (x : M34fBuffer) = 
+        let res = M34fBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         M34fBuffer(cnt)
     static member ofArray (arr : M34d[]) = 
@@ -1985,10 +2405,10 @@ type M34fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<M34d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : M34d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : M34d) = x.[i] <- v
 type M34fList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Float32Array.Create ((12 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -2024,6 +2444,41 @@ type M34fList(initialCapacity : int) =
         store.[id + 10] <- float32(value.M22)
         store.[id + 11] <- float32(value.M23)
         count <- count + 1
+    member x.Add(arg0 : float, arg1 : float, arg2 : float, arg3 : float, arg4 : float, arg5 : float, arg6 : float, arg7 : float, arg8 : float, arg9 : float, arg10 : float, arg11 : float) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 12 * count
+        store.[id] <- float32(arg0)
+        id <- id + 1
+        store.[id] <- float32(arg1)
+        id <- id + 1
+        store.[id] <- float32(arg2)
+        id <- id + 1
+        store.[id] <- float32(arg3)
+        id <- id + 1
+        store.[id] <- float32(arg4)
+        id <- id + 1
+        store.[id] <- float32(arg5)
+        id <- id + 1
+        store.[id] <- float32(arg6)
+        id <- id + 1
+        store.[id] <- float32(arg7)
+        id <- id + 1
+        store.[id] <- float32(arg8)
+        id <- id + 1
+        store.[id] <- float32(arg9)
+        id <- id + 1
+        store.[id] <- float32(arg10)
+        id <- id + 1
+        store.[id] <- float32(arg11)
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<M34d>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -2057,9 +2512,8 @@ type M34fList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Float32Buffer(store.buffer, 48 * start, count) :> IArrayBuffer
         member x.View = Float32Array.Create(store.buffer, 0, (12 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<M34d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : M34d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : M34d) = x.[i] <- v
     new() = M34fList(8)
 type M44fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Float32Array.Create(arr, byteOffset, (16 * length))
@@ -2097,6 +2551,14 @@ type M44fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         let res = M44fBuffer(cnt)
         for i in 0 .. cnt - 1 do res.[i] <- value
         res
+    static member filter (predicate : M44d -> bool) (x : M44fBuffer) = 
+        let res = M44fBuffer(x.Length)
+        let mutable o = 0
+        for i in 0 .. x.Length - 1 do
+            if predicate x.[i] then
+                res.[o] <- x.[i]
+                o <- o + 1
+        res.Sub(0, o)
     static member zeroCreate (cnt : int) = 
         M44fBuffer(cnt)
     static member ofArray (arr : M44d[]) = 
@@ -2114,10 +2576,10 @@ type M44fBuffer(arr : ArrayBuffer, byteOffset : int, length : int) =
         member x.View = store |> unbox<ArrayBufferView>
         member x.Sub(s,c) = x.Sub(s,c) :> IArrayBuffer
     interface IArrayBuffer<M44d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : M44d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : M44d) = x.[i] <- v
 type M44fList(initialCapacity : int) =
+    let initialCapacity = max 16 initialCapacity
     let mutable store = Float32Array.Create ((16 * initialCapacity))
     let mutable capacity = initialCapacity
     let mutable count = 0
@@ -2157,6 +2619,49 @@ type M44fList(initialCapacity : int) =
         store.[id + 14] <- float32(value.M32)
         store.[id + 15] <- float32(value.M33)
         count <- count + 1
+    member x.Add(arg0 : float, arg1 : float, arg2 : float, arg3 : float, arg4 : float, arg5 : float, arg6 : float, arg7 : float, arg8 : float, arg9 : float, arg10 : float, arg11 : float, arg12 : float, arg13 : float, arg14 : float, arg15 : float) =
+        if count >= capacity then
+            resize (2 * capacity)
+        let mutable id = 16 * count
+        store.[id] <- float32(arg0)
+        id <- id + 1
+        store.[id] <- float32(arg1)
+        id <- id + 1
+        store.[id] <- float32(arg2)
+        id <- id + 1
+        store.[id] <- float32(arg3)
+        id <- id + 1
+        store.[id] <- float32(arg4)
+        id <- id + 1
+        store.[id] <- float32(arg5)
+        id <- id + 1
+        store.[id] <- float32(arg6)
+        id <- id + 1
+        store.[id] <- float32(arg7)
+        id <- id + 1
+        store.[id] <- float32(arg8)
+        id <- id + 1
+        store.[id] <- float32(arg9)
+        id <- id + 1
+        store.[id] <- float32(arg10)
+        id <- id + 1
+        store.[id] <- float32(arg11)
+        id <- id + 1
+        store.[id] <- float32(arg12)
+        id <- id + 1
+        store.[id] <- float32(arg13)
+        id <- id + 1
+        store.[id] <- float32(arg14)
+        id <- id + 1
+        store.[id] <- float32(arg15)
+        id <- id + 1
+        count <- count + 1
+    member x.AddRange(b : IArrayBuffer<M44d>) =
+        let newCount = count + b.Length
+        if newCount > capacity then resize (Fun.NextPowerOfTwo newCount)
+        for i in 0 .. b.Length - 1 do
+            x.[count] <- b.Get i
+            count <- count + 1
     member x.RemoveAt(index : int) =
         if index >= 0 && index < count then
             if index = count - 1 then
@@ -2194,7 +2699,6 @@ type M44fList(initialCapacity : int) =
         member x.Sub(start : int, count : int) = Float32Buffer(store.buffer, 64 * start, count) :> IArrayBuffer
         member x.View = Float32Array.Create(store.buffer, 0, (16 * count)) |> unbox<ArrayBufferView>
     interface IArrayBuffer<M44d> with
-        member x.Item
-            with get(i : int) = x.[i]
-            and set(i : int) (v : M44d) = x.[i] <- v
+        member x.Get(i : int) = x.[i]
+        member x.Set(i : int, v : M44d) = x.[i] <- v
     new() = M44fList(8)
