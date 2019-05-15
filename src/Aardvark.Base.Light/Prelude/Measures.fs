@@ -39,9 +39,10 @@ type MicroTime =
                 if ns = 0L then "0"
                 elif ns >= 60000000000L then 
                     let m = x.TotalMinutes
-                    let sec = abs (60.0 * (m % 1.0))
-                    if sec = 0.0 then sprintf "%.0fm" m
-                    else sprintf "%.0fm%.0fs" m sec
+                    let min = floor m
+                    let sec = 60.0 * (m - min) |> abs |> round
+                    if sec = 0.0 then sprintf "%.0fm" min
+                    else sprintf "%.0fm%.0fs" min sec
                 elif ns >= 1000000000L then 
                     sprintf "%.3fs" x.TotalSeconds
                 elif ns >= 1000000L then 

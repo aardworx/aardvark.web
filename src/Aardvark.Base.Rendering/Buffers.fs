@@ -13,7 +13,9 @@ type IArrayBuffer =
 
 type IArrayBuffer<'a> =
     inherit IArrayBuffer
-    abstract member Item : int -> 'a with get, set
+    abstract member Get : int -> 'a
+    abstract member Set : int * 'a -> unit
+    //abstract member Item : int -> 'a with get, set
 
 
 type IBuffer = interface end

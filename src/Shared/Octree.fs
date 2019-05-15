@@ -83,7 +83,7 @@ module private OctHelpers =
         | _ -> failwithf "[Octree] could not get %s" def.Name
      
      
-    let repair (offset : V3d) (def : Durable.Def) (o : obj) =
+    let repair (rootCenter : V3d) (def : Durable.Def) (o : obj) =
         if def = Durable.Octree.Node then
             let o = unbox<Map<Durable.Def, obj>> o
 
@@ -91,7 +91,7 @@ module private OctHelpers =
             match Map.tryFind Durable.Octree.PositionsLocal3f o with
             | Some pos -> 
                 let cell = o.[Durable.Octree.Cell] |> unbox<Cell>
-                let offset = cell.Center - offset
+                let offset = cell.Center - rootCenter
                 let pos = unbox<V3fBuffer> pos
                 let float = Float32Array.Create((pos :> IArrayBuffer).Buffer, (pos :> IArrayBuffer).ByteOffset, pos.Length * 3)
                 for i in 0 .. 3 .. float.length - 3 do
@@ -113,7 +113,7 @@ module private OctHelpers =
                 ()
         o
 
-type Octnode(db : Database, gzip: bool, dbid : Guid, level : int, offset : V3d, m : Map<Def, obj>) =
+type Octnode(db : Database, gzip: bool, dbid : Guid, level : int, rootCenter : V3d, m : Map<Def, obj>) =
     let bounds =
         match tryGet<Box3d> Octree.BoundingBoxExactGlobal m with
         | Some box -> box
@@ -207,7 +207,10 @@ type Octnode(db : Database, gzip: bool, dbid : Guid, level : int, offset : V3d, 
     member x.MaxTreeDepth = get<int> Octree.MaxTreeDepth m
     member x.AvgPointDistance = get<float32> Octree.AveragePointDistance m
     member x.AvgPointDistanceStdDev = get<float32> Octree.AveragePointDistanceStdDev m
-    member x.PointCountCell = get<int> Octree.PointCountCell m
+    member x.PointCountCell = 
+        match tryGet<int> Octree.PointCountCell m with
+        | Some cnt -> cnt
+        | None -> x.PositionsLocal.Length
     member x.Cell = get<Cell> Octree.Cell m
     member x.BoundingBox = bounds
     member x.SubNodeIds =
@@ -220,13 +223,13 @@ type Octnode(db : Database, gzip: bool, dbid : Guid, level : int, offset : V3d, 
             x.SubNodeIds |> Array.map (fun id ->
                 if id <> Guid.Empty then
                     let prom = 
-                        db.Get(string id, gzip, repair offset) |> Prom.map (fun (def, data) ->
+                        db.Get(string id, gzip, repair rootCenter) |> Prom.map (fun (def, data) ->
                             if def <> Octree.Node then 
                                 Log.warn "unexpected data: %A" def
                                 Unchecked.defaultof<_>
                             else
                                 let d = unbox<Map<Def, obj>> data
-                                Octnode(db, gzip, id, level + 1, offset, d)
+                                Octnode(db, gzip, id, level + 1, rootCenter, d)
                         )
                     Some prom
                 else
@@ -251,36 +254,57 @@ type Octree(db : Database) =
     let root = 
         db.GetString("root.json") |> Prom.bind (fun str ->
             let obj = JSON.parse str
-            console.warn obj
+            //console.warn obj
             let id : Guid = Fable.Core.JsInterop.(?) obj "RootId"
             let gzip : bool = Fable.Core.JsInterop.(?) obj "GZipped"
 
             let cent = Fable.Core.JsInterop.(?) obj "Centroid"
             let centroidDev = Fable.Core.JsInterop.(?) obj "CentroidStdDev"
 
+            let bounds = 
+                let b = Fable.Core.JsInterop.(?) obj "Bounds"
+                let l = Fable.Core.JsInterop.(?) b "Min"
+                let h = Fable.Core.JsInterop.(?) b "Max"
+                Box3d(
+                    V3d(Fable.Core.JsInterop.(?) l "X", Fable.Core.JsInterop.(?) l "Y", Fable.Core.JsInterop.(?) l "Z"),
+                    V3d(Fable.Core.JsInterop.(?) h "X", Fable.Core.JsInterop.(?) h "Y", Fable.Core.JsInterop.(?) h "Z")
+                )
 
-            db.Get(string id, gzip, fun _ o -> o) |> Prom.map (fun (def, data) ->
+
+            if unbox cent then
+                center <- V3d(Fable.Core.JsInterop.(?) cent "X", Fable.Core.JsInterop.(?) cent "Y", Fable.Core.JsInterop.(?) cent "Z")
+                stddev <- centroidDev
+            else
+                center <- bounds.Center
+                stddev <- max bounds.Size.X (max bounds.Size.Y bounds.Size.Z)
+
+            //let repairRoot def root =
+            //    let root = unbox<Map<Durable.Def, obj>> root
+            //    if unbox cent then
+            //        center <- V3d(Fable.Core.JsInterop.(?) cent "X", Fable.Core.JsInterop.(?) cent "Y", Fable.Core.JsInterop.(?) cent "Z")
+            //        stddev <- centroidDev
+            //    else
+            //        let cell = root.[Durable.Octree.Cell] |> unbox<Cell>
+            //        let bounds = 
+            //            match Map.tryFind Durable.Octree.BoundingBoxExactGlobal root with
+            //            | Some (:? Box3d as bb) -> bb
+            //            | _ ->
+            //                match Map.tryFind Durable.Octree.BoundingBoxExactLocal root with
+            //                | Some (:? Box3d as bb) -> Box3d(bb.Min + cell.Center, bb.Max + cell.Center)
+            //                | _ -> cell.BoundingBox
+
+            //        center <- bounds.Center
+            //        stddev <- max bounds.Size.X (max bounds.Size.Y bounds.Size.Z)
+
+            //    Log.warn "center: %A" center
+            //    repair center def root
+
+            db.Get(string id, gzip, repair center) |> Prom.map (fun (def, data) ->
                 if def <> Octree.Node then 
                     Log.warn "unexpected data: %A" def
                     Unchecked.defaultof<_>
                 else
-                    let d = unbox<Map<Def, obj>> data
-                    let root = Octnode(db, gzip, id, 0, V3d.Zero, d)
-
-                    
-                    if unbox cent then
-                        center <- V3d(Fable.Core.JsInterop.(?) cent "X", Fable.Core.JsInterop.(?) cent "Y", Fable.Core.JsInterop.(?) cent "Z")
-                        stddev <- centroidDev
-                    else
-                        let s = (root.BoundingBox.Size.X + root.BoundingBox.Size.Y + root.BoundingBox.Size.Z) / 3.0
-                        center <- root.BoundingBox.Center
-                        stddev <- s / 2.0
-
-                    
-                    let d = repair center def d |> unbox
-                    let root = Octnode(db, gzip, id, 0, center, d)
-
-                    root
+                    Octnode(db, gzip, id, 0, center, unbox<Map<Def, obj>> data)
 
             )
         )

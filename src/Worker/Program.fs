@@ -246,13 +246,22 @@ module GlobalThings =
 
 [<EntryPoint>]
 let main _ =
-    let cache = Dict<int, Octree>(Unchecked.hash, Unchecked.equals)
+    let cache = Dict<int, Promise<Octree>>(Unchecked.hash, Unchecked.equals)
 
     let create (url : string) =
         let avgSize = 300.0 * 1024.0
         let totalMem = 512.0 * 1024.0 * 1024.0
-        let db = Database(url, totalMem / avgSize)
-        Octree(db)
+        let store = 
+            if url.StartsWith "local://" then
+                let name = url.Substring 8
+                LocalDatabase.connect 4096 name |> unbox<Promise<IBlobStore>>
+            else
+                let db = HttpBlobStore(url)
+                Prom.value (db :> IBlobStore)
+        store |> Prom.map (fun store ->
+            let db = Database(store, totalMem / avgSize)
+            Octree(db)
+        )
 
     let mutable states : hmap<int, State<Octnode>> = HMap.empty
     let mutable currentView = Trafo3d.Identity
@@ -261,8 +270,6 @@ let main _ =
     let rec update() =
         //Log.line "update %d" states.Count
         for (_,s) in states do
-            let center = s.center
-
             updateMutableTree s currentView
             let (a,b) = computeDelta !s.last s.root
             s.last := a
@@ -285,24 +292,28 @@ let main _ =
         match unbox<Command> e.data with
         | Command.Add (tid, url) ->
             let tree = cache.GetOrCreate(tid, fun _ -> create url)
-            tree.Root.``then`` (fun root -> 
-                let center = tree.Center
-                let state = 
-                    { 
-                        center = tree.Center
-                        quality = quality center
-                        children = fun n -> (FSharp.Collections.Array.choose (fun a -> a) n.SubNodes)
-                        root = { MutableTree.original = root; MutableTree.kill = ref id; MutableTree.children = ref None } 
-                        running = ref 0
-                        last = ref None
-                    }
             
-                states <- HMap.add tid state states
-            ) |> ignore
 
+            tree.``then``(fun tree ->
+                tree.Root.``then`` (fun root -> 
+                    let center = tree.Center
+                    postMessage(Reply.SetRootCenter(tid, center))
+                    let state = 
+                        { 
+                            center = tree.Center
+                            quality = quality center
+                            children = fun n -> (FSharp.Collections.Array.choose (fun a -> a) n.SubNodes)
+                            root = { MutableTree.original = root; MutableTree.kill = ref id; MutableTree.children = ref None } 
+                            running = ref 0
+                            last = ref None
+                        }
+            
+                    states <- HMap.add tid state states
+                ) |> ignore
+            ) |> ignore
         | Command.Remove id ->
             match cache.TryRemove id with
-            | Some t -> t.Root.``then`` (fun r -> states <- HMap.remove id states) |> ignore
+            | Some t -> t.``then``(fun t -> t.Root.``then`` (fun r -> states <- HMap.remove id states) |> ignore) |> ignore
             | None -> ()
 
         | Command.UpdateCamera(view, proj) ->

@@ -7,6 +7,7 @@
     <Compile Include="DurableDataDefs.fs" />
     <Compile Include="DurableDataCodec.fs" />
     <Compile Include="Database.fs" />
+    <Compile Include="LocalDatabase.fs" />
     <Compile Include="Octree.fs" />
     <Compile Include="AtomicOperations.fs" />
     <Compile Include="IPC.fs" />

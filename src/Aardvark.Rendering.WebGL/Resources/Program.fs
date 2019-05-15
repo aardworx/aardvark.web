@@ -166,7 +166,7 @@ module ProgramImpl =
                         yield loc, { name = att.name; typ = t; size = int att.size }
             ]
 
-        member x.GetUniformBlocks(p : WebGLProgram) =
+        member x.GetUniformBlocks(p : WebGLProgram, info : MapExt<string, FShade.GLSL.GLSLUniformBuffer>) =
             if x.IsGL2 then
                 let cnt = x.getProgramParameter(p, x.ACTIVE_UNIFORM_BLOCKS) |> unbox<int>
                 Map.ofList [
@@ -183,6 +183,11 @@ module ProgramImpl =
         
                         x.uniformBlockBinding(p, float bi, float bi)
                         let fields =
+                            let ubInfo = 
+                                match MapExt.tryFind name info with
+                                | Some i -> i.ubFields
+                                | None -> []
+
                             List.init (int indices.length) (fun i ->
                                 let off = offsets.[i] |> unbox<int>
                                 let size = sizes.[i] |> unbox<int>
@@ -194,8 +199,10 @@ module ProgramImpl =
                                 if unbox r.name then
                                     Some { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }
                                 else
-                                    document.write(sprintf "bad: %A" (JSON.stringify { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }))
-                                    None
+                                    let name = ubInfo.[i].ufName
+                                    Some { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = name; typ = t }
+                                    //document.write(sprintf "bad: %A" (JSON.stringify { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }))
+                                    //None
                                 
                             )
                             |> List.choose id
@@ -248,7 +255,7 @@ module ProgramImpl =
                 else None
             )
 
-        member x.GetProgramInterface(signature : FramebufferSignature, p : WebGLProgram) =  
+        member x.GetProgramInterface(signature : FramebufferSignature, p : WebGLProgram, iface : FShade.GLSL.GLSLProgramInterface) =  
             let valid = 
                 if x.IsGL2 then
                     signature.Colors |> Map.forall (fun slot name ->
@@ -260,7 +267,7 @@ module ProgramImpl =
                 else
                     true
             if valid then
-                let blocks = x.GetUniformBlocks(p)
+                let blocks = x.GetUniformBlocks(p, iface.uniformBuffers)
 
                 let known =
                     blocks 
@@ -307,7 +314,7 @@ module ProgramImpl =
             else
                 Some shader
 
-        member x.CreateProgram(signature : FramebufferSignature, code : string) =
+        member x.CreateProgram(signature : FramebufferSignature, code : string, iface : FShade.GLSL.GLSLProgramInterface) =
             Log.debug "create program"
 
             match x.CompileShader(x.GL.VERTEX_SHADER, code), x.CompileShader(x.GL.FRAGMENT_SHADER, code) with
@@ -319,7 +326,7 @@ module ProgramImpl =
 
                 let status = x.GL.getProgramParameter(p, x.GL.LINK_STATUS) |> unbox<int>
                 if status <> 0 then
-                    match x.GL.GetProgramInterface(signature, p) with
+                    match x.GL.GetProgramInterface(signature, p, iface) with
                     | Some iface -> 
                         Some(Program(x, p, iface))
                     | None ->

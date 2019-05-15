@@ -24,6 +24,7 @@ module.exports = {
 		  'Access-Control-Allow-Origin': '*',
 		  'Access-Control-Allow-Headers': '*',
 		},
+		clientLogLevel: 'error',
 
     },
 	devtool: production ? false : "eval-source-map",

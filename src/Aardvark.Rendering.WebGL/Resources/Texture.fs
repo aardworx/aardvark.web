@@ -40,7 +40,7 @@ module TextureImpl =
     let createImageBitmap(b : Blob) : Promise<ImageBitmap> = jsNative
 
     let loadTexture(url : string) =
-        Prom.create (fun ok error ->
+        Promise.Create (fun ok error ->
             let img = Image.Create()
             img.onload <- fun e ->
                 let c = document.createElement_canvas()
@@ -53,19 +53,7 @@ module TextureImpl =
                 ctx.getImageData(0.0, 0.0, img.width, img.height) |> ok
             img.src <- url
 
-
-            //let r = XMLHttpRequest.Create()
-            //r.responseType <- "blob"
-
-            //r.onload <- fun e ->
-            //    let blob = r.response |> unbox<Blob>
-            //    createImageBitmap(blob).``then``(fun v ->
-            //        ok v
-            //    ) |> ignore
-
-            //r.``open``("GET", url)
-            //r.send ""
-        )
+        ) |> unbox<Promise<ImageData>>
 
     let resize(img : ImageData, size : V2i) =
         if int img.width = size.X && int img.height = size.Y then
