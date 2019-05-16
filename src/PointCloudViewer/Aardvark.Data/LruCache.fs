@@ -1,42 +1,10 @@
 ﻿namespace Aardvark.Data
 
-
-open Aardvark.Import.JS
-open Microsoft.FSharp.Collections
-open System
 open Aardvark.Base
-
-type pako =
-    abstract member deflate : Uint8Array -> Uint8Array 
-    abstract member inflate : Uint8Array -> Uint8Array
-
-[<AutoOpen>]
-module GlobalThings =
-    open Fable.Core
-    let [<Import("*", "pako")>] pako : pako = jsNative
-
-
-type IBlobStore =
-    abstract member GetString : file : string -> Promise<string>
-    abstract member Get : file : string -> Promise<ArrayBuffer>
-
-type HttpBlobStore(urlFormat : string) =
-    member x.Get(file : string) =
-        let url = System.String.Format(urlFormat, file)
-        Prom.fetchBuffer url
-    member x.GetString(file : string) =
-        let url = System.String.Format(urlFormat, file)
-        Prom.fetchString url
-        
-    interface IBlobStore with
-        member x.Get(file) = x.Get file
-        member x.GetString(file) = x.GetString file
-
-
-
+open Aardvark.Import.JS
 
 [<AllowNullLiteral>]
-type LruNode<'k, 'v>(key : 'k, value : Promise<'v>) =
+type internal LruNode<'k, 'v>(key : 'k, value : Promise<'v>) =
     let mutable prev : LruNode<'k, 'v> = null
     let mutable next : LruNode<'k, 'v> = null
     
@@ -196,42 +164,3 @@ type LruCache<'k, 'v>(capacity : float, hash : 'k -> int, equals : 'k -> 'k -> b
             failwithf "[LRU] cannot get unknown key %A" key
 
 
-
-
-
-
-type Database(store : IBlobStore, cacheCapacity : float) =
-    let cache = LruCache<string, obj>(cacheCapacity, Unchecked.hash, Unchecked.equals)
-
-    member x.GetString(file : string) =
-        cache.GetOrCreate(file, fun file ->
-            store.GetString file |> unbox
-        ) |> unbox<Promise<string>>
-
-    member x.Get(file : string, gzip : bool, repair : Durable.Def -> obj -> obj) =
-        cache.GetOrCreate(file, fun file ->
-            store.Get file |> Prom.map (fun data ->
-                let data =
-                    if gzip then pako.inflate(Uint8Array.Create data).buffer
-                    else data
-
-                let s = Aardvark.Data.Stream(data)
-                let (def, o) = Aardvark.Data.DurableDataCodec.decode s
-                if def = Durable.Octree.Node then
-                    let o = o |> unbox |> Map.add Durable.Octree.Buffer (data :> obj)
-                    let o = repair def o
-                    (def, o) :> obj
-                else
-                    let o = repair def o
-                    (def, o) :> obj
-            )
-        ) |> unbox<Promise<Durable.Def * obj>>
-
-    member inline x.TryGet<'a>(file : string, gzip : bool, repair : Durable.Def -> obj -> obj) =
-        x.Get(file, gzip, repair) |> Prom.map (fun (def,o) ->
-            match o with
-            | :? 'a as o -> Some o
-            | _ -> None
-        )
-
-    new(urlFormat : string, cacheCapacity : float) = new Database(HttpBlobStore(urlFormat), cacheCapacity)

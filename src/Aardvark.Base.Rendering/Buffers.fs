@@ -1,22 +1,8 @@
 ﻿namespace Aardvark.Base.Rendering
 
 open Aardvark.Import.JS
+open Aardvark.Base
 open Aardvark.Base.Incremental
-
-type IArrayBuffer =
-    abstract member ElementType : PrimitiveType
-    abstract member Length : int
-    abstract member Buffer : ArrayBuffer
-    abstract member ByteOffset : int
-    abstract member Sub : start : int * cnt : int -> IArrayBuffer
-    abstract member View : ArrayBufferView
-
-type IArrayBuffer<'a> =
-    inherit IArrayBuffer
-    abstract member Get : int -> 'a
-    abstract member Set : int * 'a -> unit
-    //abstract member Item : int -> 'a with get, set
-
 
 type IBuffer = interface end
 type ITexture = interface end
@@ -39,7 +25,7 @@ type BufferView =
     {
         buffer  : IMod<IBuffer>
         offset  : int
-        typ     : PrimitiveType
+        typ     : Aardvark.Base.Types.PrimitiveType
     }
 
 module BufferView =

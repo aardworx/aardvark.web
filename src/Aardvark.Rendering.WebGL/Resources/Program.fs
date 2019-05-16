@@ -9,7 +9,7 @@ open Aardvark.Base
 type ProgramParameter =
     {
         name    : string
-        typ     : PrimitiveType
+        typ     : Types.PrimitiveType
         size    : int
     }
 
@@ -20,7 +20,7 @@ type UniformField =
         stride      : int
         size        : int
         rowMajor    : bool
-        typ         : PrimitiveType
+        typ         : Types.PrimitiveType
     }
 
 type UniformBlockInfo =
@@ -35,7 +35,7 @@ type UniformBlockInfo =
 type ProgramInterface =
     {
         attributes      : Map<int, ProgramParameter>
-        uniforms        : Map<string, WebGLUniformLocation * PrimitiveType>
+        uniforms        : Map<string, WebGLUniformLocation * Types.PrimitiveType>
         samplers        : Map<string, WebGLUniformLocation>
         uniformBlocks   : Map<int, UniformBlockInfo>
     }
@@ -51,6 +51,8 @@ type Program(ctx : Context, handle : WebGLProgram, iface : ProgramInterface) =
 
 [<AutoOpen>]
 module ProgramImpl = 
+    open Aardvark.Base.Types
+
     module PrimitiveType =
         let ofGLType (gl : WebGL2RenderingContext) (t : float) =
             if t = gl.BOOL then Bool
@@ -197,10 +199,10 @@ module ProgramImpl =
 
                                 let r = x.getActiveUniform(p, float indices.[i])
                                 if unbox r.name then
-                                    Some { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }
+                                    Some { UniformField.offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }
                                 else
                                     let name = ubInfo.[i].ufName
-                                    Some { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = name; typ = t }
+                                    Some { UniformField.offset = off; stride = stride; size = size; rowMajor = rowMajor; name = name; typ = t }
                                     //document.write(sprintf "bad: %A" (JSON.stringify { offset = off; stride = stride; size = size; rowMajor = rowMajor; name = r.name; typ = t }))
                                     //None
                                 

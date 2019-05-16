@@ -7,7 +7,6 @@ open System
 open Aardvark.Import.JS
 open Microsoft.FSharp.Collections
 open System
-open Aardvark.SceneGraph
 
 type Cell(x : int64, y : int64, z : int64, e : int) =
     let bb, center =

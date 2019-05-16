@@ -1,6 +1,6 @@
-namespace Aardvark.Base.Rendering
+namespace Aardvark.Base
 open Aardvark.Import.JS
-open Aardvark.Base
+open Aardvark.Base.Types
 
 type Int8Buffer(arr : ArrayBuffer, byteOffset : int, length : int) =
     let store = Int8Array.Create(arr, byteOffset, length)

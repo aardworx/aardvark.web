@@ -254,14 +254,11 @@ let main _ =
         let store = 
             if url.StartsWith "local://" then
                 let name = url.Substring 8
-                LocalDatabase.connect 4096 name |> unbox<Promise<IBlobStore>>
+                LocalBlobStore.connect name |> unbox<Promise<IBlobStore>>
             else
                 let db = HttpBlobStore(url)
                 Prom.value (db :> IBlobStore)
-        store |> Prom.map (fun store ->
-            let db = Database(store, totalMem / avgSize)
-            Octree(db)
-        )
+        store |> Prom.map (fun store -> Octree store)
 
     let mutable states : hmap<int, State<Octnode>> = HMap.empty
     let mutable currentView = Trafo3d.Identity

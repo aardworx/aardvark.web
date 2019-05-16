@@ -1,9 +1,9 @@
 ﻿namespace FShade
 
 open System
+open Aardvark.Base
 open System.Reflection
 
-open Aardvark.Base
 
 open FShade
 

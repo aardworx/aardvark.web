@@ -10,6 +10,7 @@ open Microsoft.FSharp.Quotations.ExprShape
 open Microsoft.FSharp.Reflection
 
 open Aardvark.Base
+open System.Reflection
 open FShade.Imperative
 
 

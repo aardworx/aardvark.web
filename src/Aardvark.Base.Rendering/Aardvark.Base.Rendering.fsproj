@@ -5,10 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="DefaultSemantic.fs" />
-    <Compile Include="PrimitiveType.fs" />
     <Compile Include="Buffers.fs" />
-    <None Include="ArrayBufferGen.fsx" />
-    <Compile Include="ArrayBuffer_auto.fs" />
     <Compile Include="Framebuffers.fs" />
     <Compile Include="Modes.fs" />
     <Compile Include="RenderObject.fs" />

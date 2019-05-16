@@ -1,14 +1,42 @@
 ﻿namespace Aardvark.Data
 
 open Fable.Core
-open Aardvark.Base
 open Aardvark.Import.JS
 open Aardvark.Import.Browser
+open Aardvark.Base
 
-type LocalDatabase internal(refCache : int, name : string, tableName : string, db : IDBDatabase) =
+type IBlobStore =
+    abstract member CanWrite : bool
+    abstract member GetString : file : string -> Promise<string>
+    abstract member Get : file : string -> Promise<ArrayBuffer>
+    abstract member Set : file : string * value : ArrayBuffer -> Promise<unit>
+    abstract member SetString : file : string * value : string -> Promise<unit>
+    abstract member Close : unit -> Promise<unit>
+    abstract member Delete : unit -> Promise<unit>
+
+type HttpBlobStore(urlFormat : string) =
+    member x.Get(file : string) =
+        let url = System.String.Format(urlFormat, file)
+        Prom.fetchBuffer url
+
+    member x.GetString(file : string) =
+        let url = System.String.Format(urlFormat, file)
+        Prom.fetchString url
+
+    member x.Set(_file, _data) : Promise<unit> = failwith "cannot write"
+    member x.SetString(_file, _data) : Promise<unit> = failwith "cannot write"
+        
+    interface IBlobStore with
+        member x.CanWrite = false
+        member x.Set(file, data) = x.Set(file, data)
+        member x.SetString(file, data) = x.SetString(file, data)
+        member x.Get(file) = x.Get file
+        member x.GetString(file) = x.GetString file
+        member x.Close() = Prom.value ()
+        member x.Delete() = Prom.value ()
+
+type LocalBlobStore internal(name : string, tableName : string, db : IDBDatabase) =
     let mutable closed = false
-    let refCache = LruCache<string, DbRef>(float refCache, Unchecked.hash, Unchecked.equals, fun r -> r |> Prom.bind (fun r -> r.Spill()))
-
 
     let mutable last = Prom.value ()
     let ret (write : bool) (f : IDBObjectStore -> Promise<'a>) =
@@ -30,7 +58,6 @@ type LocalDatabase internal(refCache : int, name : string, tableName : string, d
         promise {
             do! last
             if not closed then
-                do! refCache.Clear() 
                 db.close()
                 closed <- true
         }
@@ -143,106 +170,16 @@ type LocalDatabase internal(refCache : int, name : string, tableName : string, d
     member x.Exists (file : string) =
         x.TryGet(file) |> Prom.map (function Some _ -> true | None -> false)
 
-    member x.GetRef<'a>(name : string, pickle : 'a -> ArrayBuffer, unpickle : string -> ArrayBuffer -> Promise<'a>) : Promise<DbRef<'a>> =
-        let res = 
-            refCache.GetOrCreate(name, fun _ ->
-                DbRef<'a>(x, refCache, name, None, pickle, unpickle name) :> DbRef |> Prom.value
-            ) 
-        unbox<Promise<DbRef<'a>>> res
-        //if not (unbox res) then assert(false)
-        //unbox<DbRef<'a>> res
-    member x.Ref<'a>(name : string, value : 'a, pickle : 'a -> ArrayBuffer, unpickle : string -> ArrayBuffer -> Promise<'a>) =
-        let res = 
-            refCache.GetOrCreate(name, fun _ ->
-                DbRef<'a>(x, refCache, name, Some value, pickle, unpickle name) :> DbRef |> Prom.value
-            ) 
-        unbox<Promise<DbRef<'a>>> res
-
     interface IBlobStore with
+        member x.CanWrite = true
         member x.Get(file) = x.Get(file) |> unbox<Promise<ArrayBuffer>>
         member x.GetString(file) = x.Get(file) |> unbox<Promise<string>>
+        member x.Set(file, data) = x.Set(file, data)
+        member x.SetString(file, data) = x.Set(file, data)
+        member x.Close() = x.Close()
+        member x.Delete() = x.Delete()
 
-and DbRef =
-    abstract member Spill : unit -> Promise<unit>
-
-and DbRef<'a>(db : LocalDatabase, cache : LruCache<string, DbRef>, file : string, value : Option<'a>, pickle : ('a -> ArrayBuffer), unpickle : (ArrayBuffer -> Promise<'a>)) =
-    let mutable pending = Prom.value()
-    let mutable value = value
-    let mutable dirty = match value with | Some _ -> true | None -> false
-
-    let ret (f : unit -> Promise<'x>) =
-        let v = pending |> Prom.bind(fun () -> db.Wait() |> Prom.bind f)
-        pending <- unbox v
-        v
-    
-    member x.Name = file
-
-    member x.Cache = cache
-
-    member x.Delete() =
-        value <- None
-        dirty <- false
-        cache.Remove file
-        db.Delete file
-
-
-    member x.TryRead() =
-        cache.Use(file, x)
-        match value with
-        | Some v -> 
-            Prom.value (Some v)
-        | None ->
-            ret <| fun () ->
-                promise {
-                    match! db.TryGet file with
-                    | Some r ->
-                        let! (v : 'a) = unpickle (unbox r)
-                        value <- Some v
-                        return Some v
-                    | None ->
-                        return None
-                }
-
-    member x.Read() =
-        if file = string System.Guid.Empty then failwith "asdasdsa"
-        cache.Use(file, x)
-        match value with
-        | Some v -> 
-            Prom.value v
-        | None ->
-            ret <| fun () ->
-                promise {
-                    match! db.TryGet file with
-                    | Some r ->
-                        let! (v : 'a) = unpickle (unbox r)
-                        value <- Some v
-                        return v
-                    | None ->
-                        return failwithf "bad file: %A" file
-                }
-
-    member x.Write(v : 'a) =
-        cache.Use(file, x)
-        value <- Some v
-        dirty <- true
-
-    member x.Spill() =
-        if dirty then
-            dirty <- false
-            match value with
-            | Some v -> 
-                value <- None
-                ret <| fun () ->
-                    db.Set(file, pickle v)
-            | None -> 
-                Prom.value ()
-        else
-            Prom.value ()
-    
-    interface DbRef with
-        member x.Spill() = x.Spill()
-
-module LocalDatabase =
+module LocalBlobStore = 
     open Microsoft.FSharp.Collections
 
     [<Literal>]
@@ -314,7 +251,7 @@ module LocalDatabase =
         member x.storage : StorageManager = jsNative
 
 
-    let connect (refCache : int) (name : string) =
+    let connect (name : string) =
         Prom.create (fun success error ->
             let conn = indexedDB.``open``(name, Version)
             
@@ -338,7 +275,7 @@ module LocalDatabase =
             conn.addEventListener_success (fun e ->
                 let db = conn.result |> unbox<IDBDatabase>
                 if unbox db then
-                    success <| LocalDatabase(refCache, name, "blobs", db)
+                    success <| LocalBlobStore(name, "blobs", db)
                 else
                     error "no database"
             )
@@ -356,7 +293,7 @@ module LocalDatabase =
                             trans.addEventListener_abort (fun _ -> error "trans")
                         )
 
-                    prom.``then`` (fun () -> success <| LocalDatabase(refCache, name, "blobs", db)) |> ignore
+                    prom.``then`` (fun () -> success <| LocalBlobStore(name, "blobs", db)) |> ignore
                 else
                     error (sprintf "cannot upgrade db version %.0f" old)
 
@@ -365,10 +302,22 @@ module LocalDatabase =
         
         )
         
-    let inline clear (store : LocalDatabase) = store.Clear()
-    let inline delete (name : string) (store : LocalDatabase) = store.Delete name
-    let inline exists (name : string) (store : LocalDatabase) = store.Exists name
-    let inline get (name : string) (store : LocalDatabase) = store.Get(name)
-    let inline set (name : string) (value : 'a) (store : LocalDatabase) = store.Set(name, value :> obj)
-    let inline tryGet (name : string) (store : LocalDatabase) = store.TryGet(name)
-    
+    let inline clear (store : LocalBlobStore) = store.Clear()
+    let inline delete (name : string) (store : LocalBlobStore) = store.Delete name
+    let inline exists (name : string) (store : LocalBlobStore) = store.Exists name
+    let inline get (name : string) (store : LocalBlobStore) = store.Get(name)
+    let inline set (name : string) (value : 'a) (store : LocalBlobStore) = store.Set(name, value :> obj)
+    let inline tryGet (name : string) (store : LocalBlobStore) = store.TryGet(name)
+ 
+module BlobStore =  
+    let local (name : string) = LocalBlobStore.connect name |> unbox<Promise<IBlobStore>>
+    let get (url : string) = 
+        if url.StartsWith "local://" then
+            url.Substring(8) |> local
+        else
+            HttpBlobStore(url) :> IBlobStore |> Prom.value
+
+    let inline readString (file : string) (store : IBlobStore) = store.GetString file
+    let inline read (file : string) (store : IBlobStore) = store.Get file
+    let inline writeString (file : string) (value : string) (store : IBlobStore) = store.SetString(file, value)
+    let inline write (file : string) (data : ArrayBuffer) (store : IBlobStore) = store.Set(file, data)
