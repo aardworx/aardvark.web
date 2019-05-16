@@ -10,7 +10,8 @@ module.exports = {
     mode: production ? "production" : "development",
     entry: {
 		bundle: "./src/Demo/Demo.fsproj",
-		worker: "./src/Worker/Worker.fsproj"
+		worker: "./src/Worker/Worker.fsproj",
+		importer: "./src/PointCloudViewer/Importer/Importer.fsproj"
 	},
     output: {
         path: path.join(__dirname, "./public"),

@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Durable\DurableDataDefs.fs" />
+    <Compile Include="Durable\DurableDataCodec.fs" />
+    <Compile Include="FileReader.fs" />
+    <Compile Include="LruCache.fs" />
+    <Compile Include="BlobStore.fs" />
+    <Compile Include="Database.fs" />
+    <Compile Include="MutableOctree.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />
+    <ProjectReference Include="..\..\Aardvark.Base.Rendering\Aardvark.Base.Rendering.fsproj" />
+  </ItemGroup>
+  <Import Project="..\..\..\.paket\Paket.Restore.targets" />
+</Project>

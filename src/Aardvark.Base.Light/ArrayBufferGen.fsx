@@ -325,9 +325,9 @@ let run() =
 
         ]
 
-    printfn "namespace Aardvark.Base.Rendering"
+    printfn "namespace Aardvark.Base"
     printfn "open Aardvark.Import.JS"
-    printfn "open Aardvark.Base"
+    printfn "open Aardvark.Base.Types"
     printfn ""
     for t in types do def t
 

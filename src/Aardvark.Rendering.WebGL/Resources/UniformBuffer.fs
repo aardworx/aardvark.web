@@ -9,6 +9,7 @@ open FSharp.Collections
 open Aardvark.Base.Rendering
 open Fable.Core
 open Microsoft.FSharp.Reflection
+open Aardvark.Base.Types
 
 module private Blit =
     open Fable.Core.JsInterop

@@ -113,7 +113,7 @@ module private OctHelpers =
                 ()
         o
 
-type Octnode(db : Database, gzip: bool, dbid : Guid, level : int, rootCenter : V3d, m : Map<Def, obj>) =
+type Octnode(db : Database, dbid : Guid, level : int, rootCenter : V3d, m : Map<Def, obj>) =
     let bounds =
         match tryGet<Box3d> Octree.BoundingBoxExactGlobal m with
         | Some box -> box
@@ -223,13 +223,13 @@ type Octnode(db : Database, gzip: bool, dbid : Guid, level : int, rootCenter : V
             x.SubNodeIds |> Array.map (fun id ->
                 if id <> Guid.Empty then
                     let prom = 
-                        db.Get(string id, gzip, repair rootCenter) |> Prom.map (fun (def, data) ->
+                        db.ReadDurable(string id, repair rootCenter) |> Prom.map (fun (def, data) ->
                             if def <> Octree.Node then 
                                 Log.warn "unexpected data: %A" def
                                 Unchecked.defaultof<_>
                             else
                                 let d = unbox<Map<Def, obj>> data
-                                Octnode(db, gzip, id, level + 1, rootCenter, d)
+                                Octnode(db, id, level + 1, rootCenter, d)
                         )
                     Some prom
                 else
@@ -247,12 +247,12 @@ type Octnode(db : Database, gzip: bool, dbid : Guid, level : int, rootCenter : V
         else
             Prom.value ([|x|])
 
-type Octree(db : Database) =
+type Octree(store : IBlobStore) =
     let mutable center = V3d.Zero
     let mutable stddev = 1.0
 
     let root = 
-        db.GetString("root.json") |> Prom.bind (fun str ->
+        store.GetString("root.json") |> Prom.bind (fun str ->
             let obj = JSON.parse str
             //console.warn obj
             let id : Guid = Fable.Core.JsInterop.(?) obj "RootId"
@@ -278,33 +278,13 @@ type Octree(db : Database) =
                 center <- bounds.Center
                 stddev <- max bounds.Size.X (max bounds.Size.Y bounds.Size.Z)
 
-            //let repairRoot def root =
-            //    let root = unbox<Map<Durable.Def, obj>> root
-            //    if unbox cent then
-            //        center <- V3d(Fable.Core.JsInterop.(?) cent "X", Fable.Core.JsInterop.(?) cent "Y", Fable.Core.JsInterop.(?) cent "Z")
-            //        stddev <- centroidDev
-            //    else
-            //        let cell = root.[Durable.Octree.Cell] |> unbox<Cell>
-            //        let bounds = 
-            //            match Map.tryFind Durable.Octree.BoundingBoxExactGlobal root with
-            //            | Some (:? Box3d as bb) -> bb
-            //            | _ ->
-            //                match Map.tryFind Durable.Octree.BoundingBoxExactLocal root with
-            //                | Some (:? Box3d as bb) -> Box3d(bb.Min + cell.Center, bb.Max + cell.Center)
-            //                | _ -> cell.BoundingBox
-
-            //        center <- bounds.Center
-            //        stddev <- max bounds.Size.X (max bounds.Size.Y bounds.Size.Z)
-
-            //    Log.warn "center: %A" center
-            //    repair center def root
-
-            db.Get(string id, gzip, repair center) |> Prom.map (fun (def, data) ->
+            let db = Database(store, compressed = gzip)
+            db.ReadDurable(string id, repair center) |> Prom.map (fun (def, data) ->
                 if def <> Octree.Node then 
                     Log.warn "unexpected data: %A" def
                     Unchecked.defaultof<_>
                 else
-                    Octnode(db, gzip, id, 0, center, unbox<Map<Def, obj>> data)
+                    Octnode(db, id, 0, center, unbox<Map<Def, obj>> data)
 
             )
         )

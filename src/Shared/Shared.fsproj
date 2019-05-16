@@ -4,10 +4,6 @@
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="DurableDataDefs.fs" />
-    <Compile Include="DurableDataCodec.fs" />
-    <Compile Include="Database.fs" />
-    <Compile Include="LocalDatabase.fs" />
     <Compile Include="Octree.fs" />
     <Compile Include="AtomicOperations.fs" />
     <Compile Include="IPC.fs" />
@@ -20,6 +16,7 @@
     <ProjectReference Include="..\FShade\FShade.Core\FShade.Core.fsproj" />
     <ProjectReference Include="..\FShade\FShade.GLSL\FShade.GLSL.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Imperative\FShade.Imperative.fsproj" />
+    <ProjectReference Include="..\PointCloudViewer\Aardvark.Data\Aardvark.Data.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

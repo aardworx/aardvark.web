@@ -481,6 +481,30 @@ type Conversion private() =
 
 module Prom = 
     open Aardvark.Import.Browser
+    
+
+    let inline put (url : string) (data : ArrayBuffer) =
+        Promise.Create(fun fin err ->
+            let r = XMLHttpRequest.Create()
+            r.setRequestHeader("Content-Type", "application/octet-stream")
+            r.addEventListener_load(fun e -> fin ())
+            r.addEventListener_error(fun e -> err e.error)
+            r.``open``("PUT", url, true)
+            try r.send(data)
+            with e -> err e
+        ) |> unbox<Promise<unit>>
+        
+        
+    let inline putString (url : string) (data : string) =
+        Promise.Create(fun fin err ->
+            let r = XMLHttpRequest.Create()
+            r.setRequestHeader("Content-Type", "text/plain")
+            r.addEventListener_load(fun e -> fin ())
+            r.addEventListener_error(fun e -> err e.error)
+            r.``open``("PUT", url, true)
+            try r.send(data)
+            with e -> err e
+        ) |> unbox<Promise<unit>>
 
     let inline  fetchString (url : string) =
         Promise.Create(fun fin err ->
@@ -893,3 +917,19 @@ module NoSRTP =
     type IHasTransposed<'a> = abstract member Transposed : 'a
     type IHasDet<'a> = abstract member Det : 'a
     type IHasInverse<'a> = abstract member Inverse : 'a
+
+
+
+type IArrayBuffer =
+    abstract member ElementType : Aardvark.Base.Types.PrimitiveType
+    abstract member Length : int
+    abstract member Buffer : ArrayBuffer
+    abstract member ByteOffset : int
+    abstract member Sub : start : int * cnt : int -> IArrayBuffer
+    abstract member View : ArrayBufferView
+
+type IArrayBuffer<'a> =
+    inherit IArrayBuffer
+    abstract member Get : int -> 'a
+    abstract member Set : int * 'a -> unit
+    //abstract member Item : int -> 'a with get, set

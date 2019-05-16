@@ -33,7 +33,7 @@ type PreparedPipelineState =
         program             : Program
         uniformBuffers      : Map<int, IResource<UniformBuffer>>
         samplers            : Map<int, WebGLUniformLocation * IResource<Texture> * Option<IResource<Sampler>>>
-        uniforms            : hmap<WebGLUniformLocation, PrimitiveType * IResource<UniformLocation>>
+        uniforms            : hmap<WebGLUniformLocation, Types.PrimitiveType * IResource<UniformLocation>>
         depthMode           : IResource<Option<float>>
     }
 
@@ -140,6 +140,7 @@ module PreparedRenderObject =
 
 [<AutoOpen>]
 module Resources =
+    open Aardvark.Base.Types
 
     module VertexAttrib =
         let rec ofType (gl : WebGL2RenderingContext) (t : PrimitiveType) =

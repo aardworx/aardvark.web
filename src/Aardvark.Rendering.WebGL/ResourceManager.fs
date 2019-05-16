@@ -354,7 +354,7 @@ type UniformBufferSlotResource(token : IResourceToken, man : UniformBufferManage
         b.Free()
 
 
-type UniformLocationResource(token : IResourceToken, typ : PrimitiveType, value : IMod) =
+type UniformLocationResource(token : IResourceToken, typ : Types.PrimitiveType, value : IMod) =
     inherit AbstractResource<UniformLocation>(token)
     
     let mutable write = Mod.constant ()
@@ -453,7 +453,7 @@ type ResourceManager(ctx : Context) =
         indexBufferCache.GetOrCreate([data], fun token ->
             BufferResource(token, ctx.GL.ELEMENT_ARRAY_BUFFER, data)
         )
-    member x.CreateUniformLocation(typ : PrimitiveType, data : IMod) =
+    member x.CreateUniformLocation(typ : Types.PrimitiveType, data : IMod) =
         uniformLocationCache.GetOrCreate([typ; data], fun token ->
             UniformLocationResource(token, typ, data)
         )
