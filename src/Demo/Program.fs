@@ -2258,6 +2258,7 @@ module Octbuild =
         el.style.zIndex <- "1000"
         el.style.right <- "0"
         el.style.top <- "0"
+        el.style.background <- "red"
 
         let redirectLocal (name : string) =
             let searchParams = URLSearchParams.Create window.location.search
@@ -2266,7 +2267,8 @@ module Octbuild =
             window.location.search <- string searchParams
 
         el.addEventListener_change(fun e ->
-            let f = el.files.[0]
+            let file = el.files.[0]
+            el.value <- null
 
             let progress = document.createElement_div()
             document.body.appendChild(progress) |> ignore
@@ -2277,25 +2279,43 @@ module Octbuild =
             progress.style.zIndex <- "10000"
             progress.style.background <- "white"
             progress.style.color <- "black"
-            let setMessage fmt = Printf.kprintf (fun str -> progress.innerText <- str) fmt
+            progress.style.webkitUserSelect <- "none"
+            progress.style.cursor <- "no-drop"
+            let setMessage fmt = Printf.kprintf (fun str -> progress.innerHTML <- str) fmt
+
+            let data = 
+                PointCloudImporter.Import.Ascii(file, [||])
 
             let config =
                 { 
-                    Ascii.overwrite   = false
-                    Ascii.format      = [| Ascii.Token.PositionX; Ascii.Token.PositionY; Ascii.Token.PositionZ; Ascii.Token.Skip; Ascii.Token.BlueByte; Ascii.Token.GreenByte; Ascii.Token.RedByte |]
-                    Ascii.splitLimit  = 32768
-                    Ascii.progress = fun totalSize size time ->
+                    PointCloudImporter.overwrite = false
+                    PointCloudImporter.compress = false
+                    PointCloudImporter.splitLimit = 32768
+                    PointCloudImporter.store = file.name
+                    PointCloudImporter.progress = fun totalSize size time ->
                         let time = MicroTime.FromMilliseconds time
                         let r = min 1.0 (size / totalSize)
                         let eta = (time / r) - time
-                        setMessage "%s: %A: %.2f%% (eta: %A)" f.name time (100.0 * r) eta
+                        setMessage "%s: %A: %.2f%% (eta: %A)" file.name time (100.0 * r) eta
+
                 }
+
+            
 
             let run =
                 promise {
-                    let! name = PointCloudImporter.importAscii config f
-                    setMessage "imported %s" name
-                    redirectLocal name
+                    try
+                        let import = PointCloudImporter.import config data
+                        progress.addEventListener_click (fun _ -> import.cancel())
+                        let! pointCount = import
+
+                        setMessage "imported <a href=\"./?local=%s\">%s</a> with %.0f points" config.store config.store pointCount
+
+                        //Aardvark.Import.JS.setTimeout (fun () -> progress.remove()) 2000 |> ignore
+                        //redirectLocal config.store
+                    with e ->
+                        setMessage "%A" e
+                        Aardvark.Import.JS.setTimeout (fun () -> progress.remove()) 2000 |> ignore
                 }
 
             ()

@@ -6,15 +6,39 @@ open Aardvark.Import.Browser
 open Aardvark.Base
 open Aardvark.Data
 
+[<RequireQualifiedAccess>]
+type Import =
+    | Ascii of file : File * format : Ascii.Token[]
+
+    static member Pts(file : File) =
+        Import.Ascii(file, [| Ascii.Token.PositionX; Ascii.Token.PositionY; Ascii.Token.PositionZ; Ascii.Token.Skip; Ascii.Token.BlueByte; Ascii.Token.GreenByte; Ascii.Token.RedByte |])
+        
+    static member Xyz(file : File) =
+        Import.Ascii(file, [| Ascii.Token.PositionX; Ascii.Token.PositionY; Ascii.Token.PositionZ |])
+
+    static member XyzRgb(file : File) =
+        Import.Ascii(file, [| Ascii.Token.PositionX; Ascii.Token.PositionY; Ascii.Token.PositionZ; Ascii.Token.BlueByte; Ascii.Token.GreenByte; Ascii.Token.RedByte |])
+    
+type ImportConfig =
+    {
+        store       : string
+        overwrite   : bool
+        splitLimit  : int
+        compress    : bool
+        progress    : float -> float -> float -> unit
+    }
+    
+[<RequireQualifiedAccess>]
 type Command =
-    | Import of file : File * storeName : string * overwrite : bool * format : Ascii.Token[] * splitLimit : int * compress : bool
-
+    | Import of config : ImportConfig * data : Import
+    
+[<RequireQualifiedAccess>]
 type Reply =
-    | Error of file : File * json : string
-    | Progress of file : File * totalSize : float * size : float * time : float
-    | Done of file : File * pointCount : float
+    | Error of name : string * json : string
+    | Progress of name : string * totalSize : float * size : float * time : float
+    | Done of name : string * pointCount : float
 
-    member x.File =
+    member x.Name =
         match x with
         | Error(f,_) -> f
         | Progress(f,_,_,_) -> f
@@ -66,52 +90,104 @@ let tryGetPointCloudInfo (store : IBlobStore) =
 
 let execute (postMessage : obj -> unit) (cmd : Command) =
     match cmd with
-    | Import(file, storeName, overwrite, format, splitLimit, compress) ->
+    | Command.Import(config, cmd) ->
+        let name = config.store
         promise {
-            if overwrite then 
-                do! LocalBlobStore.destroy storeName
+            if config.overwrite then 
+                do! LocalBlobStore.destroy config.store
 
-            let! store = BlobStore.local storeName
+            let! store = BlobStore.local config.store
             match! tryGetPointCloudInfo store with
             | Some info ->
                 do! store.Close()
-                postMessage (Reply.Done(file, info.PointCount))
+                postMessage (Reply.Done(name, info.PointCount))
             | None -> 
                 try
-                    let db = Database(store, compressed = compress)
+                    let db = Database(store, compressed = config.compress)
 
                     let progress (totalSize : float) (size : float) (time : float) =
-                        postMessage (Reply.Progress(file, totalSize, size, time))
+                        postMessage (Reply.Progress(name, totalSize, size, time))
 
-                    let cfg =
-                        {   
-                            Ascii.overwrite = false
-                            Ascii.format = format
-                            Ascii.splitLimit = splitLimit
-                            Ascii.progress = progress
-                        }
+                    let! tree = 
+                        match cmd with
+                        | Import.Ascii(file, format) ->
+                            let cfg =
+                                {   
+                                    Ascii.overwrite = false
+                                    Ascii.format = format
+                                    Ascii.splitLimit = config.splitLimit
+                                    Ascii.progress = progress
+                                }
 
-                    let! tree = file |> MutableOctree.importAscii cfg db
+                            file |> MutableOctree.importAscii cfg db
+
+
+
                     let pointCount = 
                         match tree.Root with
                         | Some r -> r.TotalPointCount
                         | None -> 0.0
                 
+                    do! db.Flush()
                     do! db.Close()
-                    postMessage (Reply.Done(file, pointCount))
+                    postMessage (Reply.Done(name, pointCount))
                 with e ->
                     do! store.Delete()
-                    postMessage (Reply.Error (file, JSON.stringify e))
+                    postMessage (Reply.Error (name, JSON.stringify e))
         } |> ignore
 
-let importAscii (cfg : Ascii.ImportConfig) (file : File) =
-    Promise.Create (fun success error ->
+
+type CancelablePromise<'a> =
+    inherit Promise<'a>
+    abstract member cancel : unit -> unit
+
+module CancelablePromise =
+
+
+    let ofPromise (p : unit -> (unit -> unit) * Promise<'a>) =
+        let cancel, p = p()
+        Fable.Core.JsInterop.(?<-) p "cancel" cancel
+        p |> unbox<CancelablePromise<'a>>
+
+    let create (conts : ('a -> unit) -> (obj -> unit) -> obj) =
+        let mutable kill = fun () -> ()
+        let res = 
+            Promise.Create(fun success error ->
+                let cancel = conts (fun v -> success (v :> obj)) error
+                kill <- unbox<unit -> unit> cancel
+            ) |> unbox<Promise<'a>>
+        Fable.Core.JsInterop.(?<-) res "cancel" (fun () -> kill())
+        res |> unbox<CancelablePromise<'a>>
+
+
+let import (cfg : ImportConfig) (data : Import) =
+    
+    CancelablePromise.create (fun success error ->
         let w = Worker.Create("importer.js")
-        let storeName = file.name
+        let storeName = cfg.store
+        let mutable finished = false
+
+        let success v =
+            if not finished then
+                w.terminate()
+                finished <- true
+                success v
+            
+        let error v =
+            if not finished then
+                w.terminate()
+                finished <- true
+                let r = indexedDB.deleteDatabase(cfg.store)
+                r.addEventListener_success(fun _ ->
+                    error v
+                )
+                r.addEventListener_error(fun _ ->
+                    error v
+                )
 
         w.addEventListener_message(fun msg ->
             let msg = unbox<Reply> msg.data
-            if msg.File.name = file.name then
+            if msg.Name = storeName then
                 match msg with
                 | Reply.Error(_,e) -> 
                     error (JSON.parse e)
@@ -120,9 +196,11 @@ let importAscii (cfg : Ascii.ImportConfig) (file : File) =
                     cfg.progress t s time
 
                 | Reply.Done(_, cnt) -> 
-                    w.terminate()
-                    success storeName
+                    success cnt
         )
 
-        w.postMessage (Command.Import(file, storeName, cfg.overwrite, cfg.format, cfg.splitLimit, false))
-    ) |> unbox<Promise<string>>
+        let rcfg = { cfg with progress = Unchecked.defaultof<_> }
+        w.postMessage (Command.Import(rcfg, data))
+
+        (fun () -> error "cancel") :> obj
+    ) 
