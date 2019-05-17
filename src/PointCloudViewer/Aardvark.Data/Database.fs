@@ -44,10 +44,8 @@ module QuerablePromise =
                 raise (unbox o)
 
             let res = p.``then``(resolve, reject)
-
             Fable.Core.JsInterop.(?<-) res "tryGetError" (fun () -> error)
             Fable.Core.JsInterop.(?<-) res "tryGetResult" (fun () -> result)
-
             unbox<QuerablePromise<'a>> res
 
 

@@ -277,17 +277,26 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
                             c.Write v
         }
     
-    member x.BuildLod(r : DbRef<MutableOctnode>) : Promise<unit>=    
+    member x.BuildLod(r : DbRef<MutableOctnode>) : Promise<int * int>=    
         promise {
             let children = x.Children
             if children.Length > 0 then
                 let children = children |> FSharp.Collections.Array.choose (fun i -> i)
                 let values = FSharp.Collections.Array.zeroCreate children.Length
+
+                let mutable minDepth = System.Int32.MaxValue
+                let mutable maxDepth = System.Int32.MinValue
+
                 for i in 0 .. children.Length - 1 do 
                     let c = children.[i]
                     let! r = c.Read()
                     values.[i] <- r
-                    do! r.BuildLod(c)
+                    let! (dMin, dMax) = r.BuildLod(c)
+                    minDepth <- min dMin minDepth
+                    maxDepth <- max dMax maxDepth 
+
+                data <- Map.add Durable.Octree.MinTreeDepth (minDepth :> obj) data
+                data <- Map.add Durable.Octree.MaxTreeDepth (maxDepth :> obj) data
 
                 let mutable count = 0
                 for c in values do
@@ -323,6 +332,9 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
                 Log.line "%A: %d" cell count
                 cellCount <- count
                 r.Write x
+                return (minDepth, maxDepth)
+            else
+                return (0,0)
         }
     
     static member BuildWithSubtrees(db : Database, splitLimit : int, cell : Cell, ts : array<Cell * DbRef<MutableOctnode>>) : Option<Promise<DbRef<MutableOctnode>>> =
@@ -358,13 +370,22 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
 
 type MutableOctree(db : Database, splitLimit : int) =
     let mutable root : Option<MutableOctnode> = None
-    
+    let mutable sum = V3d.Zero
+    let mutable sumSq = V3d.Zero
+    let mutable cnt = 0.0
+
     member x.Root = root
 
     member x.Add(bb : Box3d, ps : IArrayBuffer<V3d>, cs : IArrayBuffer<uint8>) =
         promise {
             if ps.Length > 0 then
                 let idx = Int32Buffer.init ps.Length id
+
+                for i in 0 .. ps.Length - 1 do
+                    let p = ps.Get i
+                    sum <- sum + p
+                    sumSq <- sumSq + p*p
+                    cnt <- cnt + 1.0
 
                 let atts = 
                     Map.ofList [
@@ -425,7 +446,8 @@ type MutableOctree(db : Database, splitLimit : int) =
         | Some r -> 
             promise {
                 let! rootRef = db.Ref(string id, r, MutableOctnode.pickle, MutableOctnode.unpickle db splitLimit)
-                do! r.BuildLod(rootRef)
+                let! _ = r.BuildLod(rootRef)
+                ()
             }
         | None -> 
             Prom.value ()
@@ -436,6 +458,11 @@ type MutableOctree(db : Database, splitLimit : int) =
             | Some r ->
                 let id = r.Id
                 let bb = r.BoundingBox
+
+                let centroid = sum / cnt
+                let var = sumSq / cnt - centroid * centroid
+                let stddev = sqrt (var.X + var.Y + var.Z) //V3d(sqrt var.X, sqrt var.Y, sqrt var.Z) |> Vec.length
+
                 let rootInfo = 
                     Fable.Core.JsInterop.createObj [
                         "RootId", string id :> obj
@@ -452,6 +479,14 @@ type MutableOctree(db : Database, splitLimit : int) =
                                 "Z", bb.Max.Z :> obj
                             ]
                         ]
+                        "Centroid", Fable.Core.JsInterop.createObj [
+                            "X", centroid.X :> obj
+                            "Y", centroid.Y :> obj
+                            "Z", centroid.Z :> obj
+                        ]
+
+                        "CentroidStdDev", stddev :> obj
+
                         "Cell", Fable.Core.JsInterop.createObj [
                             "X", float r.Cell.X :> obj
                             "Y", float r.Cell.Y :> obj
@@ -632,6 +667,61 @@ module Ascii =
             ps.Add(px, py, pz)
             cs.Add r; cs.Add g; cs.Add b
 
+    [<Emit("parseInt($0)")>]
+    let parseInt(str : string) : int = jsNative
+
+    let tryGuessFormat (line : string) =
+        let parts = line.Split([| ' ' |], System.StringSplitOptions.RemoveEmptyEntries)
+
+        let kind =
+            parts |> FSharp.Collections.Array.map (fun p ->
+                let v = parseFloat p
+                if System.Double.IsNaN (unbox v) then
+                    None
+                else
+                    if v = float (int v) then
+                        if v >= 0.0 then Some ("uint", float v)
+                        else Some ("int", float v)
+                    else
+                        Some ("float", v)
+            )
+
+        let floats = [| Token.PositionX; Token.PositionY; Token.PositionZ |]
+        let uints = [| Token.BlueByte; Token.GreenByte; Token.RedByte |]
+
+        let fmt = System.Collections.Generic.List<Token>()
+
+        let add (index : int) (t : Token) =
+            while fmt.Count < index do
+                fmt.Add Token.Skip
+            fmt.Add t
+
+        let mutable floatIndex = 0
+        let mutable uintIndex = 0
+        for i in 0 .. kind.Length - 1 do
+            match kind.[i] with
+            | Some ("float",_) ->
+                if floatIndex < floats.Length then 
+                    add i floats.[floatIndex]
+                    floatIndex <- floatIndex + 1
+            | Some ("uint", v) when v <= 255.0 ->
+                if uintIndex < uints.Length then 
+                    add i uints.[uintIndex]
+                    uintIndex <- uintIndex + 1
+            | _ ->
+                ()
+        if floatIndex = floats.Length then 
+            let arr = fmt.ToArray()
+            console.warn arr
+            Some arr
+        else 
+            console.warn "bad format"
+            None
+
+
+
+
+
 
     let defaultConfig =
         {
@@ -643,9 +733,22 @@ module Ascii =
 
 module MutableOctree =
     open Aardvark.Import.Browser
+    
 
     let importAscii (cfg : Ascii.ImportConfig) (db : Database) (blob : Blob) =
         promise {
+            let parseLine = ref Unchecked.defaultof<_>
+            parseLine :=
+                if cfg.format.Length = 0 then
+                    fun state line ->
+                        match Ascii.tryGuessFormat line with
+                        | Some fmt -> 
+                            parseLine := Ascii.parseLine fmt
+                            !parseLine state line
+                        | None ->
+                            ()
+                else 
+                    Ascii.parseLine cfg.format
             let startTime = performance.now()
             let res = MutableOctree(db, cfg.splitLimit) 
             let emit (msg : Blob.ReadLineMessage<V3dList * Uint8List * Box3d>) =
@@ -670,7 +773,9 @@ module MutableOctree =
             let expectedCount = Fun.NextPowerOfTwo (chunkSize / 50)
             let init() = V3dList(expectedCount), Uint8List(3 * expectedCount), Box3d.Invalid
                             
-            return! Aardvark.Data.Blob.readLines chunkSize init (Ascii.parseLine cfg.format) emit blob
+
+
+            return! Aardvark.Data.Blob.readLines chunkSize init (fun s l -> !parseLine s l) emit blob
         }
 
 
