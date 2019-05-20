@@ -96,7 +96,6 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
             else
                 V3fBuffer(0)
                 
-                
         let localcs = 
             if n.CellCount > 0 then
                  let cs = data.[Durable.Octree.Colors3b] |> unbox<IArrayBuffer<uint8>>
@@ -295,9 +294,6 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
                     minDepth <- min dMin minDepth
                     maxDepth <- max dMax maxDepth 
 
-                data <- Map.add Durable.Octree.MinTreeDepth (minDepth :> obj) data
-                data <- Map.add Durable.Octree.MaxTreeDepth (maxDepth :> obj) data
-
                 let mutable count = 0
                 for c in values do
                     let cnt = float splitLimit * (c.TotalPointCount / totalCount) |> int
@@ -318,7 +314,18 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
                             indices :> IArrayBuffer<int>
 
                     let offset = c.Cell.Center - cell.Center
-                    for (def, att) in Map.toSeq c.Data do
+
+                    let cData =
+                        c.Data
+                        |> Map.remove Durable.Octree.MinTreeDepth
+                        |> Map.remove Durable.Octree.MaxTreeDepth
+                        |> Map.remove Durable.Octree.PointCountCell
+                        |> Map.remove Durable.Octree.TotalPointCount
+                        |> Map.remove Durable.Octree.AveragePointDistance
+                        |> Map.remove Durable.Octree.AveragePointDistanceStdDev
+                        |> Map.remove Durable.Octree.Buffer
+
+                    for (def, att) in Map.toSeq cData do
                         match Map.tryFind def data with
                         | Some dst ->   
                             append offset def index att dst
@@ -331,6 +338,8 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
 
                 Log.line "%A: %d" cell count
                 cellCount <- count
+                data <- Map.add Durable.Octree.MinTreeDepth (minDepth :> obj) data
+                data <- Map.add Durable.Octree.MaxTreeDepth (maxDepth :> obj) data
                 r.Write x
                 return (minDepth, maxDepth)
             else
@@ -370,9 +379,9 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
 
 type MutableOctree(db : Database, splitLimit : int) =
     let mutable root : Option<MutableOctnode> = None
-    let mutable sum = V3d.Zero
-    let mutable sumSq = V3d.Zero
-    let mutable cnt = 0.0
+    //let mutable sum = V3d.Zero
+    //let mutable sumSq = V3d.Zero
+    //let mutable cnt = 0.0
 
     member x.Root = root
 
@@ -381,11 +390,11 @@ type MutableOctree(db : Database, splitLimit : int) =
             if ps.Length > 0 then
                 let idx = Int32Buffer.init ps.Length id
 
-                for i in 0 .. ps.Length - 1 do
-                    let p = ps.Get i
-                    sum <- sum + p
-                    sumSq <- sumSq + p*p
-                    cnt <- cnt + 1.0
+                //for i in 0 .. ps.Length - 1 do
+                //    let p = ps.Get i
+                //    sum <- sum + p
+                //    sumSq <- sumSq + p*p
+                //    cnt <- cnt + 1.0
 
                 let atts = 
                     Map.ofList [
@@ -452,16 +461,16 @@ type MutableOctree(db : Database, splitLimit : int) =
         | None -> 
             Prom.value ()
 
-    member x.Persist() =
+    member x.Persist(centroid : V3d, stddev : float) =
         promise {
             match root with
             | Some r ->
                 let id = r.Id
                 let bb = r.BoundingBox
 
-                let centroid = sum / cnt
-                let var = sumSq / cnt - centroid * centroid
-                let stddev = sqrt (var.X + var.Y + var.Z) //V3d(sqrt var.X, sqrt var.Y, sqrt var.Z) |> Vec.length
+                //let centroid = sum / cnt
+                //let var = sumSq / cnt - centroid * centroid
+                //let stddev = sqrt (var.X + var.Y + var.Z) //V3d(sqrt var.X, sqrt var.Y, sqrt var.Z) |> Vec.length
 
                 let rootInfo = 
                     Fable.Core.JsInterop.createObj [
@@ -504,7 +513,6 @@ type MutableOctree(db : Database, splitLimit : int) =
             | None ->
                 ()
         }
-
 
 
 
@@ -608,7 +616,21 @@ module Ascii =
         else
             Some (byte v)
 
-    let parseLine (fmt : array<Token>) (ps : V3dList, cs : Uint8List, bb : Box3d) (line : string) =
+    type Stats =
+        {
+            mutable sumX : float
+            mutable sumY : float
+            mutable sumZ : float
+            mutable sumSqX : float
+            mutable sumSqY : float
+            mutable sumSqZ : float
+            mutable count : float
+        }
+
+        static member Empty = { sumX = 0.0; sumY = 0.0; sumZ = 0.0; sumSqX = 0.0; sumSqY = 0.0; sumSqZ = 0.0; count = 0.0 }
+
+
+    let parseLine (fmt : array<Token>) (ps : V3dList, cs : Uint8List, bb : Box3d, s : Stats) (line : string) =
         let mutable px = 0.0
         let mutable py = 0.0
         let mutable pz = 0.0
@@ -663,6 +685,14 @@ module Ascii =
 
 
         if not error && i = fmt.Length then
+            s.sumX <- s.sumX + px
+            s.sumY <- s.sumY + py
+            s.sumZ <- s.sumZ + pz
+            s.sumSqX <- s.sumSqX + px * px
+            s.sumSqY <- s.sumSqY + py * py
+            s.sumSqZ <- s.sumSqZ + pz * pz
+            s.count <- s.count + 1.0
+
             bb.ExtendBy(px, py, pz)
             ps.Add(px, py, pz)
             cs.Add r; cs.Add g; cs.Add b
@@ -737,6 +767,7 @@ module MutableOctree =
 
     let importAscii (cfg : Ascii.ImportConfig) (db : Database) (blob : Blob) =
         promise {
+            let stats = Ascii.Stats.Empty
             let parseLine = ref Unchecked.defaultof<_>
             parseLine :=
                 if cfg.format.Length = 0 then
@@ -751,12 +782,18 @@ module MutableOctree =
                     Ascii.parseLine cfg.format
             let startTime = performance.now()
             let res = MutableOctree(db, cfg.splitLimit) 
-            let emit (msg : Blob.ReadLineMessage<V3dList * Uint8List * Box3d>) =
+            let emit (msg : Blob.ReadLineMessage<V3dList * Uint8List * Box3d * Ascii.Stats>) =
                 match msg with
                 | Blob.Done ->
                     promise {
                         do! res.BuildLod()
-                        do! res.Persist()
+
+                        
+                        let centroid = V3d(stats.sumX, stats.sumY, stats.sumZ) / stats.count
+                        let var = V3d(stats.sumSqX, stats.sumSqY, stats.sumSqZ) / stats.count - centroid * centroid
+                        let stddev = sqrt (var.X + var.Y + var.Z)
+
+                        do! res.Persist(centroid, stddev)
                         do! db.Flush()
                         let took = performance.now() - startTime |> MicroTime.FromMilliseconds
                         Log.line "took: %A" took
@@ -766,16 +803,18 @@ module MutableOctree =
                     cfg.progress totalSize size time
                     Prom.value res
 
-                | Blob.Chunk(ps, cs, bb) ->
+                | Blob.Chunk(ps, cs, bb, s) ->
                     res.Add(bb, ps, cs) |> Prom.map (fun () -> res)
         
             let chunkSize = 4 <<< 20
             let expectedCount = Fun.NextPowerOfTwo (chunkSize / 50)
-            let init() = V3dList(expectedCount), Uint8List(3 * expectedCount), Box3d.Invalid
+
+            let init() = V3dList(expectedCount), Uint8List(3 * expectedCount), Box3d.Invalid, stats
                             
 
 
             return! Aardvark.Data.Blob.readLines chunkSize init (fun s l -> !parseLine s l) emit blob
+
         }
 
 
