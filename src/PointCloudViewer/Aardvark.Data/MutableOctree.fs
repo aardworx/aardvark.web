@@ -549,11 +549,13 @@ module Ascii =
     type private MyRef<'a> = { mutable Value : 'a }
 
 
+    let arr = [| ' '; ',' |]
+
     let inline private nextToken (str : string) (offset : MyRef<float>) =
         let mutable o = offset.Value
-        while o < float str.Length && str.charCodeAt o = 32.0 do o <- o + 1.0
+        while o < float str.Length && (str.charCodeAt o = 32.0 || str.charCodeAt o = 44.0) do o <- o + 1.0
 
-        let n = str.IndexOf(' ', unbox<int> o) |> float 
+        let n = str.IndexOfAny(arr, unbox<int> o) |> float 
         if n >= 0.0 then
             //let mutable next = n + 1.0
             //while next < float str.Length && str.charCodeAt next = 32.0 do

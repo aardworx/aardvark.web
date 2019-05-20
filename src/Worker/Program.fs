@@ -39,9 +39,10 @@ module Lod =
             center      : V3d
             quality     : Trafo3d -> 'a -> float
             children    : 'a -> array<Aardvark.Import.JS.Promise<'a>>
-            root        : MutableTree<'a>
+            size        : 'a -> int
+            roots       : hmap<string, MutableTree<'a>>
             running     : ref<int>
-            last        : ref<Option<ImmutableTree<'a>>>
+            lasts       : ref<hmap<string, ref<Option<ImmutableTree<'a>>>>>
         }
 
 
@@ -53,14 +54,47 @@ module Lod =
             let q = state.quality view node.original
             queue.HeapEnqueue(cmp, (q, node))
 
+        let mutable pointCount = 0.0
         let running = state.running
         let inline inc v = running := !running + v
         let inline dec v = running := !running - v
 
-        enqueue state.root
-        while !state.running < 12 && queue.Count > 0 do
+
+        let cap = 800000.0
+
+
+        let inline collapse (e : MutableTree<'a>) =
+            match !e.children with
+            | Some r ->
+                match !r with
+                | [] -> 
+                    e.kill.Value()
+                    e.kill := (fun () -> ())
+                    e.children := None
+                | _ -> 
+                    Log.debug "collapse %A" e.original
+                    let rec kill (node : MutableTree<'a>) =
+                        let cs = !node.children
+                        node.kill.Value()
+                        node.kill := (fun () -> ())
+                        node.children := None
+                        match cs with
+                        | Some cs -> !cs |> List.iter kill
+                        | None -> ()
+
+                    kill e
+            | None ->
+                ()
+
+
+        for (_,t) in state.roots do
+            enqueue t
+        while pointCount < cap && !state.running < 12 && queue.Count > 0 do
             //Log.line "running: %d" !state.running
             let (q, e) = queue.HeapDequeue(cmp)
+
+            pointCount <- pointCount + float (state.size e.original)
+
             //Log.line "q: %.3f" q
             if q <= 1.0 then
                 match !e.children with
@@ -79,50 +113,39 @@ module Lod =
                 | Some cs -> 
                     for c in !cs do enqueue c
             else 
-                match !e.children with
-                | Some r ->
-                    match !r with
-                    | [] -> 
-                        e.kill.Value()
-                        e.kill := (fun () -> ())
-                        e.children := None
-                    | _ -> 
-                        Log.debug "collapse %A" e.original
-                        let rec kill (node : MutableTree<'a>) =
-                            let cs = !node.children
-                            node.kill.Value()
-                            node.kill := (fun () -> ())
-                            node.children := None
-                            match cs with
-                            | Some cs -> !cs |> List.iter kill
-                            | None -> ()
-
-                        kill e
-                | None ->
-                    ()
+                collapse e
 
      
+        while queue.Count > 0 do
+            let (q,e) = queue.HeapDequeue(cmp)
+            let s = state.size e.original
+            if q <= 1.0 && pointCount + float s <= cap then
+                pointCount <- pointCount + float s
+            else
+                collapse e
+
+
         ()
 
-    let computeDelta (l : Option<ImmutableTree<'a>>) (r : MutableTree<'a>) =
-        let rec alli (m : ImmutableTree<'a>) =
-            match m.children with
-            | [] -> Seq.singleton m.original
-            | cs -> cs |> Seq.collect (alli)
+    let rec alli (m : ImmutableTree<'a>) =
+        match m.children with
+        | [] -> Seq.singleton m.original
+        | cs -> cs |> Seq.collect (alli)
 
     
-        let rec all (m : MutableTree<'a>) =
-            match !m.children with
-            | Some cs ->
-                match !cs with
-                | [] -> Seq.singleton m.original
-                | cs -> cs |> Seq.collect (all)
-            | None ->
-                Seq.singleton m.original
+    let rec all (m : MutableTree<'a>) =
+        match !m.children with
+        | Some cs ->
+            match !cs with
+            | [] -> Seq.singleton m.original
+            | cs -> cs |> Seq.collect (all)
+        | None ->
+            Seq.singleton m.original
 
-        let rec kill (l : ImmutableTree<'a>) =
-            l.children |> List.fold (fun o c -> o + kill c) (AtomicOperation.ofList [l.original, Operation.Free])
+    let rec kill (l : ImmutableTree<'a>) =
+        l.children |> List.fold (fun o c -> o + kill c) (AtomicOperation.ofList [l.original, Operation.Free])
 
+    let computeDelta (l : Option<ImmutableTree<'a>>) (r : MutableTree<'a>) =
         let rec computeDelta (deltas : ref<AtomicQueue<'a, 'a>>) (l : Option<ImmutableTree<'a>>) (r : Option<MutableTree<'a>>) =
             let inline children (m : MutableTree<'a>) =
                 match !m.children with
@@ -246,7 +269,7 @@ module GlobalThings =
 
 [<EntryPoint>]
 let main _ =
-    let cache = Dict<int, Promise<Octree>>(Unchecked.hash, Unchecked.equals)
+    let cache = Dict<string, Promise<Octree>>(Unchecked.hash, Unchecked.equals)
 
     let create (url : string) =
         let avgSize = 300.0 * 1024.0
@@ -260,57 +283,118 @@ let main _ =
                 Prom.value (db :> IBlobStore)
         store |> Prom.map (fun store -> Octree store)
 
-    let mutable states : hmap<int, State<Octnode>> = HMap.empty
+    let mutable center = V3d.Zero
+
+    let mutable state : State<Octnode> =
+        { 
+            size = fun (n : Octnode) -> n.PointCountCell
+            center = V3d.Zero
+            quality = quality center
+            children = fun n -> (FSharp.Collections.Array.choose (fun a -> a) n.SubNodes)
+            roots = HMap.empty
+            running = ref 0
+            lasts = ref HMap.empty
+        }
     let mutable currentView = Trafo3d.Identity
 
 
-    let rec update() =
+    let rec update (s : State<Octnode>) =
         //Log.line "update %d" states.Count
-        for (_,s) in states do
-            updateMutableTree s currentView
-            let (a,b) = computeDelta !s.last s.root
-            s.last := a
+        updateMutableTree s currentView
+        let mutable queue = AtomicQueue.empty
+        let lasts = !s.lasts
 
-            for op in b do
-                let res = 
-                    op.ops |> Seq.map (fun (n,o) -> 
-                        match o.value with
-                        | Some v -> 
-                            n.Id, { alloc = o.alloc; active = o.active; value = Some (v.Data.[Octree.Buffer] |> unbox<_>) }
-                        | None -> n.Id, { alloc = o.alloc; active = o.active; value = None }
-                    ) |> Seq.toArray
 
-                postMessage(Reply.Perform res)
-        setTimeout update 50 |> ignore
+        let merge (k : string) (root : Option<MutableTree<Octnode>>) (last : Option<ref<Option<ImmutableTree<Octnode>>>>) =
+            match root, last with
+            | Some root, Some last -> 
+                let (a,b) = computeDelta !last root
+                last := a
+                queue <- AtomicQueue.combine queue b
+                Some last
 
-    update()
+            | Some root, None ->
+                let (a,b) = computeDelta None root
+                let r = ref a
+                queue <- AtomicQueue.combine queue b
+                Some r
+
+            | None, Some last ->
+                match !last with
+                | Some l ->
+                    let b = kill l
+                    queue <- AtomicQueue.enqueue b queue
+                | None ->
+                    ()
+                
+                None
+            | None, None ->
+                None
+
+        s.lasts := HMap.choose2 merge s.roots !s.lasts
+
+
+        for (key, r) in s.roots do
+            match HMap.tryFind key lasts with
+            | Some last ->
+                let (a,b) = computeDelta !last r
+                last := a
+                queue <- AtomicQueue.combine queue b
+            | None ->
+                let (a,b) = computeDelta None r
+                let r = ref a
+                s.lasts := HMap.add key r !s.lasts
+                queue <- AtomicQueue.combine queue b
+                    
+
+
+
+
+        for op in queue do
+            let res = 
+                op.ops |> Seq.map (fun (n,o) -> 
+                    match o.value with
+                    | Some v -> 
+                        n.Id, { alloc = o.alloc; active = o.active; value = Some (v.Data.[Octree.Buffer] |> unbox<_>) }
+                    | None -> n.Id, { alloc = o.alloc; active = o.active; value = None }
+                ) |> Seq.toArray
+
+            postMessage(Reply.Perform res)
+        setTimeout (fun () -> update state) 50 |> ignore
+
+    update state
 
     self.addEventListener_message (fun e ->
         match unbox<Command> e.data with
-        | Command.Add (tid, url) ->
-            let tree = cache.GetOrCreate(tid, fun _ -> create url)
+        | Command.Add (url) ->
+            let tree = cache.GetOrCreate(url, fun _ -> create url)
             
 
             tree.``then``(fun tree ->
                 tree.Root.``then`` (fun root -> 
                     let center = tree.Center
-                    postMessage(Reply.SetRootCenter(tid, center))
-                    let state = 
-                        { 
+                    postMessage(Reply.SetRootCenter(url, center))
+
+                    state <-
+                        { state with 
                             center = tree.Center
                             quality = quality center
-                            children = fun n -> (FSharp.Collections.Array.choose (fun a -> a) n.SubNodes)
-                            root = { MutableTree.original = root; MutableTree.kill = ref id; MutableTree.children = ref None } 
-                            running = ref 0
-                            last = ref None
+                            roots = HMap.add url  { MutableTree.original = root; MutableTree.kill = ref id; MutableTree.children = ref None } state.roots
                         }
-            
-                    states <- HMap.add tid state states
+
                 ) |> ignore
             ) |> ignore
-        | Command.Remove id ->
-            match cache.TryRemove id with
-            | Some t -> t.``then``(fun t -> t.Root.``then`` (fun r -> states <- HMap.remove id states) |> ignore) |> ignore
+        | Command.Remove url ->
+            match cache.TryRemove url with
+            | Some t -> 
+                t.``then``(fun t -> 
+                    t.Root.``then`` (fun r -> 
+                        state <-
+                            { state with 
+                                roots = HMap.remove url state.roots
+                            }
+                        ) |> ignore
+                ) |> ignore
             | None -> ()
 
         | Command.UpdateCamera(view, proj) ->
