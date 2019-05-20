@@ -138,7 +138,7 @@ module FShadeTest =
                 else V3d.III
 
             let c = V4d((0.5 + 0.5 * z) * c, 1.0)
-            return c //{ c = c; d = newDepth }
+            return { c = c; d = newDepth }
 
             //let sn = 0.5 * (V3d(c, sqrt (1.0 - l2)) + V3d.III)
             //return V4d(sn, 1.0)
@@ -839,10 +839,11 @@ module Lod =
             if count = 0 then 1.0
             else sum / float count
 
-    type TreeReader2(url : string, control : Aardvark.Application.RenderControl, state : TraversalState, time : IMod<float>) as this =
+    type TreeReader2(urls : aset<string>, control : Aardvark.Application.RenderControl, state : TraversalState, time : IMod<float>) as this =
         inherit AbstractReader<hdeltaset<IRenderObject>>(HDeltaSet.monoid)
 
         let manager = control.Manager
+        let urlReader = urls.GetReader()
 
         let pipeline = 
             let template = 
@@ -966,12 +967,14 @@ module Lod =
                         
                         for (call, bounds) in calls do
                             if bounds.IntersectsViewProj mvp then
-                                offsets.[count] <- call.first
-                                counts.[count] <- call.faceVertexCount
-                                instanceCounts.[count] <- 1
-                                count <- count + 1
+                                if call.faceVertexCount > 0 then
+                                    offsets.[count] <- call.first
+                                    counts.[count] <- call.faceVertexCount
+                                    instanceCounts.[count] <- 1
+                                    count <- count + 1
 
-                        inst.multiDrawArraysInstancedWEBGL(gl.POINTS, offsets, 0, counts, 0, instanceCounts, 0, count)
+                        if count > 0 then
+                            inst.multiDrawArraysInstancedWEBGL(gl.POINTS, offsets, 0, counts, 0, instanceCounts, 0, count)
                 else
                     fun (calls : Dict<DrawCall, Box3d>) ->  
                         let mvp = Mod.force mvp
@@ -1038,7 +1041,7 @@ module Lod =
             | _ ->
                 ()
 
-        do w.postMessage (Command.Add(0, url))
+        //do w.postMessage (Command.Add(0, url))
 
         override x.Kind = "SetReader"
 
@@ -1046,7 +1049,14 @@ module Lod =
             let start = performance.now()
             let elapsed() = performance.now() - start
 
-            while elapsed() < renderTime.Average && not (AtomicQueue.isEmpty queue) do
+            for op in urlReader.GetOperations token do
+                match op with
+                | Add(_,url) -> w.postMessage (Command.Add(url))
+                | Rem(_,url) -> w.postMessage (Command.Remove(url))
+                ()
+
+
+            while elapsed() < 0.5 * renderTime.Average && not (AtomicQueue.isEmpty queue) do
                 let op, rest = AtomicQueue.dequeue queue
                 queue <- rest
                 
@@ -1110,13 +1120,13 @@ module Lod =
             PreparedPipelineState.release pipeline
             ()
 
-    type TreeSg(ctrl : Aardvark.Application.RenderControl, url : string) =
+    type TreeSg(ctrl : Aardvark.Application.RenderControl, urls : aset<string>) =
         interface ISg with
             member x.RenderObjects(state) =
-                ASet.create (fun () -> new TreeReader2(url, ctrl, state, ctrl.Time))
+                ASet.create (fun () -> new TreeReader2(urls, ctrl, state, ctrl.Time))
 
-    let sg<'a> ctrl (url : string) : ISg =
-        TreeSg(ctrl, url) :> ISg
+    let sg<'a> ctrl (urls : aset<string>) : ISg =
+        TreeSg(ctrl, urls) :> ISg
 
 
 open Aardvark.Base.Management
@@ -2250,26 +2260,10 @@ module Octbuild =
 
 
 
-    let test() =
-        let el = document.createElement_input()
-        document.body.appendChild(el) |> ignore
-        el.``type`` <- "file"
-        el.style.position <- "fixed"
-        el.style.zIndex <- "1000"
-        el.style.right <- "0"
-        el.style.top <- "0"
-        el.style.background <- "red"
+    let test (update : string -> unit) =
 
-        let redirectLocal (name : string) =
-            let searchParams = URLSearchParams.Create window.location.search
-            searchParams.set("local", name)
-            searchParams.delete("blob")
-            window.location.search <- string searchParams
-
-        el.addEventListener_change(fun e ->
-            let file = el.files.[0]
-            el.value <- null
-
+        let load (file : File) =
+            
             let progress = document.createElement_div()
             document.body.appendChild(progress) |> ignore
             progress.style.position <- "fixed"
@@ -2282,10 +2276,19 @@ module Octbuild =
             progress.style.webkitUserSelect <- "none"
             progress.style.cursor <- "no-drop"
             let setMessage fmt = Printf.kprintf (fun str -> progress.innerHTML <- str) fmt
-
+        
             let data = 
-                PointCloudImporter.Import.Ascii(file, [||])
-
+                PointCloudImporter.Import.Ascii(file, [| 
+                    yield Ascii.Token.PositionX
+                    yield Ascii.Token.PositionY
+                    yield Ascii.Token.PositionZ
+                    for i in 1 .. 10 do
+                        yield Ascii.Token.Skip
+                    yield Ascii.Token.BlueByte
+                    yield Ascii.Token.GreenByte
+                    yield Ascii.Token.RedByte
+                |])
+        
             let config =
                 { 
                     PointCloudImporter.overwrite = false
@@ -2297,95 +2300,80 @@ module Octbuild =
                         let r = min 1.0 (size / totalSize)
                         let eta = (time / r) - time
                         setMessage "%s: %A: %.2f%% (eta: %A)" file.name time (100.0 * r) eta
-
+        
                 }
-
-            
-
+        
+                    
+        
             let run =
                 promise {
                     try
                         let import = PointCloudImporter.import config data
                         progress.addEventListener_click (fun _ -> import.cancel())
                         let! pointCount = import
-
+                        
+                        update config.store
                         setMessage "imported <a href=\"./?local=%s\">%s</a> with %.0f points" config.store config.store pointCount
+        
+                        window.history.pushState("", "", sprintf "/?local=%s" config.store)
 
-                        //Aardvark.Import.JS.setTimeout (fun () -> progress.remove()) 2000 |> ignore
-                        //redirectLocal config.store
+                        Aardvark.Import.JS.setTimeout (fun () -> progress.remove()) 1000 |> ignore
                     with e ->
                         setMessage "%A" e
                         Aardvark.Import.JS.setTimeout (fun () -> progress.remove()) 2000 |> ignore
                 }
-
+        
             ()
 
-            //let import (dbName : string) (fmt : Ascii.Token[]) (f : File) =
-            //    promise {
-            //        let name = f.name
-            //        Log.start "[Octree] import %s" name
-            //        do! LocalBlobStore.destroy dbName
-            //        let startTime = performance.now()
+        let dropzone = document.createElement_div()
+        dropzone.style.position <- "fixed"
+        dropzone.style.height <- "100vh"
+        dropzone.style.width <- "100vw"
+        dropzone.style.background <- "rgb(80,80,80)"
+        dropzone.style.pointerEvents <- "none"
+        dropzone.style.opacity <- "0"
+        dropzone.style.display <- "flex"
+        dropzone.style.alignItems <- "center"
+        dropzone.style.justifyContent <- "center"
+        dropzone.style.fontSize <- "6em"
+        dropzone.style.color <- "white"
+        dropzone.style.fontFamily <- "monospace"
+        document.body.appendChild(dropzone) |> ignore
 
-            //        let progress = document.createElement_div()
-            //        document.body.appendChild(progress) |> ignore
-            //        progress.style.position <- "fixed"
-            //        progress.style.right <- "10pt"
-            //        progress.style.bottom <- "10pt"
-            //        progress.style.fontFamily <- "Consolas"
-            //        progress.style.zIndex <- "10000"
-            //        progress.style.background <- "white"
-            //        progress.style.color <- "black"
-            //        let setMessage fmt = Printf.kprintf (fun str -> progress.innerText <- str) fmt
+        document.addEventListener_dragleave(fun e ->
+            dropzone.style.opacity <- "0"
+            e.preventDefault()
+        )
 
+        document.addEventListener_dragover(fun e ->
+            dropzone.style.opacity <- "0.5"
+            e.preventDefault()
+        )
 
-            //        let! db = LocalDatabase.connect 3000 dbName
-            //        let res = InCore.Octree(db, 32768, false) 
-            //        let emit (msg : Message<V3dList * Uint8List * Box3d>) =
-            //            match msg with
-            //            | Done ->
-            //                promise {
-            //                    setMessage "%s generate lod" name
-            //                    do! res.BuildLod()
-            //                    setMessage "%s persist" name
-            //                    do! res.Persist()
-            //                    do! db.Close()
-            //                    let took = performance.now() - startTime |> MicroTime.FromMilliseconds
-            //                    Log.line "took: %A" took
-            //                    setMessage "%s (%A)" name took
-            //                    Log.stop()
-            //                    return res
-            //                }
-            //            | Progress(totalSize, size, time) ->
-            //                let time = MicroTime.FromMilliseconds time
-            //                let r = min 1.0 (size / totalSize)
-            //                let eta = (time / r) - time
-            //                setMessage "%s: %A: %.2f%% (eta: %A)" name time (100.0 * r) eta
-            //                Prom.value res
-            //            | Chunk(t) ->
-            //                let (ps, cs, bb) = t
-            //                promise {
-            //                    do! res.Add(bb, ps, cs)
-            //                    return res
-            //                }
+        //document.addEventListener_dragend(fun e ->
+        //    dropzone.style.opacity <- "0"
+        //    e.preventDefault()
+            
+        //)
 
-            //        let chunkSize = 4 <<< 20
-            //        let expectedCount = Fun.NextPowerOfTwo (chunkSize / 50)
-            //        let init() = V3dList(expectedCount), Uint8List(3 * expectedCount), Box3d.Invalid
-                    
-            //        return! readLines chunkSize init (Pts.parseLine fmt) emit f
-            //    }
+        document.addEventListener_drop(fun e ->
+            if e.dataTransfer.files.length > 0 then
+                let f = e.dataTransfer.files.[0]
+                if f.name.EndsWith ".pts" then
+                    load e.dataTransfer.files.[0]
+                    dropzone.style.opacity <- "0"
+                else
+                    let o = dropzone.style.background
+                    dropzone.style.background <- "#800000"
+                    dropzone.style.opacity <- "0.8"
+                    dropzone.innerText <- sprintf "could not load %s" f.name
+                    let restore () =
+                        dropzone.style.background <- o
+                        dropzone.innerText <- ""
+                        dropzone.style.opacity <- "0"
+                    Aardvark.Import.JS.setTimeout restore 2000 |> ignore
 
-            //let fmt = [| Ascii.Token.PositionX; Ascii.Token.PositionY; Ascii.Token.PositionZ; Ascii.Token.Skip; Ascii.Token.BlueByte; Ascii.Token.GreenByte; Ascii.Token.RedByte |]
-            //import "temp" fmt f |> Prom.map (fun t ->
-            //    match t.Root with
-            //    | Some r -> 
-            //        Log.warn "%A" r.Cell
-            //        Log.warn "%A" r.BoundingBox
-            //    | None ->
-            //        Log.warn "DINE"
-
-            //)
+            e.preventDefault()
         )
 
 
@@ -2412,7 +2400,7 @@ let main argv =
    
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
-            Octbuild.test()
+            
 
             let canvas = document.getElementById "target" |> unbox<HTMLCanvasElement>
             canvas.tabIndex <- 1.0
@@ -2423,7 +2411,7 @@ let main argv =
             let color = Mod.init true
 
             let view = cam |> Mod.map (fun v -> v |> CameraView.viewTrafo)
-            let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 0.1 1000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
+            let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
 
 
             control.Keyboard.DownWithRepeats.Add (fun k ->
@@ -2431,10 +2419,18 @@ let main argv =
                 | Aardvark.Application.Keys.V -> transact (fun () -> color.Value <- not color.Value)
                 | _ -> ()
             )
-            let sg = Lod.sg control url
+
+            let url = Mod.init url
+
+            Octbuild.test(fun store ->
+                let u = "local://" + store
+                transact (fun () -> url.Value <- u)
+            )
+
+            let set = ASet.ofModSingle url
 
             let sg =
-                Lod.sg control url 
+                Lod.sg control set
                 |> Sg.shader {
                     do! FShadeTest.depthVertex
                     do! FShadeTest.circularPoint

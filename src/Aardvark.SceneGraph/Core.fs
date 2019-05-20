@@ -202,6 +202,13 @@ module Sg =
         override x.RenderObjects (state : TraversalState) =
             sg.RenderObjects { state with depthMode = mode }
 
+    type DynamicSg(inner : IMod<ISg>) =
+        inherit ASg()
+        
+        override x.RenderObjects (state : TraversalState) =
+            inner |> ASet.bind (fun i -> i.RenderObjects(state))
+
+
 
     type SgShaderBuilder() =
         member x.Yield(()) = []
@@ -245,7 +252,7 @@ module Sg =
     let uniform (name : string) (value : IMod<'a>) (sg : ISg) = UniformApplicator(name, value :> IMod, sg) :> ISg
     let depthTest (mode : IMod<DepthTestMode>) (sg : ISg) = DepthTestModeApplicator(mode, sg) :> ISg
     let shader = SgShaderBuilder()
-
+    let dynamic (m : IMod<ISg>) = DynamicSg(m) :> ISg
 [<AutoOpen>]
 module SgExtensions =
 
