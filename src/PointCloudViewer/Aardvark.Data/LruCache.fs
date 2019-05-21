@@ -98,6 +98,7 @@ type LruCache<'k, 'v>(capacity : float, hash : 'k -> int, equals : 'k -> 'k -> b
 
     member x.GetOrCreate(key : 'k, creator : 'k -> Promise<'v>) =
         promise {
+            do! lastOp
             let node = 
                 nodes.GetOrCreate(key, fun key ->
                     let value = creator key
@@ -119,25 +120,25 @@ type LruCache<'k, 'v>(capacity : float, hash : 'k -> int, equals : 'k -> 'k -> b
         }
 
     
-    member x.GetOrCreateValue(key : 'k, creator : 'k -> 'v) =
-        let node = 
-            nodes.GetOrCreate(key, fun key ->
-                let value = creator key
-                let n = LruNode(key, Prom.value value)
+    //member x.GetOrCreateValue(key : 'k, creator : 'k -> 'v) =
+    //    let node = 
+    //        nodes.GetOrCreate(key, fun key ->
+    //            let value = creator key
+    //            let n = LruNode(key, Prom.value value)
 
-                if unbox first then first.Prev <- n
-                else last <- n // empty
+    //            if unbox first then first.Prev <- n
+    //            else last <- n // empty
 
-                n.Next <- first
-                first <- n
-                currentCount <- currentCount + 1.0
-                n
-            )
+    //            n.Next <- first
+    //            first <- n
+    //            currentCount <- currentCount + 1.0
+    //            n
+    //        )
 
-        moveToFront node
-        clean(capacity) |> ignore
-        let v = Fable.Core.JsInterop.(?) node.Value "resolved" |> unbox<'v>
-        v
+    //    moveToFront node
+    //    clean(capacity) |> ignore
+    //    let v = Fable.Core.JsInterop.(?) node.Value "resolved" |> unbox<'v>
+    //    v
 
     member x.Clear() =
         clean 0.0 |> Prom.map (fun () ->

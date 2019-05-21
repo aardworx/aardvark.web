@@ -813,6 +813,15 @@ module Time =
 module Lod =
     open Aardvark.Base.Management
 
+    type Stats =
+        {
+            totalNodes      : float
+            visibleNodes    : float
+            totalPoints     : float
+            visiblePoints   : float
+
+        }
+
     type RunningMean(capacity : int) =
         let mutable sum = 0.0
         let mutable values = Array.zeroCreate<float> capacity
@@ -839,7 +848,7 @@ module Lod =
             if count = 0 then 1.0
             else sum / float count
 
-    type TreeReader2(urls : aset<string>, control : Aardvark.Application.RenderControl, state : TraversalState, time : IMod<float>) as this =
+    type TreeReader2(urls : aset<string>, emitStats : Stats -> unit, control : Aardvark.Application.RenderControl, state : TraversalState, time : IMod<float>) as this =
         inherit AbstractReader<hdeltaset<IRenderObject>>(HDeltaSet.monoid)
 
         let manager = control.Manager
@@ -954,6 +963,9 @@ module Lod =
 
         let mutable last = -1.0
 
+
+        
+
         let run =
             let render = 
                 if unbox inst then
@@ -964,24 +976,46 @@ module Lod =
                         let mutable counts = Array.zeroCreate calls.Count
                         let mutable instanceCounts = Array.zeroCreate calls.Count
 
+                        let mutable pointCount = 0.0
+                        let mutable visiblePointCount = 0.0
+                        let mutable nodeCount = 0.0
+                        let mutable visibleNodeCount = 0.0
                         
                         for (call, bounds) in calls do
+                            nodeCount <- nodeCount + 1.0
+                            pointCount <- pointCount + float call.faceVertexCount
                             if bounds.IntersectsViewProj mvp then
                                 if call.faceVertexCount > 0 then
                                     offsets.[count] <- call.first
                                     counts.[count] <- call.faceVertexCount
                                     instanceCounts.[count] <- 1
                                     count <- count + 1
+                                    visibleNodeCount <- visibleNodeCount + 1.0
+                                    visiblePointCount <- visiblePointCount + float call.faceVertexCount
+
+                        emitStats { totalNodes = nodeCount; visibleNodes = visibleNodeCount; totalPoints = pointCount; visiblePoints = visiblePointCount}
 
                         if count > 0 then
                             inst.multiDrawArraysInstancedWEBGL(gl.POINTS, offsets, 0, counts, 0, instanceCounts, 0, count)
                 else
-                    fun (calls : Dict<DrawCall, Box3d>) ->  
+                    fun (calls : Dict<DrawCall, Box3d>) -> 
+                        
+                        let mutable pointCount = 0.0
+                        let mutable visiblePointCount = 0.0
+                        let mutable nodeCount = 0.0
+                        let mutable visibleNodeCount = 0.0
+                        
                         let mvp = Mod.force mvp
                         for (call, bounds) in calls do
+                            nodeCount <- nodeCount + 1.0
+                            pointCount <- pointCount + float call.faceVertexCount
                             if bounds.IntersectsViewProj mvp then
                                 gl.drawArrays(gl.POINTS, float call.first, float call.faceVertexCount)
-                    
+                                visibleNodeCount <- visibleNodeCount + 1.0
+                                visiblePointCount <- visiblePointCount + float call.faceVertexCount
+                        
+                        emitStats { totalNodes = nodeCount; visibleNodes = visibleNodeCount; totalPoints = pointCount; visiblePoints = visiblePointCount}
+
             fun () ->
                 for mem, calls in calls do
                     mem.Value |> Map.iter (fun id b ->
@@ -1040,8 +1074,6 @@ module Lod =
                 transact (fun () -> this.MarkOutdated())
             | _ ->
                 ()
-
-        //do w.postMessage (Command.Add(0, url))
 
         override x.Kind = "SetReader"
 
@@ -1120,10 +1152,10 @@ module Lod =
             PreparedPipelineState.release pipeline
             ()
 
-    type TreeSg(ctrl : Aardvark.Application.RenderControl, urls : aset<string>) =
+    type TreeSg(ctrl : Aardvark.Application.RenderControl, urls : aset<string>, ?emitStats : (Stats -> unit)) =
         interface ISg with
             member x.RenderObjects(state) =
-                ASet.create (fun () -> new TreeReader2(urls, ctrl, state, ctrl.Time))
+                ASet.create (fun () -> new TreeReader2(urls, defaultArg emitStats ignore, ctrl, state, ctrl.Time))
 
     let sg<'a> ctrl (urls : aset<string>) : ISg =
         TreeSg(ctrl, urls) :> ISg
@@ -2278,16 +2310,7 @@ module Octbuild =
             let setMessage fmt = Printf.kprintf (fun str -> progress.innerHTML <- str) fmt
         
             let data = 
-                PointCloudImporter.Import.Ascii(file, [| 
-                    yield Ascii.Token.PositionX
-                    yield Ascii.Token.PositionY
-                    yield Ascii.Token.PositionZ
-                    for i in 1 .. 10 do
-                        yield Ascii.Token.Skip
-                    yield Ascii.Token.BlueByte
-                    yield Ascii.Token.GreenByte
-                    yield Ascii.Token.RedByte
-                |])
+                PointCloudImporter.Import.Ascii(file, [||])
         
             let config =
                 { 
@@ -2315,7 +2338,7 @@ module Octbuild =
                         update config.store
                         setMessage "imported <a href=\"./?local=%s\">%s</a> with %.0f points" config.store config.store pointCount
         
-                        window.history.pushState("", "", sprintf "/?local=%s" config.store)
+                        window.history.replaceState("", "", sprintf "./?local=%s" config.store)
 
                         Aardvark.Import.JS.setTimeout (fun () -> progress.remove()) 1000 |> ignore
                     with e ->
@@ -2377,10 +2400,16 @@ module Octbuild =
         )
 
 
+type IDBInfo =
+    abstract member name : string
+    abstract member version : float
+
+type IDBFactory with
+    [<Emit("$0.databases()")>]
+    member x.databases() : Aardvark.Import.JS.Promise<IDBInfo[]> = jsNative
 
 [<EntryPoint>]
 let main argv =
-
 
     let query = 
         window.location.search.Split([| '&'; '?' |], System.StringSplitOptions.RemoveEmptyEntries)
@@ -2394,17 +2423,56 @@ let main argv =
         | None -> 
             match Map.tryFind "local" query with
             | Some l -> "local://" + l
-            | None -> "./rolli/{0}"
+            | None -> "./navvis/{0}"
 
+    let largestr (unit : string) (v : float) =
+        let a = abs v
+        if a = 0.0 then "0" + unit
+        elif a >= 1000000000.0 then sprintf "%.3fG%s" (v / 1000000000.0) unit
+        elif a >= 1000000.0 then sprintf "%.2fM%s" (a / 1000000.0) unit
+        elif a >= 1000.0 then sprintf "%.1fk%s" (a / 1000.0) unit
+        elif a >= 1.0 then sprintf "%.0f%s" a unit
+        elif a >= 0.001 then sprintf "%.0fm%s" (a * 1000.0) unit
+        elif a >= 0.000001 then sprintf "%.0fu%s" (a * 1000000.0) unit
+        elif a >= 0.000000001 then sprintf "%.0fn%s" (a * 1000000000.0) unit
+        else string v
 
    
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
-            
+
+            let select = document.getElementById "clouds" |> unbox<HTMLSelectElement>
+            indexedDB.databases().``then``(fun dbs -> 
+                select.innerHTML <- ""
+                dbs |> Array.iter (fun db ->
+                    let name = db.name
+                    if unbox name then
+                        let e = document.createElement_option()
+                        e.value <- "local://" + name
+                        e.innerText <- name
+                        select.appendChild e |> ignore
+                )
+                let e = document.createElement_option()
+                e.value <- "navvis"
+                e.innerText <- "navvis"
+                select.appendChild e |> ignore
+
+                match Map.tryFind "local" query with
+                | Some q -> 
+                    select.value <- "local://" + q
+                | None ->
+                    select.value <- "navvis"
+
+            ) |> ignore
 
             let canvas = document.getElementById "target" |> unbox<HTMLCanvasElement>
             canvas.tabIndex <- 1.0
             
+
+            canvas.addEventListener_click(fun _ ->
+                canvas.focus()
+            )
+
             let control = new Aardvark.Application.RenderControl(canvas, false, true, ClearColor = V4d.OOOO)
             let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
             let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
@@ -2422,15 +2490,43 @@ let main argv =
 
             let url = Mod.init url
 
+
+            let set (u : string) =
+                if u.StartsWith "local://" then
+                    let name = u.Substring 8
+                    transact (fun () -> url.Value <- u)
+                    window.history.replaceState("", "", sprintf "./?local=%s" name)
+                else   
+                    transact (fun () -> url.Value <- "./" + u + "/{0}")
+                    window.history.replaceState("", "", sprintf "./?blob=%s" u)
+                    
+            select.addEventListener_change(fun e ->
+                set select.value
+            )
+
             Octbuild.test(fun store ->
                 let u = "local://" + store
                 transact (fun () -> url.Value <- u)
+                let e = document.createElement_option()
+                e.value <- u
+                e.innerText <- store
+                select.appendChild e |> ignore
+                select.value <- store
+                
+                set u
+
             )
 
             let set = ASet.ofModSingle url
 
+            let emitStats (s : Lod.Stats) =
+                let cnt = document.getElementById "pointCount"
+                cnt.innerText <- sprintf "%s (%s)" (largestr "" s.totalPoints) (largestr "" s.visiblePoints)
+                let cnt = document.getElementById "nodeCount"
+                cnt.innerText <- sprintf "%s (%s)" (largestr "" s.totalNodes) (largestr "" s.visibleNodes)
+
             let sg =
-                Lod.sg control set
+                Lod.TreeSg(control, set, emitStats) :> ISg
                 |> Sg.shader {
                     do! FShadeTest.depthVertex
                     do! FShadeTest.circularPoint

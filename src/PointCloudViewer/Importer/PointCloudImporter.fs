@@ -31,7 +31,8 @@ type ImportConfig =
 [<RequireQualifiedAccess>]
 type Command =
     | Import of config : ImportConfig * data : Import
-    
+    | Shutdown
+
 [<RequireQualifiedAccess>]
 type Reply =
     | Error of name : string * json : string
@@ -90,6 +91,8 @@ let tryGetPointCloudInfo (store : IBlobStore) =
 
 let execute (postMessage : obj -> unit) (cmd : Command) =
     match cmd with
+    | Command.Shutdown ->
+        self.close()
     | Command.Import(config, cmd) ->
         let name = config.store
         promise {
@@ -103,6 +106,7 @@ let execute (postMessage : obj -> unit) (cmd : Command) =
                 postMessage (Reply.Done(name, info.PointCount))
             | None -> 
                 try
+                    do! LocalBlobStore.destroy config.store
                     let db = Database(store, compressed = config.compress)
 
                     let progress (totalSize : float) (size : float) (time : float) =
@@ -169,13 +173,13 @@ let import (cfg : ImportConfig) (data : Import) =
 
         let success v =
             if not finished then
-                w.terminate()
+                w.postMessage Command.Shutdown
                 finished <- true
                 success v
             
         let error v =
             if not finished then
-                w.terminate()
+                w.postMessage Command.Shutdown
                 finished <- true
                 let r = indexedDB.deleteDatabase(cfg.store)
                 r.addEventListener_success(fun _ ->
