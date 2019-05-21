@@ -1,54 +1,86 @@
 <html>
-	<head>
-		<script src="bundle.js"></script>
-		<style>
-			button {
-				font-size: 2em;
-				background: black;
-				color: #888888;
-				border: 1px solid #888888;
-				cursor: pointer;
-			}
-			button:hover {
-				color: white;
-				border: 1px solid white;
-			}
-			
-			body {
-				margin: 0;
-				padding: 0;
-				//background-image: url("test.jpg");
-			}
-			
-			h1 {
-				color: #555555;
-			}
-			
-			iframe {
-				position: fixed;
-				border: none;
-				padding: 0;
-				margin: 0;
-				top: 0vw;
-				left: 0vh;
-				width: 100vw;
-				height: 100vh;
-			}
-		</style>
-	</head>
-	<body style="width: 100%; height: 100%; margin: 0; padding: 0; background: black;">
-		<canvas style="position: fixed; top:0; left:0; width: 100%; height: 100%; margin: 0; padding: 0; background: transparent; outline: none" id="target">
-		</canvas>
-		<div style="position: fixed; top:0; left:0; padding: 6px;">
-			<div>
-				<button onclick="window.location.href = './?blob=p20';">P20</button>
-				<button onclick="window.location.href = './?blob=jbs-haus';">JB</button>
-				<button onclick="window.location.href = './?blob=rolli';">Rolli</button>
-			</div>
-			
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/fomantic-ui@2.7.5/dist/semantic.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/fomantic-ui@2.7.5/dist/semantic.min.js"></script>
 
-			
-			
-		</div>
-	</body>
+    <script src="bundle.js"></script>
+    <style>
+        button {
+            font-size: 2em;
+            background: black;
+            color: #888888;
+            border: 1px solid #888888;
+            cursor: pointer;
+        }
+
+        button:hover {
+            color: white;
+            border: 1px solid white;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            border: 0;
+            overflow: hidden;
+        }
+
+        h1 {
+            color: #555555;
+        }
+
+        iframe {
+            position: fixed;
+            border: none;
+            padding: 0;
+            margin: 0;
+            top: 0vw;
+            left: 0vh;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        td {
+            font-size: 1.2em;
+        }
+
+        .name {
+            font-weight: bold;
+            padding-right: 10pt;
+        }
+    </style>
+</head>
+<body style="width: 100%; height: 100%; margin: 0; padding: 0; background: black;">
+    <canvas style="position: fixed; top:0; left:0; width: 100%; height: 100%; margin: 0; padding: 0; background: transparent; outline: none" id="target"></canvas>
+
+
+    <div style="position: fixed; top:6pt; right: 10pt; opacity: 0.7" >
+        <select id="clouds" class="ui inverted dropdown">
+        </select>
+    </div>
+
+
+    <div style="position: fixed; top:6pt; left:6pt; pointer-events:none; user-select: none">
+        <table class="ui small very compact inverted celled striped table" style="opacity: 0.7">
+            <tr><td>WASD</td><td>move</td></tr>
+            <tr><td>Left Mouse</td><td>rotate camera</td></tr>
+            <tr><td>Right Mouse</td><td>move forward/backward</td></tr>
+            <tr><td>Middle Mouse</td><td>pan</td></tr>
+            <tr><td>Scroll</td><td>zoom</td></tr>
+            <tr><td>V</td><td>toggle point colors</td></tr>
+            <tr><td>Points</td><td id="pointCount">0</td></tr>
+            <tr><td>Nodes</td><td id="nodeCount">0</td></tr>
+        </table>
+
+
+
+
+    </div>
+
+    <script>
+        $("#clouds").dropdown();
+    </script>
+
+</body>
 </html>

@@ -60,7 +60,7 @@ module Lod =
         let inline dec v = running := !running - v
 
 
-        let cap = 800000.0
+        let cap = 500000.0
 
 
         let inline collapse (e : MutableTree<'a>) =
@@ -93,10 +93,12 @@ module Lod =
             //Log.line "running: %d" !state.running
             let (q, e) = queue.HeapDequeue(cmp)
 
-            pointCount <- pointCount + float (state.size e.original)
+            let size = float (state.size e.original)
+            
+            pointCount <- pointCount + size
 
             //Log.line "q: %.3f" q
-            if q <= 1.0 then
+            if q <= 1.0 then   
                 match !e.children with
                 | None ->
                     Log.debug "split %A; %.3f" e.original q
@@ -119,11 +121,9 @@ module Lod =
         while queue.Count > 0 do
             let (q,e) = queue.HeapDequeue(cmp)
             let s = state.size e.original
-            if q <= 1.0 && pointCount + float s <= cap then
-                pointCount <- pointCount + float s
-            else
-                collapse e
-
+            pointCount <- pointCount + float s
+            collapse e
+        //console.warn pointCount
 
         ()
 
