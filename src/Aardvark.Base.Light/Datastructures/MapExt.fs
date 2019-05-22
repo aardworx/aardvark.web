@@ -135,10 +135,10 @@ module MapExtImplementation =
                 elif c = 0 then Some v2
                 else tryFind comparer k r
 
-        let partition1 (comparer: IComparer<'Value>) (f:OptimizedClosures.FSharpFunc<_,_,_>) k v (acc1,acc2) = 
-            if f.Invoke(k, v) then (add comparer k v acc1,acc2) else (acc1,add comparer k v acc2) 
+        let partition1 (comparer: IComparer<'Value>) f k v (acc1,acc2) = 
+            if f k v then (add comparer k v acc1,acc2) else (acc1,add comparer k v acc2) 
         
-        let rec partitionAux (comparer: IComparer<'Value>) (f:OptimizedClosures.FSharpFunc<_,_,_>) s acc = 
+        let rec partitionAux (comparer: IComparer<'Value>) f s acc = 
             match s with 
             | MapEmpty -> acc
             | MapOne(k,v) -> partition1 comparer f k v acc
@@ -147,11 +147,11 @@ module MapExtImplementation =
                 let acc = partition1 comparer f k v acc
                 partitionAux comparer f l acc
 
-        let partition (comparer: IComparer<'Value>) f s = partitionAux comparer (OptimizedClosures.FSharpFunc<_,_,_>.Adapt(f)) s (empty,empty)
+        let partition (comparer: IComparer<'Value>) f s = partitionAux comparer f s (empty,empty)
 
-        let filter1 (comparer: IComparer<'Value>) (f:OptimizedClosures.FSharpFunc<_,_,_>) k v acc = if f.Invoke(k, v) then add comparer k v acc else acc 
+        let filter1 (comparer: IComparer<'Value>) f k v acc = if f k v then add comparer k v acc else acc 
 
-        let rec filterAux (comparer: IComparer<'Value>) (f:OptimizedClosures.FSharpFunc<_,_,_>) s acc = 
+        let rec filterAux (comparer: IComparer<'Value>) f s acc = 
             match s with 
             | MapEmpty -> acc
             | MapOne(k,v) -> filter1 comparer f k v acc
@@ -160,7 +160,7 @@ module MapExtImplementation =
                 let acc = filter1 comparer f k v acc
                 filterAux comparer f r acc
 
-        let filter (comparer: IComparer<'Value>) f s = filterAux comparer (OptimizedClosures.FSharpFunc<_,_,_>.Adapt(f)) s empty
+        let filter (comparer: IComparer<'Value>) f s = filterAux comparer f s empty
 
         let rec spliceOutSuccessor m = 
             match m with 
@@ -369,7 +369,7 @@ module MapExtImplementation =
 
                     
 
-        let rec unionWithOpt (comparer: IComparer<'Value>) (f : OptimizedClosures.FSharpFunc<_,_,_>) l r =
+        let rec unionWithOpt (comparer: IComparer<'Value>) f l r =
             match l, r with
                 | MapEmpty, r -> r
                 | l, MapEmpty -> l
@@ -377,14 +377,14 @@ module MapExtImplementation =
                     r |> alter comparer k (fun o -> 
                         match o with
                             | None -> v |> Some
-                            | Some o -> f.Invoke(v, o) |> Some
+                            | Some o -> f v o |> Some
                     )
 
                 | l, MapOne(k,v) ->
                     l |> alter comparer k (fun o ->
                         match o with
                             | None -> v |> Some
-                            | Some o -> f.Invoke(o, v) |> Some
+                            | Some o -> f o v |> Some
                     )
 
                 | MapNode(k,v,ll,lr,_,_),r ->
@@ -392,12 +392,12 @@ module MapExtImplementation =
                     
                     let v = 
                         match self with
-                            | Some rv -> f.Invoke(v, rv)
+                            | Some rv -> f v rv
                             | None -> v
                     join (unionWithOpt comparer f ll rs) k v (unionWithOpt comparer f lr rg)
                  
         let unionWith(comparer: IComparer<'Value>) f l r =
-            unionWithOpt comparer (OptimizedClosures.FSharpFunc<_,_,_>.Adapt(f)) l r
+            unionWithOpt comparer f l r
 
 
 
@@ -450,60 +450,60 @@ module MapExtImplementation =
                 if c < 0 then mem comparer k l
                 else (c = 0 || mem comparer k r)
 
-        let rec iterOpt (f:OptimizedClosures.FSharpFunc<_,_,_>) m =
+        let rec iterOpt f m =
             match m with 
             | MapEmpty -> ()
-            | MapOne(k2,v2) -> f.Invoke(k2, v2)
-            | MapNode(k2,v2,l,r,_,_) -> iterOpt f l; f.Invoke(k2, v2); iterOpt f r
+            | MapOne(k2,v2) -> f k2 v2
+            | MapNode(k2,v2,l,r,_,_) -> iterOpt f l; f k2 v2; iterOpt f r
 
-        let iter f m = iterOpt (OptimizedClosures.FSharpFunc<_,_,_>.Adapt(f)) m
+        let iter f m = iterOpt f m
 
-        let rec tryPickOpt (f:OptimizedClosures.FSharpFunc<_,_,_>) m =
+        let rec tryPickOpt f m =
             match m with 
             | MapEmpty -> None
-            | MapOne(k2,v2) -> f.Invoke(k2, v2) 
+            | MapOne(k2,v2) -> f k2 v2
             | MapNode(k2,v2,l,r,_,_) -> 
                 match tryPickOpt f l with 
                 | Some _ as res -> res 
                 | None -> 
-                match f.Invoke(k2, v2) with 
+                match f k2 v2 with 
                 | Some _ as res -> res 
                 | None -> 
                 tryPickOpt f r
 
-        let tryPick f m = tryPickOpt (OptimizedClosures.FSharpFunc<_,_,_>.Adapt(f)) m
+        let tryPick f m = tryPickOpt f m
 
-        let rec tryPickOptBack (f:OptimizedClosures.FSharpFunc<_,_,_>) m =
+        let rec tryPickOptBack f m =
             match m with 
             | MapEmpty -> None
-            | MapOne(k2,v2) -> f.Invoke(k2, v2) 
+            | MapOne(k2,v2) -> f k2 v2
             | MapNode(k2,v2,l,r,_,_) -> 
                 match tryPickOptBack f r with 
                 | Some _ as res -> res 
                 | None -> 
-                match f.Invoke(k2, v2) with 
+                match f k2 v2 with 
                 | Some _ as res -> res 
                 | None -> 
                 tryPickOptBack f l
 
-        let tryPickBack f m = tryPickOptBack (OptimizedClosures.FSharpFunc<_,_,_>.Adapt(f)) m
+        let tryPickBack f m = tryPickOptBack f m
 
 
-        let rec existsOpt (f:OptimizedClosures.FSharpFunc<_,_,_>) m = 
+        let rec existsOpt f m = 
             match m with 
             | MapEmpty -> false
-            | MapOne(k2,v2) -> f.Invoke(k2, v2)
-            | MapNode(k2,v2,l,r,_,_) -> existsOpt f l || f.Invoke(k2, v2) || existsOpt f r
+            | MapOne(k2,v2) -> f k2 v2
+            | MapNode(k2,v2,l,r,_,_) -> existsOpt f l || f k2 v2 || existsOpt f r
 
-        let exists f m = existsOpt (OptimizedClosures.FSharpFunc<_,_,_>.Adapt(f)) m
+        let exists f m = existsOpt f m
 
-        let rec forallOpt (f:OptimizedClosures.FSharpFunc<_,_,_>) m = 
+        let rec forallOpt f m = 
             match m with 
             | MapEmpty -> true
-            | MapOne(k2,v2) -> f.Invoke(k2, v2)
-            | MapNode(k2,v2,l,r,_,_) -> forallOpt f l && f.Invoke(k2, v2) && forallOpt f r
+            | MapOne(k2,v2) -> f k2 v2
+            | MapNode(k2,v2,l,r,_,_) -> forallOpt f l && f k2 v2 && forallOpt f r
 
-        let forall f m = forallOpt (OptimizedClosures.FSharpFunc<_,_,_>.Adapt(f)) m
+        let forall f m = forallOpt f m
 
         let rec map f m = 
             match m with 
@@ -527,31 +527,31 @@ module MapExtImplementation =
 
         let mapi f m = mapiOpt f m
 
-        let rec mapiMonotonicAux (f:OptimizedClosures.FSharpFunc<_,_,_>) m =
+        let rec mapiMonotonicAux f m =
             match m with
             | MapEmpty -> empty
             | MapOne(k,v) -> 
-                let (k2, v2) = f.Invoke(k, v)
+                let (k2, v2) = f k v
                 MapOne(k2, v2)
             | MapNode(k,v,l,r,h,c) -> 
                 let l2 = mapiMonotonicAux f l 
-                let k2, v2 = f.Invoke(k, v) 
+                let k2, v2 = f k v
                 let r2 = mapiMonotonicAux f r 
                 MapNode(k2,v2, l2, r2,h,c)
 
-        let mapiMonotonic f m = mapiMonotonicAux (OptimizedClosures.FSharpFunc<_,_,_>.Adapt(f)) m
+        let mapiMonotonic f m = mapiMonotonicAux f m
     
-        let rec chooseiOpt (f:OptimizedClosures.FSharpFunc<'k,'a,Option<'b>>) m =
+        let rec chooseiOpt f m =
             match m with
                 | MapEmpty -> empty
                 | MapOne(k,v) ->
-                    match f.Invoke(k,v) with
+                    match f k v with
                         | Some v -> MapOne(k,v)
                         | None -> MapEmpty
 
                 | MapNode(k,v,l,r,h,c) ->
                     let l' = chooseiOpt f l
-                    let s' = f.Invoke(k,v)
+                    let s' = f k v
                     let r' = chooseiOpt f r
                     match s' with
                         | None -> 
@@ -566,7 +566,7 @@ module MapExtImplementation =
                         | Some v ->
                             join l' k v r'
 
-        let choosei f m = chooseiOpt (OptimizedClosures.FSharpFunc<_,_,_>.Adapt(f)) m
+        let choosei f m = chooseiOpt f m
     
         let rec tryMinAux acc m =
             match m with
@@ -782,21 +782,21 @@ module MapExtImplementation =
                                     let k,v,r = spliceOutSuccessor r
                                     join l k v r
 
-        let rec intersectWithAux (f:OptimizedClosures.FSharpFunc<'a,'b,'c>) (comparer: IComparer<'k>) (l : MapTree<'k, 'a>) (r : MapTree<'k, 'b>) : MapTree<'k, 'c> =
+        let rec intersectWithAux f (comparer: IComparer<'k>) (l : MapTree<'k, 'a>) (r : MapTree<'k, 'b>) : MapTree<'k, 'c> =
             match l with
             | MapEmpty -> 
                 MapEmpty
 
             | MapOne(k,lv) ->
                 match tryFind comparer k r with
-                | Some rv -> MapOne(k, f.Invoke(lv, rv))
+                | Some rv -> MapOne(k, f lv rv)
                 | None -> MapEmpty
 
             | MapNode(k,v,l1,r1,_,_) ->
                 let a, s, b = split comparer k r
                 match s with
                 | Some s ->
-                    let v = f.Invoke(v,s)
+                    let v = f v s
                     rebalance (intersectWithAux f comparer l1 a) k v (intersectWithAux f comparer r1 b)
                 | None ->
                     let l = intersectWithAux f comparer l1 a
@@ -814,55 +814,55 @@ module MapExtImplementation =
             let lc = size l
             let rc = size r
             if lc <= rc then
-                intersectWithAux (OptimizedClosures.FSharpFunc<_,_,_>.Adapt f) comparer l r
+                intersectWithAux f comparer l r
             else
-                intersectWithAux (OptimizedClosures.FSharpFunc<_,_,_>.Adapt(fun a b -> f b a)) comparer r l
+                intersectWithAux (fun a b -> f b a) comparer r l
 
 
                       
-        let rec foldBackOpt (f:OptimizedClosures.FSharpFunc<_,_,_,_>) m x = 
+        let rec foldBackOpt f m x = 
             match m with 
             | MapEmpty -> x
-            | MapOne(k,v) -> f.Invoke(k,v,x)
+            | MapOne(k,v) -> f k v x
             | MapNode(k,v,l,r,_,_) -> 
                 let x = foldBackOpt f r x
-                let x = f.Invoke(k,v,x)
+                let x = f k v x
                 foldBackOpt f l x
 
-        let foldBack f m x = foldBackOpt (OptimizedClosures.FSharpFunc<_,_,_,_>.Adapt(f)) m x
+        let foldBack f m x = foldBackOpt f m x
 
-        let rec foldOpt (f:OptimizedClosures.FSharpFunc<_,_,_,_>) x m  = 
+        let rec foldOpt f x m  = 
             match m with 
             | MapEmpty -> x
-            | MapOne(k,v) -> f.Invoke(x,k,v)
+            | MapOne(k,v) -> f x k v
             | MapNode(k,v,l,r,_,_) -> 
                 let x = foldOpt f x l
-                let x = f.Invoke(x,k,v)
+                let x = f x k v
                 foldOpt f x r
 
-        let fold f x m = foldOpt (OptimizedClosures.FSharpFunc<_,_,_,_>.Adapt(f)) x m
+        let fold f x m = foldOpt f x m
 
-        let foldSectionOpt (comparer: IComparer<'Value>) lo hi (f:OptimizedClosures.FSharpFunc<_,_,_,_>) m x =
-            let rec foldFromTo (f:OptimizedClosures.FSharpFunc<_,_,_,_>) m x = 
+        let foldSectionOpt (comparer: IComparer<'Value>) lo hi f m x =
+            let rec foldFromTo f m x = 
                 match m with 
                 | MapEmpty -> x
                 | MapOne(k,v) ->
                     let cLoKey = comparer.Compare(lo,k)
                     let cKeyHi = comparer.Compare(k,hi)
-                    let x = if cLoKey <= 0 && cKeyHi <= 0 then f.Invoke(k, v, x) else x
+                    let x = if cLoKey <= 0 && cKeyHi <= 0 then f k v x else x
                     x
                 | MapNode(k,v,l,r,_,_) ->
                     let cLoKey = comparer.Compare(lo,k)
                     let cKeyHi = comparer.Compare(k,hi)
                     let x = if cLoKey < 0                 then foldFromTo f l x else x
-                    let x = if cLoKey <= 0 && cKeyHi <= 0 then f.Invoke(k, v, x) else x
+                    let x = if cLoKey <= 0 && cKeyHi <= 0 then f k v x else x
                     let x = if cKeyHi < 0                 then foldFromTo f r x else x
                     x
            
             if comparer.Compare(lo,hi) = 1 then x else foldFromTo f m x
 
         let foldSection (comparer: IComparer<'Value>) lo hi f m x =
-            foldSectionOpt comparer lo hi (OptimizedClosures.FSharpFunc<_,_,_,_>.Adapt(f)) m x
+            foldSectionOpt comparer lo hi f m x
 
         let toList m = 
             let rec loop m acc = 

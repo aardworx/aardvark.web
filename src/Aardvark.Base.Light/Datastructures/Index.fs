@@ -20,204 +20,121 @@ type Index() =
     interface IComparable with
         member x.CompareTo(o : obj) = x.CompareTo o
         
-    interface IComparable<Index> with
-        member x.CompareTo(o : Index) = x.CompareTo o
-
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Index =
+
+    type Time private(number : largeuint, dexp : int) =
     
-    [<StructuredFormatDisplay("{AsString}")>]
-    type private Value =
-        class
-            val mutable public Root : Value
-            val mutable public Prev : Value
-            val mutable public Next : Value
-            val mutable public Tag : uint64
-            val mutable public RefCount : int
-
-            static member private Relabel(start : Value) =
-                let all = List<Value>()
-
-                let distance (l : Value) (r : Value) =
-                    if l = r then UInt64.MaxValue
-                    else r.Tag - l.Tag
-
-
-                // distance start start.Next == 1
-
-                let mutable current = start.Next
-                all.Add start.Next
-                Monitor.Enter start.Next
-
-                let mutable cnt = 1UL
-                while distance start current < 1UL + cnt * cnt do
-                    current <- current.Next
-                    cnt <- cnt + 1UL
-                    all.Add current
-                    Monitor.Enter current
-
-                let space = distance start current
-
-                // the last node does not get relabeled
-                current <- current.Prev
-                all.RemoveAt (all.Count - 1)
-                Monitor.Exit current.Next
-                cnt <- cnt - 1UL
-
-                let step = space / (1UL + cnt)
-                let mutable current = start.Tag + step
-                for n in all do
-                    n.Tag <- current
-                    current <- current + step
-                    Monitor.Exit n
-                    
-                step
-
-            member x.Key = x.Tag - x.Root.Tag
-
-            member x.InsertAfter() =
-                lock x (fun () ->
-                    let next = x.Next
-                    
-                    let mutable distance = 
-                        if next = x then UInt64.MaxValue
-                        else next.Tag - x.Tag
-
-                    if distance = 1UL then
-                        distance <- Value.Relabel x
-                        
-                    let key = x.Tag + (distance / 2UL)
-                    let res = Value(x.Root, Prev = x, Next = x.Next, Tag = key)
-
-                    next.Prev <- res
-                    x.Next <- res
-
-                    res
-                )
-
-            member x.Delete() =
-                let prev = x.Prev
-                Monitor.Enter prev
-                if prev.Next <> x then
-                    Monitor.Exit prev
-                    x.Delete()
-                else
-                    Monitor.Enter x
-                    try
-                        if x.RefCount = 1 then
-                            prev.Next <- x.Next
-                            x.Next.Prev <- prev
-                            x.RefCount <- 0
-                        else
-                            x.RefCount <- x.RefCount - 1
-
-                    finally
-                        Monitor.Exit x
-                        Monitor.Exit prev
-
-            member x.AddRef() =
-                lock x (fun () ->
-                    x.RefCount <- x.RefCount + 1
-                )
-
-            member x.CompareTo(o : Value) =
-                compare x.Key o.Key
-
-
-            interface IComparable with
-                member x.CompareTo (o : obj) =
-                    match o with
-                        | :? Value as o -> x.CompareTo o
-                        | _ -> failwithf "[Real] cannot compare real to %A" o
-
-            override x.GetHashCode() = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(x)
-            override x.Equals o = System.Object.ReferenceEquals(x,o)
-            override x.ToString() = sprintf "%f" (float x.Key / float UInt64.MaxValue)
-            member private x.AsString = x.ToString()
-
-            new(root : Value) = { Root = root; Prev = Unchecked.defaultof<_>; Next = Unchecked.defaultof<_>; Tag = 0UL; RefCount = 0 }
-        end
-        
-    [<StructuredFormatDisplay("{AsString}")>]
-    type private GCReal(real : Value) =
-        inherit Index()
-        do real.AddRef()
-
-        //static let queue = new System.Collections.Concurrent.BlockingCollection<Value>()
-        //static let runner =
-            
-        //    1
-        //    ()
-        //    //startThread (fun () -> 
-        //    //    while true do
-        //    //        let e = queue.Take()
-        //    //        e.Delete()
-        //    //)
-
-        member private x.Value = real
-
-        override x.After() =
-            lock real (fun () ->
-                if real.Next <> real.Root then GCReal real.Next :> Index
-                else GCReal (real.InsertAfter()) :> Index
-            )   
-
-        override x.Before() =
-            let prev = real.Prev
-            Monitor.Enter prev
-            if prev.Next <> real then
-                Monitor.Exit prev
-                x.Before()
+        let number, dexp =
+            if number.IsZero then
+                number, 0
             else
-                try
-                    if prev = real.Root then 
-                        prev.InsertAfter() |> GCReal :> Index
-                    else
-                        prev |> GCReal :> Index
-                finally
-                    Monitor.Exit prev
+                let mutable number = number
+                let mutable dexp = dexp
+                while number.GetBit 0 = 0u do
+                    number <- number >>> 1
+                    dexp <- dexp - 1
+                number, dexp
 
-        override l.Between(r : Index) =
-            let l = l.Value
-            let r = (unbox<GCReal> r).Value
-            Monitor.Enter l
-            try
-                if l.Next = r then l.InsertAfter() |> GCReal :> Index
-                else l.Next |> GCReal :> Index
-            finally
-                Monitor.Exit l
+        member private x.Number = number
+        member private x.DenomiatorExp = dexp
 
-        override x.Finalize() =
-            Aardvark.Import.JS.console.warn "finalize"
-            //queue.Add real
+        static member Zero = Time(largeuint.Zero, 0)
+        static member One = Time(largeuint.One, 0)
+        
+        override x.ToString() =
 
-        override x.CompareTo (o : obj) =
-            match o with
-                | :? GCReal as o -> real.CompareTo(o.Value)
-                | _ -> failwithf "[Real] cannot compare real to %A" o
+            //let denomiatior = largeuint.One <<< dexp
 
-        override x.GetHashCode() = real.GetHashCode()
+            //let a = number
+            //let b = denomiatior - number
+            //if b < a then
+            //    sprintf "1-%s*2^-%d" (string b) dexp
+
+            //else
+            sprintf "%s*2^-%d" (string number) dexp
+
+        override x.GetHashCode() =
+            let a = number.GetHashCode() 
+            let b = dexp.GetHashCode()
+            uint32 a ^^^ uint32 b + 0x9e3779b9u + (uint32 a <<< 6) + (uint32 a >>> 2) |> int
+
         override x.Equals o =
             match o with
-                | :? GCReal as o -> real.Equals o.Value
-                | _ -> false
-                
-        override x.ToString() = real.ToString()
-        member private x.AsString = x.ToString()
+            | :? Time as o -> number = o.Number && dexp = o.DenomiatorExp
+            | _ -> false
 
-        override x.Next = 
-            lock real (fun () ->
-                GCReal real.Next :> Index
-            )
+        static member Between(l : Time, r : Time) =
+            let le = l.DenomiatorExp
+            let re = r.DenomiatorExp
+            let c = compare le re
+            let mutable a = Unchecked.defaultof<_>
+            let mutable b = Unchecked.defaultof<_>
+            let mutable e = 0
+            if c < 0 then
+                a <- l.Number <<< (re - le)
+                b <- r.Number
+                e <- re
 
-        new() = 
-            let r = Value(Unchecked.defaultof<_>)
-            r.Root <- r
-            r.Next <- r
-            r.Prev <- r
-            GCReal(r)
+            elif c > 0 then
+                a <- l.Number
+                b <- r.Number <<< (le - re)
+                e <- le
+            
+            else
+                a <- l.Number
+                b <- r.Number
+                e <- le
 
-    let zero = GCReal() :> Index
+            //if a = b then failwith "equal Times"
+            if largeuint.DistanceIsOne(a,b) then
+                Time(a + b, e + 1)
+            else
+                Time((a + b) >>> 1, e)
+        
+        interface System.IComparable with
+            member x.CompareTo o =
+                match o with
+                | :? Time as o -> 
+                    if dexp < o.DenomiatorExp then
+                        let a = number <<< (o.DenomiatorExp - dexp)
+                        let b = o.Number
+                        compare a b
+                    elif o.DenomiatorExp < dexp then
+                        let a = number
+                        let b = o.Number <<< (dexp - o.DenomiatorExp)
+                        compare a b
+                    else
+                        compare number o.Number
+                | _ ->
+                    failwith "uncomparable"
+
+    [<StructuredFormatDisplay("{AsString}")>]
+    type private TimeIndex(time : Time) =
+        inherit Index()
+        member x.Time = time
+        
+        member private x.AsString = string time
+
+        override x.ToString() = string time
+        override x.After() = TimeIndex(Time.Between(time, Time.One)) :> Index
+        override x.Before() = TimeIndex(Time.Between(Time.Zero, time)) :> Index
+        override x.Between(other) = 
+            let other = unbox<TimeIndex> other
+            TimeIndex(Time.Between(time, other.Time)) :> Index
+        override x.CompareTo o =
+            let other = unbox<TimeIndex> o
+            compare time other.Time
+
+        override x.Next = failwith "bad"
+        
+        override x.GetHashCode() = time.GetHashCode()
+        override x.Equals o =
+            match o with
+            | :? TimeIndex as o -> time = o.Time
+            | _ -> false
+
+    let zero = TimeIndex(Time.Zero) :> Index
     let after (r : Index) = r.After()
     let before (r : Index) = r.Before()
     let between (l : Index) (r : Index) = l.Between r

@@ -167,415 +167,11 @@ module FShadeTest =
                 return f * v.c
         }
 
-type largeuint(data : byte[]) =
-    static let ceilDiv8 (v : int) =
-        if v < 0 then 0
-        elif v &&& 7 = 0 then v / 8
-        else 1 + v / 8
-
-    static let trim (arr : byte[]) =
-        let mutable off = 0
-        while off < arr.Length && arr.[off] = 0uy do
-            off <- off + 1
-        if off > 0 then Array.skip off arr
-        else arr
-
-    let data = trim data
-    member x.Data = data
-    member x.Bits = 8 * data.Length
-
-    static member Zero = largeuint([||])
-    static member One = largeuint([| 1uy |])
-
-    new (v : int) =
-        assert(v >= 0)
-        largeuint [| byte (v >>> 24); byte (v >>> 16); byte (v >>> 8); byte v |]
-
-    override x.ToString() = 
-        data |> Seq.mapi (fun i v -> if i = 0 then sprintf "%X" v else sprintf "%02X" v) |> String.concat "" |> sprintf "0x%s"
-
-    static member (<<<) (l : largeuint, r : int) : largeuint =
-        if r = 0 then l
-        elif r < 0 then l >>> -r
-        else
-            let maxBits = 8 * l.Data.Length + r
-            let res = Array.zeroCreate (ceilDiv8 maxBits)
-            let shift = r &&& 7
-            if shift = 0 then
-                let mutable ri = res.Length - 1 - (r >>> 3)
-                let mutable li = l.Data.Length - 1
-                while li >= 0 && ri >= 0 do 
-                    res.[ri] <- l.Data.[li]
-                    ri <- ri - 1
-                    li <- li - 1
-                largeuint res
-
-            else
-                let mutable ri = res.Length - 1 - (r >>> 3)
-                let mutable li = l.Data.Length - 1
-                let mutable c = 0uy
-                while li >= 0 && ri >= 0 do 
-                    res.[ri] <- (l.Data.[li] <<< shift) ||| c
-                    c <- l.Data.[li] >>> (8-shift)
-                    ri <- ri - 1
-                    li <- li - 1
-
-                if ri >= 0 && c <> 0uy then
-                    res.[ri] <- c
-
-                largeuint res
-
-
-    static member (>>>) (l : largeuint, r : int) =
-        if r = 0 then l
-        elif r < 0 then l <<< -r
-        else
-            let maxBits = 8 * l.Data.Length - r
-            let res = Array.zeroCreate (ceilDiv8 maxBits)
-            let shift = r &&& 7
-            if shift = 0 then
-                let mutable ri = 0
-                let mutable li = 0
-                while li < l.Data.Length && ri < res.Length do 
-                    res.[ri] <- l.Data.[li]
-                    ri <- ri + 1
-                    li <- li + 1
-                
-                largeuint res
-                
-            else
-                let mask = (1uy <<< shift) - 1uy
-                let mutable ri = 0
-                let mutable li = 0
-                let mutable c = 0uy
-                while li < l.Data.Length && ri < res.Length do 
-                    res.[ri] <- (l.Data.[li] >>> shift) ||| c
-                    c <- (l.Data.[li] &&& mask) <<< (8 - shift)
-                    ri <- ri + 1
-                    li <- li + 1
-                
-
-                largeuint res
-
-
-
-    static member (+) (l : largeuint, r : largeuint) : largeuint =
-        let bits = 1 + max l.Bits r.Bits
-        let res = Array.zeroCreate (ceilDiv8 bits)
-
-        let mutable li = l.Data.Length-1
-        let mutable ri = r.Data.Length-1
-        let mutable oi = res.Length-1
-        let mutable c = 0uy
-        while li >= 0 && ri >= 0 do
-            let v = int l.Data.[li] + int r.Data.[ri] + int c
-            res.[oi] <- byte v
-            c <- if v > 255 then 1uy else 0uy
-            li <- li - 1
-            ri <- ri - 1
-            oi <- oi - 1
-
-        while li >= 0 do
-            let v = int l.Data.[li] + int c
-            res.[oi] <- byte v
-            li <- li - 1
-            oi <- oi - 1
-            c <- if v > 255 then 1uy else 0uy
-
-        while ri >= 0 do
-            let v = int r.Data.[ri] + int c
-            res.[oi] <- byte v
-            ri <- ri - 1
-            oi <- oi - 1
-            c <- if v > 255 then 1uy else 0uy
-
-        while oi >= 0 do
-            let v = int c
-            res.[oi] <- byte v
-            c <- if v > 255 then 1uy else 0uy
-            oi <- oi - 1
-
-        largeuint res
-
-    static member DistanceIsOne(l : largeuint, r : largeuint) : bool =
-        // TODO: faster implementation!!!
-        let c = compare l r
-        if c > 0 then 
-            l = r + largeuint.One
-        elif c < 0 then
-            r = l + largeuint.One
-        else
-            false
-
-    member x.Equals(o : bigint) =
-        let arr = o.ToByteArray() |> Array.rev |> trim
-        arr.Length = data.Length && Array.forall2 (=) arr data
-
-
-    override x.GetHashCode() =
-        let combine a b =
-            uint32 a ^^^ uint32 b + 0x9e3779b9u + (uint32 a <<< 6) + (uint32 a >>> 2) |> int
-        data |> Array.fold (fun c v -> combine c (Unchecked.hash v)) 0
-
-    override x.Equals o =
-        match o with
-        | :? largeuint as o -> data.Length = o.Data.Length && Array.forall2 (=) data o.Data
-        | _ -> false
-
-    interface System.IComparable with
-        member x.CompareTo o =
-            match o with
-            | :? largeuint as o ->
-                let c = compare data.Length o.Data.Length
-                if c <> 0 then c
-                else
-                    let rec compareArray (i : int) (l : byte[]) (r : byte[]) =
-                        if i < l.Length then 
-                            let c = compare l.[i] r.[i]
-                            if c <> 0 then c
-                            else compareArray (i+1) l r
-                        else
-                            0
-                    compareArray 0 data o.Data
-            | _ ->
-                failwith "uncomparable"
-
-type largeuint32(data : uint32[]) =
-    static let ceilDiv32 (v : int) =
-        if v < 0 then 0
-        elif v &&& 31 = 0 then v  /32
-        else 1 + v / 32
-
-    static let trim (arr : uint32[]) =
-        let mutable off = 0
-        while off < arr.Length && arr.[off] = 0u do
-            off <- off + 1
-        if off > 0 then Array.skip off arr
-        else arr
-
-    let data = trim data
-    member x.Data = data
-    member x.Bits = 32 * data.Length
-
-    static member Zero = largeuint32([||])
-    static member One = largeuint32([| 1u |])
-
-    new (v : int) =
-        assert(v >= 0)
-        largeuint32 [| uint32 v |]
-
-    override x.ToString() = 
-        data |> Seq.mapi (fun i v -> if i = 0 then sprintf "%X" v else sprintf "%08X" v) |> String.concat "" |> sprintf "0x%s"
-
-    static member (<<<) (l : largeuint32, r : int) : largeuint32 =
-        if r = 0 then l
-        elif r < 0 then l >>> -r
-        else
-            let maxBits = 32 * l.Data.Length + r
-            let res = Array.zeroCreate (ceilDiv32 maxBits)
-            let shift = r &&& 31
-            if shift = 0 then
-                let mutable ri = res.Length - 1 - (r >>> 5)
-                let mutable li = l.Data.Length - 1
-                while li >= 0 && ri >= 0 do 
-                    res.[ri] <- l.Data.[li]
-                    ri <- ri - 1
-                    li <- li - 1
-                largeuint32 res
-
-            else
-                let mutable ri = res.Length - 1 - (r >>> 5)
-                let mutable li = l.Data.Length - 1
-                let mutable c = 0u
-                while li >= 0 && ri >= 0 do 
-                    res.[ri] <- (l.Data.[li] <<< shift) ||| c
-                    c <- l.Data.[li] >>> (32-shift)
-                    ri <- ri - 1
-                    li <- li - 1
-
-                if ri >= 0 && c <> 0u then
-                    res.[ri] <- c
-
-                largeuint32 res
-
-
-    static member (>>>) (l : largeuint32, r : int) =
-        if r = 0 then l
-        elif r < 0 then l <<< -r
-        else
-            let maxBits = 32 * l.Data.Length - r
-            let res = Array.zeroCreate (ceilDiv32 maxBits)
-            let shift = r &&& 31
-            if shift = 0 then
-                let mutable ri = 0
-                let mutable li = 0
-                while li < l.Data.Length && ri < res.Length do 
-                    res.[ri] <- l.Data.[li]
-                    ri <- ri + 1
-                    li <- li + 1
-                
-                largeuint32 res
-                
-            else
-                let mask = (1u <<< shift) - 1u
-                let mutable ri = 0
-                let mutable li = 0
-                let mutable c = 0u
-                while li < l.Data.Length && ri < res.Length do 
-                    res.[ri] <- (l.Data.[li] >>> shift) ||| c
-                    c <- (l.Data.[li] &&& mask) <<< (32 - shift)
-                    ri <- ri + 1
-                    li <- li + 1
-                
-
-                largeuint32 res
-
-
-
-    static member (+) (l : largeuint32, r : largeuint32) : largeuint32 =
-        let bits = 1 + max l.Bits r.Bits
-        let res = Array.zeroCreate (ceilDiv32 bits)
-
-        let mutable li = l.Data.Length-1
-        let mutable ri = r.Data.Length-1
-        let mutable oi = res.Length-1
-        let mutable c = 0u
-        while li >= 0 && ri >= 0 do
-            let v = float l.Data.[li] + float r.Data.[ri] + float c
-
-            res.[oi] <- uint32 v
-            c <- if v > 4294967295.0 then 1u else 0u
-            li <- li - 1
-            ri <- ri - 1
-            oi <- oi - 1
-
-        while li >= 0 do
-            let v = float l.Data.[li] + float c
-            res.[oi] <- uint32 v
-            c <- if v > 4294967295.0 then 1u else 0u
-            li <- li - 1
-            oi <- oi - 1
-
-        while ri >= 0 do
-            let v = float r.Data.[ri] + float c
-            res.[oi] <- uint32 v
-            c <- if v > 4294967295.0 then 1u else 0u
-            ri <- ri - 1
-            oi <- oi - 1
-
-        while oi >= 0 do
-            let v = float c
-            c <- if v > 4294967295.0 then 1u else 0u
-            res.[oi] <- uint32 v
-            oi <- oi - 1
-
-        largeuint32 res
-
-    static member (-) (l : largeuint32, r : largeuint32) : largeuint32 =
-        let bits = 1 + max l.Bits r.Bits
-        let res = Array.zeroCreate (ceilDiv32 bits)
-
-        let mutable li = l.Data.Length-1
-        let mutable ri = r.Data.Length-1
-        let mutable oi = res.Length-1
-        let mutable c = 1u
-        while li >= 0 && ri >= 0 do
-            let v = float l.Data.[li] + float ~~~r.Data.[ri] + float c
-
-            res.[oi] <- uint32 v
-            c <- if v > 4294967295.0 then 1u else 0u
-            li <- li - 1
-            ri <- ri - 1
-            oi <- oi - 1
-
-        while li >= 0 do
-            let v = float l.Data.[li] + float c
-            res.[oi] <- uint32 v
-            c <- if v > 4294967295.0 then 1u else 0u
-            li <- li - 1
-            oi <- oi - 1
-
-        while ri >= 0 do
-            let v = float ~~~r.Data.[ri] + float c
-            res.[oi] <- uint32 v
-            c <- if v > 4294967295.0 then 1u else 0u
-            ri <- ri - 1
-            oi <- oi - 1
-
-        while oi >= 0 do
-            let v = float c
-            c <- if v > 4294967295.0 then 1u else 0u
-            res.[oi] <- uint32 v
-            oi <- oi - 1
-
-        largeuint32 res
-    static member DistanceIsOne(l : largeuint32, r : largeuint32) : bool =
-        // TODO: faster implementation!!!
-        let c = compare l r
-        if c > 0 then 
-            // 0FF
-            // 100
-
-            // 101001
-            // 101000
-            
-            // 101000
-            // 100111
-            // 001111
-            
-            // 101001
-            // 101000
-            
-            // 010110 // 1
-            // 101000
-
-            //     01
-
-
-
-
-
-
-
-            l = r + largeuint32.One
-        elif c < 0 then
-            r = l + largeuint32.One
-        else
-            false
-
-    override x.GetHashCode() =
-        let combine a b =
-            uint32 a ^^^ uint32 b + 0x9e3779b9u + (uint32 a <<< 6) + (uint32 a >>> 2) |> int
-        data |> Array.fold (fun c v -> combine c (Unchecked.hash v)) 0
-
-    override x.Equals o =
-        match o with
-        | :? largeuint32 as o -> data.Length = o.Data.Length && Array.forall2 (=) data o.Data
-        | _ -> false
-
-    interface System.IComparable with
-        member x.CompareTo o =
-            match o with
-            | :? largeuint32 as o ->
-                let c = compare data.Length o.Data.Length
-                if c <> 0 then c
-                else
-                    let rec compareArray (i : int) (l : uint32[]) (r : uint32[]) =
-                        if i < l.Length then 
-                            let c = compare l.[i] r.[i]
-                            if c <> 0 then c
-                            else compareArray (i+1) l r
-                        else
-                            0
-                    compareArray 0 data o.Data
-            | _ ->
-                failwith "uncomparable"
-
-type System.Numerics.BigInteger with
-    static member DistanceIsOne(l : bigint, r : bigint) =
-        l = r + bigint.One || r = l + bigint.One
-
-type bla = largeuint32
+    let bla (v : Vertex) =
+        fragment {  
+            let c : V4d = uniform?Color
+            return v.c * (1.0  - c.W) + c * c.W
+        }
 
 module Normal16 =
     let private sgn (v : V2d) = V2d((if v.X >= 0.0 then 1.0 else -1.0), (if v.Y >= 0.0 then 1.0 else -1.0))
@@ -652,87 +248,6 @@ module Normal32 =
         best
 
 
-[<Struct; CustomEquality; CustomComparison>]
-type Time private(number : bla, dexp : int) =
-    
-    member private x.Number = number
-    member private x.DenomiatorExp = dexp
-
-    static member Zero = Time(bla.Zero, 0)
-    static member One = Time(bla.One, 0)
-
-    override x.ToString() =
-        let denomiator = bla.One <<< dexp
-        sprintf "%A / %A" number denomiator
-        //let mutable d,r = bigint.DivRem(number, denomiator)
-        //let mutable str = sprintf "%A." d
-        //if r.IsZero then 
-        //    str + "0"
-        //else
-        //    let mutable digits = 0
-        //    while digits < 30 && not r.IsZero do
-        //        r <- r * bigint 10
-        //        let (d1, r1) = bigint.DivRem(r, denomiator)
-        //        str <- str + sprintf "%A" d1
-        //        r <- r1
-        //        digits <- digits + 1
-        //    str
-
-    override x.GetHashCode() =
-        let a = number.GetHashCode() 
-        let b = dexp.GetHashCode()
-        uint32 a ^^^ uint32 b + 0x9e3779b9u + (uint32 a <<< 6) + (uint32 a >>> 2) |> int
-
-    override x.Equals o =
-        match o with
-        | :? Time as o -> number = o.Number && dexp = o.DenomiatorExp
-        | _ -> false
-
-    static member Between(l : Time, r : Time) =
-        let le = l.DenomiatorExp
-        let re = r.DenomiatorExp
-        let c = compare le re
-        let mutable a = Unchecked.defaultof<_>
-        let mutable b = Unchecked.defaultof<_>
-        let mutable e = 0
-        if c < 0 then
-            a <- l.Number <<< (re - le)
-            b <- r.Number
-            e <- re
-
-        elif c > 0 then
-            a <- l.Number
-            b <- r.Number <<< (le - re)
-            e <- le
-            
-        else
-            a <- l.Number
-            b <- r.Number
-            e <- le
-
-        //if d.IsZero then failwith "equal Times"
-        if bla.DistanceIsOne(a,b) then
-            Time(a + b, e + 1)
-        else
-            Time((a + b) >>> 1, e)
-        
-    interface System.IComparable with
-        member x.CompareTo o =
-            match o with
-            | :? Time as o -> 
-                if dexp < o.DenomiatorExp then
-                    let a = number <<< (o.DenomiatorExp - dexp)
-                    let b = o.Number
-                    compare a b
-                elif o.DenomiatorExp < dexp then
-                    let a = number
-                    let b = o.Number <<< (dexp - o.DenomiatorExp)
-                    compare a b
-                else
-                    compare number o.Number
-            | _ ->
-                failwith "uncomparable"
-
 module Time =
     let timed (f : unit -> int) =
         #if FABLE_QUOTATIONS
@@ -746,68 +261,6 @@ module Time =
         sw.Stop()
         printfn "took %.3fµs" (1000.0 * sw.Elapsed.TotalMilliseconds / float iter)
         #endif
-
-    let test() =
-        let rand = System.Random()
-
-        let a = largeuint32 3 - largeuint32 18 + largeuint32 18
-        console.warn (string a)
-
-        //for i in 1 .. 1000 do
-        //    let shift = rand.Next(20)
-        //    let s2 = rand.Next(shift)
-
-        //    let v = rand.Next()
-        //    let a = (bigint v <<< shift) >>> s2
-        //    let b = (largeuint v <<< shift) >>> s2
-        //    let sa = sprintf "0x%s" (a.ToString("X")) 
-        //    let sb = b.ToString()
-
-        //    if not (b.Equals a) then 
-                
-        //        failwithf "bad(%d): %A <<< %d -> %A vs %A" i v shift sa sb
-
-
-
-
-
-        let a = Time.Zero
-        let b = Time.One
-        
-        timed ( fun () ->
-            let mutable l = a
-            let mutable h = b
-        
-            let iter = 10000
-            for i in 1 .. iter do
-                h <- Time.Between(l,h)
-            iter
-        )
-        let mutable l = a
-        let mutable h = b
-        for i in 1 .. 10000 do
-            let n = Time.Between(l,h)
-            if n >= h || n <= l then failwithf "bad: %A %A -> %A" l h n
-            if rand.NextDouble() > 0.5 then l <- n
-            else h <- n
-
-
-        
-        let a = Time.Zero
-        let b = Time.One
-        
-        for i in 1 .. 10 do
-            timed ( fun () ->
-                let mutable l = a
-                let mutable h = b
-        
-                let iter = 10000
-                for i in 1 .. iter do
-                    h <- Time.Between(l,h)
-                iter
-            )
-
-
 
 
 module Lod =
@@ -2310,7 +1763,7 @@ module Octbuild =
             let setMessage fmt = Printf.kprintf (fun str -> progress.innerHTML <- str) fmt
         
             let data = 
-                PointCloudImporter.Import.Ascii(file, [||])
+                PointCloudImporter.Import.Pts(file)
         
             let config =
                 { 
@@ -2335,6 +1788,7 @@ module Octbuild =
                         progress.addEventListener_click (fun _ -> import.cancel())
                         let! pointCount = import
                         
+                        progress.style.cursor <- ""
                         update config.store
                         setMessage "imported <a href=\"./?local=%s\">%s</a> with %.0f points" config.store config.store pointCount
         
@@ -2343,6 +1797,7 @@ module Octbuild =
                         Aardvark.Import.JS.setTimeout (fun () -> progress.remove()) 1000 |> ignore
                     with e ->
                         setMessage "%A" e
+                        progress.style.cursor <- ""
                         Aardvark.Import.JS.setTimeout (fun () -> progress.remove()) 2000 |> ignore
                 }
         
@@ -2405,8 +1860,8 @@ type IDBInfo =
     abstract member version : float
 
 type IDBFactory with
-    [<Emit("$0.databases()")>]
-    member x.databases() : Aardvark.Import.JS.Promise<IDBInfo[]> = jsNative
+    [<Emit("$0.databases")>]
+    member x.databases : unit -> Aardvark.Import.JS.Promise<IDBInfo[]> = jsNative
 
 [<EntryPoint>]
 let main argv =
@@ -2442,28 +1897,32 @@ let main argv =
         if document.readyState = "complete" then
 
             let select = document.getElementById "clouds" |> unbox<HTMLSelectElement>
-            indexedDB.databases().``then``(fun dbs -> 
-                select.innerHTML <- ""
-                dbs |> Array.iter (fun db ->
-                    let name = db.name
-                    if unbox name then
-                        let e = document.createElement_option()
-                        e.value <- "local://" + name
-                        e.innerText <- name
-                        select.appendChild e |> ignore
-                )
-                let e = document.createElement_option()
-                e.value <- "navvis"
-                e.innerText <- "navvis"
-                select.appendChild e |> ignore
+            if unbox indexedDB.databases then
+                indexedDB.databases().``then``(fun dbs -> 
+                    select.innerHTML <- ""
+                    dbs |> Array.iter (fun db ->
+                        let name = db.name
+                        if unbox name then
+                            let e = document.createElement_option()
+                            e.value <- "local://" + name
+                            e.innerText <- name
+                            select.appendChild e |> ignore
+                    )
+                    let e = document.createElement_option()
+                    e.value <- "navvis"
+                    e.innerText <- "navvis"
+                    select.appendChild e |> ignore
 
-                match Map.tryFind "local" query with
-                | Some q -> 
-                    select.value <- "local://" + q
-                | None ->
-                    select.value <- "navvis"
+                    match Map.tryFind "local" query with
+                    | Some q -> 
+                        select.value <- "local://" + q
+                    | None ->
+                        select.value <- "navvis"
 
-            ) |> ignore
+                ) |> ignore
+            else
+                let select = document.getElementById "clouds"
+                select.parentElement.remove()
 
             let canvas = document.getElementById "target" |> unbox<HTMLCanvasElement>
             canvas.tabIndex <- 1.0
@@ -2504,6 +1963,37 @@ let main argv =
                 set select.value
             )
 
+
+            let l = mlist<int> PList.empty
+
+            let test = l |> AList.map (fun v -> 2*v) |> AList.sort
+            let r = test.GetReader()
+
+            Log.line "%A" l.Value
+            r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
+            r.State |> Log.line "%A"
+
+            transact (fun () -> l.Update (PList.ofList [1;3]))
+            
+            Log.line "%A" l.Value
+            r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
+            r.State |> Log.line "%A"
+            
+            transact (fun () -> l.Update (PList.append 15 l.Value))
+            
+            Log.line "%A" l.Value
+            r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
+            r.State |> Log.line "%A"
+            
+            transact (fun () -> l.Update (PList.insertAt 1 7 l.Value))
+            
+            Log.line "%A" l.Value
+            r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
+            r.State |> Log.line "%A"
+
+            console.warn (PList.ofList [1;2;3])
+
+
             Octbuild.test(fun store ->
                 let u = "local://" + store
                 transact (fun () -> url.Value <- u)
@@ -2517,6 +2007,26 @@ let main argv =
 
             )
 
+            //for b in 0 .. 8 .. 1000 do
+            //    let mutable t = Index.zero
+            //    for i in 1 .. b do
+            //        t <- Index.after t
+
+            //    let mutable bla = t
+
+            //    let rep = 20
+            //    let mutable sum = 0.0
+            //    for i in -1 .. rep do
+            //        let t0 = performance.now()
+            //        let iter = 20000
+            //        for i in 1 .. iter do
+            //            bla <- Index.after t
+            //        if i > 0 then
+            //            let dt = (performance.now() - t0) / float iter
+            //            sum <- sum + dt
+            //    Log.line "%d: %.5fus" b (1000.0 * sum / float rep)
+
+            //console.warn "done"
             let set = ASet.ofModSingle url
 
             let emitStats (s : Lod.Stats) =
