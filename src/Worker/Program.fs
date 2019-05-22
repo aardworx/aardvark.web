@@ -117,12 +117,12 @@ module Lod =
             else 
                 collapse e
 
-     
-        while queue.Count > 0 do
-            let (q,e) = queue.HeapDequeue(cmp)
-            let s = state.size e.original
-            pointCount <- pointCount + float s
-            collapse e
+        if pointCount >= cap then
+            while queue.Count > 0 do
+                let (q,e) = queue.HeapDequeue(cmp)
+                let s = state.size e.original
+                pointCount <- pointCount + float s
+                collapse e
         //console.warn pointCount
 
         ()

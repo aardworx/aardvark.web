@@ -22,6 +22,7 @@
     <Compile Include="Prelude/Measures.fs" />
 	<Compile Include="Prelude/Lens.fs" />
 	<Compile Include="Prelude/Monoid.fs" />
+	<Compile Include="Datastructures\largeuint.fs" />
 	<Compile Include="Datastructures\MapExt.fs" />
 	<Compile Include="Datastructures\Dict.fs" />
 	<Compile Include="Datastructures/SetOperation.fs" />
@@ -32,6 +33,8 @@
 	<Compile Include="Datastructures\HDeltaSet.fs" />
 	<Compile Include="Datastructures\HSet.fs" />
 	<Compile Include="Datastructures\HRefSet.fs" />
+	<Compile Include="Datastructures\PDeltaList.fs" />
+	<Compile Include="Datastructures\PList.fs" />
 	<Compile Include="Incremental\PriorityQueue.fs" />
 	<Compile Include="Incremental\Core.fs" />
 	<Compile Include="Incremental\Mod\Mod.fs" />
@@ -45,6 +48,10 @@
 	<Compile Include="Incremental\AMap\mmap.fs" />
 	<Compile Include="Incremental\AMap\cmap.fs" />
 	<Compile Include="Incremental\AMap\amap.fs" />
+	<Compile Include="Incremental\AList\alistcore.fs" />
+	<Compile Include="Incremental\AList\clist.fs" />
+	<Compile Include="Incremental\AList\mlist.fs" />
+	<Compile Include="Incremental\AList\alist.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

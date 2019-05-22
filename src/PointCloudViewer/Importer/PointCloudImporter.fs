@@ -106,7 +106,7 @@ let execute (postMessage : obj -> unit) (cmd : Command) =
                 postMessage (Reply.Done(name, info.PointCount))
             | None -> 
                 try
-                    do! LocalBlobStore.destroy config.store
+                    //do! LocalBlobStore.destroy config.store
                     let db = Database(store, compressed = config.compress)
 
                     let progress (totalSize : float) (size : float) (time : float) =

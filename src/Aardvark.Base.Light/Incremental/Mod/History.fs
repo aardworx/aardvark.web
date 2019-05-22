@@ -22,6 +22,8 @@ type IOpReader<'s, 'ops> =
 type AbstractReader<'ops>(t : Monoid<'ops>) =
     inherit AdaptiveObject()
 
+    let mutable t = t
+
     abstract member Release : unit -> unit
     abstract member Compute : AdaptiveToken -> 'ops
 
