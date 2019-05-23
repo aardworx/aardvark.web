@@ -1863,6 +1863,29 @@ type IDBFactory with
     [<Emit("$0.databases")>]
     member x.databases : unit -> Aardvark.Import.JS.Promise<IDBInfo[]> = jsNative
 
+module UITest =
+    open Aardvark.UI
+    open Aardvark.UI.Generic
+
+    let test() =
+        let value = Mod.init "YEAH"
+        let ui =
+            button [style "background: red"; click (fun _ -> performance.now() |> string) ] value
+            //Aardvark.UI.Node.text 
+            //    "button" 
+            //    (AttributeMap.ofList [
+            //        "style", String "background: red"
+            //        "click", Event (fun e -> Seq.singleton (performance.now() |> string))
+            //    ]) 
+            //    value
+
+        let scope = { Updater.emit = Seq.iter (fun m -> transact (fun () -> value.Value <- m)) }
+        let u = Aardvark.UI.Node.newUpdater document.body scope ui
+        let rec update () =
+            u.Update(AdaptiveToken.Top)
+            Aardvark.Import.JS.setTimeout update 50 |> ignore
+        update()
+
 [<EntryPoint>]
 let main argv =
 
@@ -1896,158 +1919,160 @@ let main argv =
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
 
-            let select = document.getElementById "clouds" |> unbox<HTMLSelectElement>
-            if unbox indexedDB.databases then
-                indexedDB.databases().``then``(fun dbs -> 
-                    select.innerHTML <- ""
-                    dbs |> Array.iter (fun db ->
-                        let name = db.name
-                        if unbox name then
-                            let e = document.createElement_option()
-                            e.value <- "local://" + name
-                            e.innerText <- name
-                            select.appendChild e |> ignore
-                    )
-                    let e = document.createElement_option()
-                    e.value <- "navvis"
-                    e.innerText <- "navvis"
-                    select.appendChild e |> ignore
+            UITest.test()
+            if false then
+                let select = document.getElementById "clouds" |> unbox<HTMLSelectElement>
+                if unbox indexedDB.databases then
+                    indexedDB.databases().``then``(fun dbs -> 
+                        select.innerHTML <- ""
+                        dbs |> Array.iter (fun db ->
+                            let name = db.name
+                            if unbox name then
+                                let e = document.createElement_option()
+                                e.value <- "local://" + name
+                                e.innerText <- name
+                                select.appendChild e |> ignore
+                        )
+                        let e = document.createElement_option()
+                        e.value <- "navvis"
+                        e.innerText <- "navvis"
+                        select.appendChild e |> ignore
 
-                    match Map.tryFind "local" query with
-                    | Some q -> 
-                        select.value <- "local://" + q
-                    | None ->
-                        select.value <- "navvis"
+                        match Map.tryFind "local" query with
+                        | Some q -> 
+                            select.value <- "local://" + q
+                        | None ->
+                            select.value <- "navvis"
 
-                ) |> ignore
-            else
-                let select = document.getElementById "clouds"
-                select.parentElement.remove()
+                    ) |> ignore
+                else
+                    let select = document.getElementById "clouds"
+                    select.parentElement.remove()
 
-            let canvas = document.getElementById "target" |> unbox<HTMLCanvasElement>
-            canvas.tabIndex <- 1.0
+                let canvas = document.getElementById "target" |> unbox<HTMLCanvasElement>
+                canvas.tabIndex <- 1.0
             
 
-            canvas.addEventListener_click(fun _ ->
-                canvas.focus()
-            )
+                canvas.addEventListener_click(fun _ ->
+                    canvas.focus()
+                )
 
-            let control = new Aardvark.Application.RenderControl(canvas, false, true, ClearColor = V4d.OOOO)
-            let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
-            let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
-            let color = Mod.init true
+                let control = new Aardvark.Application.RenderControl(canvas, false, true, ClearColor = V4d.OOOO)
+                let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
+                let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
+                let color = Mod.init true
 
-            let view = cam |> Mod.map (fun v -> v |> CameraView.viewTrafo)
-            let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
-
-
-            control.Keyboard.DownWithRepeats.Add (fun k ->
-                match k with
-                | Aardvark.Application.Keys.V -> transact (fun () -> color.Value <- not color.Value)
-                | _ -> ()
-            )
-
-            let url = Mod.init url
+                let view = cam |> Mod.map (fun v -> v |> CameraView.viewTrafo)
+                let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
 
 
-            let set (u : string) =
-                if u.StartsWith "local://" then
-                    let name = u.Substring 8
-                    transact (fun () -> url.Value <- u)
-                    window.history.replaceState("", "", sprintf "./?local=%s" name)
-                else   
-                    transact (fun () -> url.Value <- "./" + u + "/{0}")
-                    window.history.replaceState("", "", sprintf "./?blob=%s" u)
+                control.Keyboard.DownWithRepeats.Add (fun k ->
+                    match k with
+                    | Aardvark.Application.Keys.V -> transact (fun () -> color.Value <- not color.Value)
+                    | _ -> ()
+                )
+
+                let url = Mod.init url
+
+
+                let set (u : string) =
+                    if u.StartsWith "local://" then
+                        let name = u.Substring 8
+                        transact (fun () -> url.Value <- u)
+                        window.history.replaceState("", "", sprintf "./?local=%s" name)
+                    else   
+                        transact (fun () -> url.Value <- "./" + u + "/{0}")
+                        window.history.replaceState("", "", sprintf "./?blob=%s" u)
                     
-            select.addEventListener_change(fun e ->
-                set select.value
-            )
+                select.addEventListener_change(fun e ->
+                    set select.value
+                )
 
 
-            let l = mlist<int> PList.empty
+                let l = mlist<int> PList.empty
 
-            let test = l |> AList.map (fun v -> 2*v) |> AList.sort
-            let r = test.GetReader()
+                let test = l |> AList.map (fun v -> 2*v) |> AList.sort
+                let r = test.GetReader()
 
-            Log.line "%A" l.Value
-            r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
-            r.State |> Log.line "%A"
+                Log.line "%A" l.Value
+                r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
+                r.State |> Log.line "%A"
 
-            transact (fun () -> l.Update (PList.ofList [1;3]))
+                transact (fun () -> l.Update (PList.ofList [1;3]))
             
-            Log.line "%A" l.Value
-            r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
-            r.State |> Log.line "%A"
+                Log.line "%A" l.Value
+                r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
+                r.State |> Log.line "%A"
             
-            transact (fun () -> l.Update (PList.append 15 l.Value))
+                transact (fun () -> l.Update (PList.append 15 l.Value))
             
-            Log.line "%A" l.Value
-            r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
-            r.State |> Log.line "%A"
+                Log.line "%A" l.Value
+                r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
+                r.State |> Log.line "%A"
             
-            transact (fun () -> l.Update (PList.insertAt 1 7 l.Value))
+                transact (fun () -> l.Update (PList.insertAt 1 7 l.Value))
             
-            Log.line "%A" l.Value
-            r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
-            r.State |> Log.line "%A"
+                Log.line "%A" l.Value
+                r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
+                r.State |> Log.line "%A"
 
-            console.warn (PList.ofList [1;2;3])
+                console.warn (PList.ofList [1;2;3])
 
 
-            Octbuild.test(fun store ->
-                let u = "local://" + store
-                transact (fun () -> url.Value <- u)
-                let e = document.createElement_option()
-                e.value <- u
-                e.innerText <- store
-                select.appendChild e |> ignore
-                select.value <- store
+                Octbuild.test(fun store ->
+                    let u = "local://" + store
+                    transact (fun () -> url.Value <- u)
+                    let e = document.createElement_option()
+                    e.value <- u
+                    e.innerText <- store
+                    select.appendChild e |> ignore
+                    select.value <- store
                 
-                set u
+                    set u
 
-            )
+                )
 
-            //for b in 0 .. 8 .. 1000 do
-            //    let mutable t = Index.zero
-            //    for i in 1 .. b do
-            //        t <- Index.after t
+                //for b in 0 .. 8 .. 1000 do
+                //    let mutable t = Index.zero
+                //    for i in 1 .. b do
+                //        t <- Index.after t
 
-            //    let mutable bla = t
+                //    let mutable bla = t
 
-            //    let rep = 20
-            //    let mutable sum = 0.0
-            //    for i in -1 .. rep do
-            //        let t0 = performance.now()
-            //        let iter = 20000
-            //        for i in 1 .. iter do
-            //            bla <- Index.after t
-            //        if i > 0 then
-            //            let dt = (performance.now() - t0) / float iter
-            //            sum <- sum + dt
-            //    Log.line "%d: %.5fus" b (1000.0 * sum / float rep)
+                //    let rep = 20
+                //    let mutable sum = 0.0
+                //    for i in -1 .. rep do
+                //        let t0 = performance.now()
+                //        let iter = 20000
+                //        for i in 1 .. iter do
+                //            bla <- Index.after t
+                //        if i > 0 then
+                //            let dt = (performance.now() - t0) / float iter
+                //            sum <- sum + dt
+                //    Log.line "%d: %.5fus" b (1000.0 * sum / float rep)
 
-            //console.warn "done"
-            let set = ASet.ofModSingle url
+                //console.warn "done"
+                let set = ASet.ofModSingle url
 
-            let emitStats (s : Lod.Stats) =
-                let cnt = document.getElementById "pointCount"
-                cnt.innerText <- sprintf "%s (%s)" (largestr "" s.totalPoints) (largestr "" s.visiblePoints)
-                let cnt = document.getElementById "nodeCount"
-                cnt.innerText <- sprintf "%s (%s)" (largestr "" s.totalNodes) (largestr "" s.visibleNodes)
+                let emitStats (s : Lod.Stats) =
+                    let cnt = document.getElementById "pointCount"
+                    cnt.innerText <- sprintf "%s (%s)" (largestr "" s.totalPoints) (largestr "" s.visiblePoints)
+                    let cnt = document.getElementById "nodeCount"
+                    cnt.innerText <- sprintf "%s (%s)" (largestr "" s.totalNodes) (largestr "" s.visibleNodes)
 
-            let sg =
-                Lod.TreeSg(control, set, emitStats) :> ISg
-                |> Sg.shader {
-                    do! FShadeTest.depthVertex
-                    do! FShadeTest.circularPoint
-                }
-                |> Sg.viewTrafo view
-                |> Sg.projTrafo proj
-                |> Sg.uniform "ViewportSize" control.Size
-                |> Sg.uniform "ShowColor" color
-            let objects = sg.RenderObjects()
-            let task() = new RenderTask(control.FramebufferSignature, control.Manager, objects) :> IRenderTask
+                let sg =
+                    Lod.TreeSg(control, set, emitStats) :> ISg
+                    |> Sg.shader {
+                        do! FShadeTest.depthVertex
+                        do! FShadeTest.circularPoint
+                    }
+                    |> Sg.viewTrafo view
+                    |> Sg.projTrafo proj
+                    |> Sg.uniform "ViewportSize" control.Size
+                    |> Sg.uniform "ShowColor" color
+                let objects = sg.RenderObjects()
+                let task() = new RenderTask(control.FramebufferSignature, control.Manager, objects) :> IRenderTask
 
-            control.RenderTask <- task()
+                control.RenderTask <- task()
     )
     0

@@ -1,14 +1,11 @@
 ﻿namespace Aardvark.Data
 
-open Aardvark.Import.Browser
 open Aardvark.Import.JS
 open System
 open Aardvark.Base
 open Aardvark.Data
 open Aardvark.Data.Durable
 open Microsoft.FSharp.Collections
-open Aardvark.SceneGraph
-open Aardvark.Base.Rendering
 
 
 module HeatMap =
