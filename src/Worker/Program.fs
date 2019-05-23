@@ -8,7 +8,7 @@ open Aardvark.Import.Browser
 open Aardvark.Data
 open Aardvark.Data.Durable
 open Fable.Core
-open Aardvark.SceneGraph
+
 
 //type Config<'a> =
 //    {
