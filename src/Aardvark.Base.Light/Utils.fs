@@ -266,6 +266,20 @@ type ArrayExtensions private() =
 type Fun private() =    
 
     [<Extension>]
+    static member PrevPowerOfTwo(v : int) =
+        if v <= 0 then 
+            0
+        else
+            let mutable x = v
+            x <- x >>> 1
+            x <- x ||| (x >>> 1)
+            x <- x ||| (x >>> 2)
+            x <- x ||| (x >>> 4)
+            x <- x ||| (x >>> 8)
+            x <- x ||| (x >>> 16)
+            1 + x
+
+    [<Extension>]
     static member NextPowerOfTwo(v : int) =
         if v <= 0 then 
             1

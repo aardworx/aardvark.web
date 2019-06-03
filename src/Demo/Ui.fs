@@ -426,7 +426,9 @@ module Updater =
                         n.Update(t)
                         nodes <- MapExt.add i n nodes
                 
-
+            for s in MapExt.values nodes do
+                s.Update(t)
+                
             
         override x.Kill() =
             att.Destroy()
