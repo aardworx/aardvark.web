@@ -26,7 +26,7 @@ module internal MethodTable =
     let getMethod (e : Expr) =
         e |> tryGetMethod |> Option.get
 
-    let ofList (list : list<'a * list<MethodInfo>>) =
+    let ofList (list : array<'a * array<MethodInfo>>) =
         let store = Dict<MethodInfo, 'a>(Unchecked.hash, Unchecked.equals)
 
         for (value, mis) in list do

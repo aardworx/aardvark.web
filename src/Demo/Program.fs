@@ -1867,27 +1867,57 @@ module UITest =
     open Aardvark.UI
     open Aardvark.UI.Generic
 
-    let test() =
-        let value = Mod.init "YEAH"
-        let ui =
-            button [style "background: red"; click (fun _ -> performance.now() |> string) ] value
-            //Aardvark.UI.Node.text 
-            //    "button" 
-            //    (AttributeMap.ofList [
-            //        "style", String "background: red"
-            //        "click", Event (fun e -> Seq.singleton (performance.now() |> string))
-            //    ]) 
-            //    value
+    //type Tag(tag : string) =
+    //    member x.Tag = tag
+    //    static member Node(t : Tag, attributes : AttributeMap<'msg>, children : alist<Node<'msg>>) =
+    //        Aardvark.UI.Node.node t.Tag attributes children
+            
+    //    static member Node(t : Tag, attributes : list<string * AttributeValue<'msg>>, children : list<Node<'msg>>) =
+    //        Aardvark.UI.Node.node t.Tag (AttributeMap.ofList attributes) (AList.ofList children)
 
-        let scope = { Updater.emit = Seq.iter (fun m -> transact (fun () -> value.Value <- m)) }
+    //let inline create (tag : ^a) (att : ^b) (children : ^c) = ((^a or ^b) : (static member Node : ^a * ^b * ^c -> ^x) (tag, att, children))
+
+
+    //let inline bla a b c = create (Tag a) b c
+
+
+
+
+    let test() =
+
+        //let sepp = bla "div" [] []
+        //console.warn(sepp)
+        //let sepp2 = bla "div" AttributeMap.empty AList.empty
+        //console.warn(sepp2)
+
+
+
+        let values = mlist [ "YEAH" ]
+        let ui = 
+            div [style "color: white"] [
+                button [style "background: red"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string) ] "clock"
+
+                div [] (values |> AList.map (fun v -> div [] v))
+            ]
+
+        let scope = { Updater.emit = Seq.iter (fun m -> Log.warn "%A" m; transact (fun () -> values.Update(PList.append m values.Value))) }
         let u = Aardvark.UI.Node.newUpdater document.body scope ui
+
+        let rec kill() =
+            transact (fun () -> values.Update(PList.single "YEAH") |> ignore)
+            u.Update(AdaptiveToken.Top)
+            Aardvark.Import.JS.setTimeout kill 2000 |> ignore
+            
+
         let rec update () =
             u.Update(AdaptiveToken.Top)
             Aardvark.Import.JS.setTimeout update 50 |> ignore
         update()
+        kill()
 
 [<EntryPoint>]
 let main argv =
+    RKdTree.test()
 
     let query = 
         window.location.search.Split([| '&'; '?' |], System.StringSplitOptions.RemoveEmptyEntries)
@@ -1919,8 +1949,8 @@ let main argv =
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
 
-            UITest.test()
-            if false then
+            //UITest.test()
+            if true then
                 let select = document.getElementById "clouds" |> unbox<HTMLSelectElement>
                 if unbox indexedDB.databases then
                     indexedDB.databases().``then``(fun dbs -> 
