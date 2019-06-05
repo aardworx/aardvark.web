@@ -396,7 +396,7 @@ module Resources =
 
 
             let program = x.CreateProgram(signature, shader.code, shader.iface)
-
+            program.Acquire()
 
             let uniformBuffers = 
                 program.Interface.uniformBlocks |> Map.map (fun index block ->
