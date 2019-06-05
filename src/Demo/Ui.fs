@@ -3,6 +3,7 @@
 open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.SceneGraph
+open Aardvark.Base.Rendering
 
 type AttributeValue<'msg> =
     | String of string
@@ -284,7 +285,7 @@ module Updater =
                         let listener =
                             listeners.GetOrCreate(k, fun k ->
                                 { new EventListenerObject with
-                                    member x.handleEvent e = e |> callback |> s.emit
+                                    member x.handleEvent e = Seq.delay (fun () -> callback e) |> s.emit
                                 }
                             )
                         //Log.warn "addEventListener(%s)" k
@@ -297,6 +298,11 @@ module Updater =
                 let newReader = newAttributes.Values.GetReader()
                 let _ = newReader.GetOperations(t)
                 let ops = HMap.computeDelta reader.State newReader.State
+
+                for (k,o) in ops do
+                    match o with
+                    | Set _ -> Log.warn "set %s" k
+                    | Remove -> Log.warn "remove %s" k
 
                 reader.Dispose()
                 attributes <- newAttributes
@@ -411,7 +417,7 @@ module Updater =
                         match r with
                         | Some (_ri, r) when unbox r.Node ->
                             let n = document.createElement(tag)
-                            r.Node.insertBefore n |> ignore
+                            node.insertBefore(n, r.Node) |> ignore
                             n
                                 
                         | _ ->
@@ -529,7 +535,7 @@ module Updater =
         
         let att = AttributeUpdater<'msg>(node, attributes)
 
-        let scene =
+        let wrap(scene : ISg) =
             let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
             let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
             let color = Mod.init true
@@ -542,17 +548,35 @@ module Updater =
             |> Sg.projTrafo proj
 
 
-
-        let mutable objects = scene.RenderObjects()
+        let mutable scene = scene
+        let mutable objects = (wrap scene).RenderObjects()
         let mutable task = new Aardvark.Rendering.WebGL.RenderTask(control.FramebufferSignature, control.Manager, objects)
         do control.RenderTask <- task
         override x.Kill() =
             att.Destroy()
+            control.RenderTask <- RenderTask.empty
             task.Dispose()
             objects <- ASet.empty
             // control.Dispose()
 
-        override x.TryReplace (t : AdaptiveToken, n : Node<'msg>) = false
+        override x.TryReplace (t : AdaptiveToken, n : Node<'msg>) = 
+            match n with
+            | Node.NRender(a,b) ->
+                x.EvaluateAlways t (fun t ->
+                    att.Replace(a, t, scope)
+
+                    control.RenderTask <- RenderTask.empty
+                    task.Dispose()
+
+                    scene <- b
+                    objects <- (wrap scene).RenderObjects()
+                    task <- new Aardvark.Rendering.WebGL.RenderTask(control.FramebufferSignature, control.Manager, objects)
+                    control.RenderTask <- task
+
+                    true
+                )
+            | _ -> 
+                false
 
         override x.Compute(t) =
             x.EvaluateIfNeeded t () (fun t ->

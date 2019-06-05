@@ -799,44 +799,125 @@ module UITest =
     //let inline bla a b c = create (Tag a) b c
 
 
+    type Model =
+        {
+            elements : plist<string>
+            box : bool
+        }
 
+    type MModel(initial : Model) =
+        let _elements = mlist initial.elements
+        let _box = Mod.init initial.box
+
+        member x.elements = _elements :> alist<_>
+        member x.box = _box :> IMod<_>
+
+        member x.Update(v : Model) =
+            _elements.Update v.elements
+            _box.Value <- v.box
+
+        static member Create (m : Model) = MModel m
+        static member Update (m : MModel, v : Model) = m.Update v
+
+    type Message =
+        | Clear 
+        | Append of string
+        | Prepend of string
+        | Toggle
+
+    let update (m : Model) (msg : Message) =
+        match msg with
+        | Toggle -> 
+            { m with box = not m.box }
+        | Clear ->
+            { m with elements = PList.ofList ["YEAH"] }
+        | Append element -> 
+            { m with elements = PList.append element m.elements }
+        | Prepend element -> 
+            { m with elements = PList.prepend element m.elements }
+
+    let view (m : MModel) =
+        div [style "color: white"] [
+            button [clazz "ui basic yellow button"; click (fun _ -> Toggle) ] (m.box |> Mod.map (function true -> "sphere" | false -> "box"))
+            button [clazz "ui basic green button"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string |> Append) ] "append"
+            button [clazz "ui basic green button"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string |> Prepend) ] "prepend"
+            button [clazz "ui basic red button"; click (fun _ -> Clear) ] "clear"
+
+            div [] (m.elements |> AList.map (fun v -> div [clazz "ui basic inverted label"] v))
+
+            div [] (m.box |> Mod.map (fun box ->
+                [
+                    if box then 
+                        yield Aardvark.UI.Node.Render(
+                            AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"; clazz "hugo"], 
+                            Sg.box Box3d.Unit
+                                |> Sg.shader {
+                                    do! FShadeTest.trafo
+                                    do! FShadeTest.constantColor V4d.IIII
+                                    do! FShadeTest.simpleLight
+                                }
+                        )
+                    else
+                        yield Aardvark.UI.Node.Render(
+                            AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"], 
+                            Sg.sphere 3
+                                |> Sg.shader {
+                                    do! FShadeTest.trafo
+                                    do! FShadeTest.constantColor V4d.IIII
+                                    do! FShadeTest.simpleLight
+                                }
+                        )
+                        
+                ]
+            ))
+
+        ]
+
+    let app = 
+        { 
+            initial = { elements = PList.ofList [ "YEAH" ]; box = true }
+            update = update
+            view = view
+            unpersist = Unpersist.instance
+        }
 
     let test() =
+        let d = App.run document.body app
+        ()
+        //let values = mlist [ "YEAH" ]
+        //let ui = 
+        //    div [style "color: white"] [
+        //        button [style "background: red"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string) ] "clock"
 
-        let values = mlist [ "YEAH" ]
-        let ui = 
-            div [style "color: white"] [
-                button [style "background: red"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string) ] "clock"
+        //        div [] (values |> AList.map (fun v -> div [] v))
 
-                div [] (values |> AList.map (fun v -> div [] v))
+        //        Aardvark.UI.Node.Render(
+        //            AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"], 
+        //            Sg.box Box3d.Unit
+        //                |> Sg.shader {
+        //                    do! FShadeTest.trafo
+        //                    do! FShadeTest.constantColor V4d.IIII
+        //                    do! FShadeTest.simpleLight
+        //                }
+        //        )
 
-                Aardvark.UI.Node.Render(
-                    AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"], 
-                    Sg.box Box3d.Unit
-                        |> Sg.shader {
-                            do! FShadeTest.trafo
-                            do! FShadeTest.constantColor V4d.IIII
-                            do! FShadeTest.simpleLight
-                        }
-                )
+        //    ]
 
-            ]
+        //let scope = { Updater.emit = Seq.iter (fun m -> transact (fun () -> values.Update(PList.append m values.Value))) }
+        //let u = Aardvark.UI.Node.newUpdater document.body scope ui
 
-        let scope = { Updater.emit = Seq.iter (fun m -> transact (fun () -> values.Update(PList.append m values.Value))) }
-        let u = Aardvark.UI.Node.newUpdater document.body scope ui
-
-        let rec kill() =
-            let now = performance.now() |> MicroTime.FromMilliseconds |> string
-            transact (fun () -> values.Update(PList.single now) |> ignore)
-            u.Update(AdaptiveToken.Top)
-            Aardvark.Import.JS.setTimeout kill 2000 |> ignore
+        //let rec kill() =
+        //    let now = performance.now() |> MicroTime.FromMilliseconds |> string
+        //    transact (fun () -> values.Update(PList.single now) |> ignore)
+        //    u.Update(AdaptiveToken.Top)
+        //    Aardvark.Import.JS.setTimeout kill 2000 |> ignore
             
 
-        let rec update () =
-            u.Update(AdaptiveToken.Top)
-            Aardvark.Import.JS.setTimeout update 50 |> ignore
-        update()
-        kill()
+        //let rec update () =
+        //    u.Update(AdaptiveToken.Top)
+        //    Aardvark.Import.JS.setTimeout update 50 |> ignore
+        //update()
+        //kill()
 
 [<EntryPoint>]
 let main argv =
@@ -870,8 +951,8 @@ let main argv =
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
 
-            //UITest.test()
-            if true then
+            UITest.test()
+            if false then
                 let select = document.getElementById "clouds" |> unbox<HTMLSelectElement>
                 if unbox indexedDB.databases then
                     indexedDB.databases().``then``(fun dbs -> 
