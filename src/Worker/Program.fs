@@ -60,7 +60,7 @@ module Lod =
         let inline dec v = running := !running - v
 
 
-        let cap = 500000.0
+        let cap = 50000000.0
 
 
         let inline collapse (e : MutableTree<'a>) =
@@ -206,55 +206,6 @@ module Lod =
         let n = computeDelta delta l (Some r)
         n, !delta
 
-
-
-let minDist (b : Box3d) (v : V3d) =
-
-    let bMax = V3d(max b.Min.X b.Max.X, max b.Min.Y b.Max.Y, max b.Min.Z b.Max.Z)
-    let bMin = V3d(min b.Min.X b.Max.X, min b.Min.Y b.Max.Y, min b.Min.Z b.Max.Z)
-    let b = Box3d(bMin, bMax)
-
-    let x = 
-        if v.X > b.Max.X then b.Max.X
-        elif v.X < b.Min.X then b.Min.X
-        else v.X
-        
-    let y = 
-        if v.Y > b.Max.Y then b.Max.Y
-        elif v.Y < b.Min.Y then b.Min.Y
-        else v.Y
-        
-    let z = 
-        if v.Z > b.Max.Z then b.Max.Z
-        elif v.Z < b.Min.Z then b.Min.Z
-        else v.Z
-
-    let c = V3d(x,y,z)
-    //Log.line "%A %A -> %A" b v c
-    v - c |> Vec.length
-
-let angle (localBounds : Box3d) (view : Trafo3d) (avgPointDistance : float) =
-    let cam = view.Backward.C3.XYZ
-    let minDist = minDist localBounds cam
-    let minDist = max 0.01 minDist
-    Constant.DegreesPerRadian * atan2 avgPointDistance minDist
-
-
-
-let quality (rootCenter : V3d) (view : Trafo3d) (n : Octnode) =
-    if n.SubNodeIds.Length > 0 then 
-        let worldBounds = n.BoundingBox
-        let localBounds = Box3d(worldBounds.Min - rootCenter, worldBounds.Max - rootCenter)
-
-        let dist  =
-            let normMax = max (max (abs localBounds.Size.X) (abs localBounds.Size.Y)) (abs localBounds.Size.Z)
-            normMax / 40.0
-
-        let q = 1.0 / angle localBounds view dist
-        q
-    else 
-        System.Double.PositiveInfinity
-
 [<Emit("postMessage($0)")>]
 let postMessage (msg : obj) : unit = jsNative
 
@@ -289,7 +240,7 @@ let main _ =
         { 
             size = fun (n : Octnode) -> n.PointCountCell
             center = V3d.Zero
-            quality = quality center
+            quality = fun (view : Trafo3d) (n : Octnode) -> n.SplitQuality(center, view)
             children = fun n -> (FSharp.Collections.Array.choose (fun a -> a) n.SubNodes)
             roots = HMap.empty
             running = ref 0
@@ -378,7 +329,7 @@ let main _ =
                     state <-
                         { state with 
                             center = tree.Center
-                            quality = quality center
+                            quality = fun (view : Trafo3d) (n : Octnode) -> n.SplitQuality(center, view)
                             roots = HMap.add url  { MutableTree.original = root; MutableTree.kill = ref id; MutableTree.children = ref None } state.roots
                         }
 

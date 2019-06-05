@@ -110,7 +110,7 @@ module private OctHelpers =
                 ()
         o
 
-type Octnode(db : Database, dbid : Guid, level : int, rootCenter : V3d, m : Map<Def, obj>) =
+type Octnode(db : Database, dbid : Guid, parent : Option<Octnode>, level : int, rootCenter : V3d, m : Map<Def, obj>) =
     let bounds =
         match tryGet<Box3d> Octree.BoundingBoxExactGlobal m with
         | Some box -> box
@@ -119,6 +119,40 @@ type Octnode(db : Database, dbid : Guid, level : int, rootCenter : V3d, m : Map<
             match tryGet<Box3d> Octree.BoundingBoxExactLocal m with
             | Some box -> Box3d(box.Min + cell.Center, box.Max + cell.Center)
             | None -> cell.BoundingBox
+
+
+    static let minDist (b : Box3d) (v : V3d) =
+
+        let bMax = V3d(max b.Min.X b.Max.X, max b.Min.Y b.Max.Y, max b.Min.Z b.Max.Z)
+        let bMin = V3d(min b.Min.X b.Max.X, min b.Min.Y b.Max.Y, min b.Min.Z b.Max.Z)
+        let b = Box3d(bMin, bMax)
+
+        let x = 
+            if v.X > b.Max.X then b.Max.X
+            elif v.X < b.Min.X then b.Min.X
+            else v.X
+        
+        let y = 
+            if v.Y > b.Max.Y then b.Max.Y
+            elif v.Y < b.Min.Y then b.Min.Y
+            else v.Y
+        
+        let z = 
+            if v.Z > b.Max.Z then b.Max.Z
+            elif v.Z < b.Min.Z then b.Min.Z
+            else v.Z
+
+        let c = V3d(x,y,z)
+        //Log.line "%A %A -> %A" b v c
+        v - c |> Vec.length
+
+    let angle (localBounds : Box3d) (view : Trafo3d) (avgPointDistance : float) =
+        let cam = view.Backward.C3.XYZ
+        let minDist = minDist localBounds cam
+        let minDist = max 0.01 minDist
+        Constant.DegreesPerRadian * atan2 avgPointDistance minDist
+
+
 
     member x.Data = m
 
@@ -130,6 +164,7 @@ type Octnode(db : Database, dbid : Guid, level : int, rootCenter : V3d, m : Map<
 
     override x.ToString() =
         sprintf "%A(%d)" dbid level
+
 
     member x.Id = dbid 
 
@@ -226,7 +261,7 @@ type Octnode(db : Database, dbid : Guid, level : int, rootCenter : V3d, m : Map<
                                 Unchecked.defaultof<_>
                             else
                                 let d = unbox<Map<Def, obj>> data
-                                Octnode(db, id, level + 1, rootCenter, d)
+                                Octnode(db, id, Some x, level + 1, rootCenter, d)
                         )
                     Some prom
                 else
@@ -243,6 +278,40 @@ type Octnode(db : Database, dbid : Guid, level : int, rootCenter : V3d, m : Map<
             )
         else
             Prom.value ([|x|])
+
+    member x.PercentageOfParent = 
+        match tryGet<float32> Durable.Octree.AveragePointDistance m with
+        | Some v -> float v
+        | None -> 1.0
+
+    member n.SplitQuality (rootCenter : V3d, view : Trafo3d) =
+        if n.SubNodeIds.Length > 0 then 
+            let worldBounds = n.BoundingBox
+            let localBounds = Box3d(worldBounds.Min - rootCenter, worldBounds.Max - rootCenter)
+
+            let dist  =
+                let normMax = max (max (abs localBounds.Size.X) (abs localBounds.Size.Y)) (abs localBounds.Size.Z)
+                normMax / 40.0
+
+            let q = 2.0 / angle localBounds view dist
+            q
+        else 
+            System.Double.PositiveInfinity
+
+    member n.Quality (rootCenter : V3d, view : Trafo3d) =
+        //if n.SubNodeIds.Length > 0 then 
+            let worldBounds = n.BoundingBox
+            let localBounds = Box3d(worldBounds.Min - rootCenter, worldBounds.Max - rootCenter)
+
+            let dist  =
+                let normMax = max (max (abs localBounds.Size.X) (abs localBounds.Size.Y)) (abs localBounds.Size.Z)
+                normMax / 40.0
+
+            let q = 2.0 / angle localBounds view dist
+            q
+        //else 
+        //    let q = 1.0 / angle localBounds view dist
+        //    q
 
 type Octree(store : IBlobStore) =
     let mutable center = V3d.Zero
@@ -281,7 +350,7 @@ type Octree(store : IBlobStore) =
                     Log.warn "unexpected data: %A" def
                     Unchecked.defaultof<_>
                 else
-                    Octnode(db, id, 0, center, unbox<Map<Def, obj>> data)
+                    Octnode(db, id, None, 0, center, unbox<Map<Def, obj>> data)
 
             )
         )
