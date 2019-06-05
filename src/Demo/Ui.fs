@@ -177,7 +177,7 @@ type Node<'msg> =
     | NText of tag : string * attributes : AttributeMap<'msg> * value : IMod<string>
     | NNode of tag : string * attributes : AttributeMap<'msg> * children : alist<Node<'msg>>
     | NRender of attributes : AttributeMap<'msg> * scene : ISg
-    | NMap of mapping : (string -> obj -> seq<'msg>) * child : Node<obj>
+    | NMap of mapping : (obj -> seq<'msg>) * child : Node<obj>
 
     member x.Attributes : AttributeMap<'msg> =
         match x with
@@ -186,7 +186,7 @@ type Node<'msg> =
         | NNode(_,a,_) -> a
         | NRender(a,_) -> a
         | NMap(mapping,inner) ->
-            inner.Attributes |> AttributeMap.collect mapping
+            inner.Attributes |> AttributeMap.collect (fun _ -> mapping)
 
     member x.TagName : Option<string> =
         match x with
@@ -200,10 +200,10 @@ type Node<'msg> =
     static member Text(tag : string, attributes : AttributeMap<'msg>, value : IMod<string>) = NText(tag, attributes, value)
     static member Node(tag : string, attributes : AttributeMap<'msg>, children : alist<Node<'msg>>) = NNode(tag, attributes, children)
     static member Render(attributes : AttributeMap<'msg>, scene : ISg) = NRender(attributes, scene)
-    static member Map(mapping : 'a -> 'b, m : Node<'a>) = NMap((fun _ o -> Seq.singleton (mapping (unbox o))), unbox m)
-    static member Choose (mapping : 'a -> Option<'b>, m : Node<'a>) : Node<'b> = NMap((fun _ o -> match mapping (unbox o) with | Some v -> Seq.singleton v | None -> Seq.empty), unbox m)
-    static member Collect (mapping : 'a -> seq<'b>, m : Node<'a>) : Node<'b> = NMap((fun _ o -> mapping (unbox o)), unbox m)
-    static member Ignore (m : Node<'a>) : Node<'msg> = NMap((fun _ _ -> Seq.empty), unbox m)
+    static member Map(mapping : 'a -> 'b, m : Node<'a>) = NMap((fun o -> Seq.singleton (mapping (unbox o))), unbox m)
+    static member Choose (mapping : 'a -> Option<'b>, m : Node<'a>) : Node<'b> = NMap((fun o -> match mapping (unbox o) with | Some v -> Seq.singleton v | None -> Seq.empty), unbox m)
+    static member Collect (mapping : 'a -> seq<'b>, m : Node<'a>) : Node<'b> = NMap((fun o -> mapping (unbox o)), unbox m)
+    static member Ignore (m : Node<'a>) : Node<'msg> = NMap((fun _ -> Seq.empty), unbox m)
 
 module Updater = 
     open Fable.Core
@@ -226,7 +226,8 @@ module Updater =
             | Node.NEmpty -> EmptyUpdater<'msg>(scope) :> NodeUpdater<_>
             | Node.NText(a,b,c) -> TextUpdater<'msg>(scope, createNode(a), a, b, c) :> NodeUpdater<_>
             | Node.NNode(a,b,c) -> InnerNodeUpdater<'msg>(scope, createNode(a), a, b, c) :> NodeUpdater<_>
-            | _ -> failwith "not implemented"
+            | Node.NMap(mapping,b) -> MapUpdater<'msg>(scope, b, createNode, mapping) :> NodeUpdater<_>
+            | Node.NRender(att, scene) -> RenderUpdater<'msg>(scope, createNode "canvas", att, scene) :> NodeUpdater<_>
 
         static member Create(parent : HTMLElement, scope : Scope<'msg>, n : Node<'msg>) =
             let createNode (tag : string) =
@@ -266,8 +267,7 @@ module Updater =
         let mutable reader = attributes.Values.GetReader()
         let listeners = Dict<string, EventListenerObject>(Unchecked.hash, Unchecked.equals)
 
-        let update (t : AdaptiveToken) (s : Scope<'msg>) =
-            let ops = reader.GetOperations(t)
+        let update (ops : hdeltamap<string,AttributeValue<'msg>>) (s : Scope<'msg>) =
             for (k, o) in ops do
                 match o with
                 | Remove ->
@@ -287,21 +287,28 @@ module Updater =
                                     member x.handleEvent e = e |> callback |> s.emit
                                 }
                             )
-                        Log.warn "addEventListener(%s)" k
+                        //Log.warn "addEventListener(%s)" k
                         node.addEventListener(k, U2.Case2 listener)
 
         override x.Kind = "AttributeUpdater"
 
         member x.Replace(newAttributes : AttributeMap<'msg>, t : AdaptiveToken, s : Scope<'msg>) =
             x.EvaluateAlways t (fun t ->
-                x.Destroy()
+                let newReader = newAttributes.Values.GetReader()
+                let _ = newReader.GetOperations(t)
+                let ops = HMap.computeDelta reader.State newReader.State
+
+                reader.Dispose()
                 attributes <- newAttributes
-                reader <- newAttributes.Values.GetReader()
-                update t s
+                reader <- newReader
+                update ops s
             )
 
         member x.Update(t : AdaptiveToken, s : Scope<'msg>) =
-            x.EvaluateIfNeeded t () (fun t -> update t s)
+            x.EvaluateIfNeeded t () (fun t -> 
+                let ops = reader.GetOperations t
+                update ops s
+            )
 
         member x.Destroy() =
             for (k, _) in reader.State do
@@ -319,7 +326,10 @@ module Updater =
         override x.Node = null
         override x.Compute(_) = ()
         override x.Kill() = ()
-        override x.TryReplace (_t : AdaptiveToken, _n : Node<'msg>) = false
+        override x.TryReplace (_t : AdaptiveToken, n : Node<'msg>) = 
+            match n with
+            | Node.NEmpty -> true
+            | _ -> false
 
     and TextUpdater<'msg>(scope : Scope<'msg>, node : HTMLElement, tag : string, attributes : AttributeMap<'msg>, content : IMod<string>) =
         inherit NodeUpdater<'msg>(scope)
@@ -337,6 +347,7 @@ module Updater =
             match lastValue with
             | Some o when o = v -> ()
             | _ ->
+                //Log.warn "%s.innerText = \"%s\"" node.tagName v
                 node.innerText <- v
                 lastValue <- Some v
 
@@ -358,6 +369,7 @@ module Updater =
                     match lastValue with
                     | Some o when o = v -> ()
                     | _ ->
+                        //Log.warn "repl %s.innerText = \"%s\"" node.tagName v
                         node.innerText <- v
                         lastValue <- Some v
 
@@ -376,11 +388,8 @@ module Updater =
         let mutable nodes : MapExt<Index, NodeUpdater<'msg>> = MapExt.empty
         let att = AttributeUpdater(node, attributes)
         
-        override x.Node = node
-        override x.Compute(t) =
-            att.Update(t, scope)
 
-            let ops = reader.GetOperations t
+        let update (t : AdaptiveToken) (ops : pdeltalist<Node<'msg>>) =
             for (i, op) in PDeltaList.toSeq ops do
                 match op with
                 | Remove ->
@@ -389,6 +398,7 @@ module Updater =
                         nodes <- rest
                         u.Destroy()
                         if unbox u.Node then
+                            //Log.warn "remove %s" u.Node.tagName
                             u.Node.remove()
                     | None ->
                         Log.warn "strange"
@@ -397,17 +407,14 @@ module Updater =
                     let (_l, s, r) = MapExt.neighbours i nodes
 
                     let insert (tag : string) =
+                        //Log.warn "insert %s" tag
                         match r with
-                        | Some (_ri, r) ->
+                        | Some (_ri, r) when unbox r.Node ->
                             let n = document.createElement(tag)
-                            if unbox r.Node then
-                                r.Node.insertBefore n |> ignore
-                                n
-                            else
-                                node.appendChild n |> ignore
-                                n
+                            r.Node.insertBefore n |> ignore
+                            n
                                 
-                        | None ->
+                        | _ ->
                             let n = document.createElement(tag)
                             node.appendChild n |> ignore
                             n
@@ -425,9 +432,16 @@ module Updater =
                         let n = NodeUpdater<'msg>.Create(insert, scope, value)
                         n.Update(t)
                         nodes <- MapExt.add i n nodes
-                
-            for s in MapExt.values nodes do
+
+            for (_,s) in MapExt.toSeq nodes do
                 s.Update(t)
+
+        override x.Node = node
+        override x.Compute(t) =
+            att.Update(t, scope)
+
+            let ops = reader.GetOperations t
+            update t ops
                 
             
         override x.Kill() =
@@ -441,7 +455,113 @@ module Updater =
 
 
         override x.TryReplace (t : AdaptiveToken, n : Node<'msg>) =
-            false
+            match n with
+            | Node.NNode(ntag, natt, nchildren) when tag = ntag ->
+                x.EvaluateAlways t (fun t ->
+                    att.Replace(natt, t, scope)
+                    attributes <- natt
+
+                    let r = nchildren.GetReader()
+                    let _ = r.GetOperations t
+                    let nState = PList.toMap r.State
+                    let oState = nodes
+
+                    let tryUpdate (key : Index) (o : Option<NodeUpdater<'msg>>) (n : Option<Node<'msg>>) =
+                        match o, n with
+                        | Some o, Some n -> 
+                            if o.TryReplace(t, n) then
+                                None
+                            else
+                                Some (ElementOperation.Set n)
+                        | None, Some n ->
+                            Some (ElementOperation.Set n)
+                        | Some o, None ->
+                            nodes <- MapExt.remove key nodes
+                            o.Destroy()
+                            Some (ElementOperation.Remove)
+                        | None, None ->
+                            None
+
+                    let deltas = MapExt.choose2 tryUpdate oState nState |> PDeltaList.ofMap
+
+                    children <- nchildren
+                    reader <- r
+
+                    update t deltas
+                    true
+                )
+            | _ ->
+                false
+
+    and MapUpdater<'msg>(scope : Scope<'msg>, inner : Node<obj>, createNode : string -> HTMLElement, mapping : obj -> seq<'msg>) =
+        inherit NodeUpdater<'msg>(scope)
+
+        let mutable mapping = mapping
+        let innerScope =
+            { 
+                emit = fun v -> v |> Seq.collect mapping |> scope.emit
+            }
+
+        let inner = NodeUpdater<obj>.Create(createNode, innerScope, inner)
+        
+        override x.Kill() = inner.Destroy()
+        override x.Node = inner.Node
+        override x.Compute(t) = x.EvaluateIfNeeded t () (fun t -> inner.Update(t))
+        
+        override x.TryReplace (t : AdaptiveToken, n : Node<'msg>) =
+            match n with
+            | Node.NMap(nmapping,ninner) ->
+                x.EvaluateAlways t (fun t ->
+                    if inner.TryReplace(t, ninner) then
+                        mapping <- nmapping
+                        true
+                    else
+                        false
+                )
+            | _ -> 
+                false
+
+    and RenderUpdater<'msg>(scope : Scope<'msg>, node : HTMLElement, attributes : AttributeMap<'msg>, scene : ISg) =
+        inherit NodeUpdater<'msg>(scope)
+
+        let canvas = unbox<HTMLCanvasElement> node
+        let control = new Aardvark.Application.RenderControl(canvas, true, true, ClearColor = V4d.OOOO)
+        
+        let att = AttributeUpdater<'msg>(node, attributes)
+
+        let scene =
+            let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
+            let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
+            let color = Mod.init true
+
+            let view = cam |> Mod.map (fun v -> v |> CameraView.viewTrafo)
+            let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
+
+            scene
+            |> Sg.viewTrafo view
+            |> Sg.projTrafo proj
+
+
+
+        let mutable objects = scene.RenderObjects()
+        let mutable task = new Aardvark.Rendering.WebGL.RenderTask(control.FramebufferSignature, control.Manager, objects)
+        do control.RenderTask <- task
+        override x.Kill() =
+            att.Destroy()
+            task.Dispose()
+            objects <- ASet.empty
+            // control.Dispose()
+
+        override x.TryReplace (t : AdaptiveToken, n : Node<'msg>) = false
+
+        override x.Compute(t) =
+            x.EvaluateIfNeeded t () (fun t ->
+                att.Update(t, scope)
+            )
+
+        override x.Node = node
+
+
 
 module Node =
 

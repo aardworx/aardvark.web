@@ -18,18 +18,6 @@ module RKdTree =
 
     [<AutoOpen>]
     module private Helpers = 
-        type V3d with
-            member this.MajorDim =
-                let x = abs this.X
-                let y = abs this.Y
-                let z = abs this.Z
-
-                if x > y then
-                    if z > y then 2
-                    else 1
-                else
-                    if z > x then 2
-                    else 0
 
         let get_x = fun (v : V3d) -> v.X
         let get_y = fun (v : V3d) -> v.Y
@@ -42,150 +30,7 @@ module RKdTree =
         let gets = [| get_x; get_y; get_z; get_x |]
         let sets = [| set_x; set_y; set_z; set_x |]
 
-        let inline get (i : int) (v : V3d) = gets.[i &&& 3] v
-        let inline set (i : int) (v : V3d) (a : float) = sets.[i &&& 3] v a
-
-        let private c_insertionMedianThreshold = 7
-
-        type Int32Array with
-            member a.QuickMedian(cmp : int -> int -> int, l : int, r : int, countSub1 : int, med : int) =
-                let mutable countSub1 = countSub1
-                let mutable l = l
-                let mutable r = r
-                let mutable ret = false
-                while not ret && countSub1 >= c_insertionMedianThreshold do
-                    let sixth = (1 + countSub1) / 6
-                    let e1 = l + sixth
-                    let e5 = r - sixth
-                    let e3 = (l + r) >>> 1
-                    let e4 = e3 + sixth
-                    let e2 = e3 - sixth
-
-                    if cmp a.[e1] a.[e2] > 0 then ( let t = a.[e1] in a.[e1] <- a.[e2]; a.[e2] <- t )
-                    if cmp a.[e4] a.[e5] > 0 then ( let t = a.[e4] in a.[e4] <- a.[e5]; a.[e5] <- t )
-                    if cmp a.[e1] a.[e3] > 0 then ( let t = a.[e1] in a.[e1] <- a.[e3]; a.[e3] <- t )
-                    if cmp a.[e2] a.[e3] > 0 then ( let t = a.[e2] in a.[e2] <- a.[e3]; a.[e3] <- t )
-                    if cmp a.[e1] a.[e4] > 0 then ( let t = a.[e1] in a.[e1] <- a.[e4]; a.[e4] <- t )
-                    if cmp a.[e3] a.[e4] > 0 then ( let t = a.[e3] in a.[e3] <- a.[e4]; a.[e4] <- t )
-                    if cmp a.[e2] a.[e5] > 0 then ( let t = a.[e2] in a.[e2] <- a.[e5]; a.[e5] <- t )
-                    if cmp a.[e2] a.[e3] > 0 then ( let t = a.[e2] in a.[e2] <- a.[e3]; a.[e3] <- t )
-                    if cmp a.[e4] a.[e5] > 0 then ( let t = a.[e4] in a.[e4] <- a.[e5]; a.[e5] <- t )
-
-                    let mutable p1 = a.[e2]
-                    a.[e2] <- a.[l]
-                    let mutable p2 = a.[e4]
-                    a.[e4] <- a.[r]
-
-                    let mutable lo = l + 1;
-                    let mutable hi = r - 1;
-
-                    let pivotsDiffer = cmp p1 p2 <> 0
-
-                    if pivotsDiffer then
-                        let mutable i = lo
-                        while i <= hi do
-                            let mutable ai = a.[i]
-                            if cmp ai p1 < 0 then ( a.[i] <- a.[lo]; a.[lo] <- ai; lo <- lo + 1 )
-                            elif cmp ai p2 > 0 then
-                                while cmp a.[hi] p2 > 0 && i < hi do
-                                    hi <- hi - 1
-                                a.[i] <- a.[hi]
-                                a.[hi] <- ai
-                                hi <- hi - 1
-                                ai <- a.[i]
-                                if cmp ai p1 < 0 then 
-                                    a.[i] <- a.[lo]
-                                    a.[lo] <- ai
-                                    lo <- lo + 1
-                            i <- i + 1
-                    else
-                        let mutable i = lo
-                        while i <= hi do
-                            let mutable ai = a.[i]
-                            if cmp ai p1 = 0 then ()
-                            elif cmp ai p1 < 0 then ( a.[i] <- a.[lo]; a.[lo] <- ai; lo <- lo + 1 )
-                            else
-                                while cmp a.[hi] p1 > 0 do
-                                    hi <- hi - 1
-                                a.[i] <- a.[hi]
-                                a.[hi] <- ai
-                                hi <- hi - 1
-                                ai <- a.[i]
-                                if cmp ai p1 < 0 then 
-                                    a.[i] <- a.[lo]
-                                    a.[lo] <- ai
-                                    lo <- lo + 1
-
-                            i <- i + 1
-
-                    a.[l] <- a.[lo - 1]; a.[lo - 1] <- p1
-                    a.[r] <- a.[hi + 1]; a.[hi + 1] <- p2
-
-                    let cl = lo - 2 - l
-                    let cr = r - hi - 2
-
-                    if pivotsDiffer then
-                        if lo < e1 && e5 < hi then
-                            if med <= lo - 2 then
-                                r <- lo - 2
-                                countSub1 <- cl
-                            elif med >= hi + 2 then 
-                                l <- hi + 2
-                                countSub1 <- cr
-                            else
-                                while cmp a.[lo] p1 = 0 do
-                                    lo <- lo + 1
-
-                                let mutable i = lo + 1
-                                while i <= hi do
-                                    if cmp a.[i] p1 = 0 then
-                                        p1 <- a.[i]
-                                        a.[i] <- a.[lo]
-                                        a.[lo] <- p1
-                                        lo <- lo + 1
-                                    i <- i + 1
-                                while cmp a.[hi] p2 = 0 do
-                                    hi <- hi - 1
-
-                                let mutable i = hi - 1
-                                while i >= lo do
-                                    if cmp a.[i] p2 = 0 then
-                                        p2 <- a.[i]
-                                        a.[i] <- a.[hi]
-                                        a.[hi] <- p2
-                                        hi <- hi - 1
-                                    i <- i - 1
-                                if (med < lo || med > hi) then ret <- true
-                                l <- lo
-                                r <- hi
-                                countSub1 <- hi - lo
-
-                        else
-                            if med <= lo - 2 then (r <- lo - 2; countSub1 <- cl )
-                            elif (med >= hi + 2) then (l <- hi + 2; countSub1 <- cr )
-                            elif (med >= lo && med <= hi) then ( l <- lo; r <- hi; countSub1 <- hi - lo )
-                            else ret <- true
-                    else
-                        if (med <= lo - 2) then ( r <- lo - 2; countSub1 <- cl )
-                        elif (med >= hi + 2) then ( l <- hi + 2; countSub1 <- cr )
-                        else ret <- true
-                
-
-                if not ret then
-                    let mutable i = l + 1
-                    while i <= r do
-                        let mutable ai = a.[i]
-                        
-                        let mutable j = i - 1;
-                        while j >= l && cmp ai a.[j] < 0 do
-                            a.[j + 1] <- a.[j]
-                            j <- j - 1
-                        a.[j + 1] <- ai
-                        i <- i + 1
-
-            member inline x.QuickMedian(cmp : int -> int -> int, beginIncl : int, endExcl : int, med : int) =
-                x.QuickMedian(cmp, beginIncl, endExcl - 1, endExcl - beginIncl - 1, med)
-
+        let c_insertionMedianThreshold = 7
         let compares (pos : IArrayBuffer<V3d>) =
             [|
                 fun (l : int) (r : int) -> compare (pos.Get(l).X) (pos.Get(r).X)
@@ -194,7 +39,162 @@ module RKdTree =
                 fun (l : int) (r : int) -> compare (pos.Get(l).X) (pos.Get(r).X)
             |]
 
-    let rec private balance (eps : float) (cmps : array<int -> int -> int>) (data : RKdTree) (perm : int[]) (positions : IArrayBuffer<V3d>)
+
+    let get (i : int) (v : V3d) = gets.[i &&& 3] v
+    let set (i : int) (v : V3d) (a : float) = sets.[i &&& 3] v a
+
+    type IArrayBuffer<'a> with
+        member a.QuickMedian(cmp : 'a -> 'a -> int, l : int, r : int, countSub1 : int, med : int) =
+            let mutable countSub1 = countSub1
+            let mutable l = l
+            let mutable r = r
+            let mutable ret = false
+            while not ret && countSub1 >= c_insertionMedianThreshold do
+                let sixth = (1 + countSub1) / 6
+                let e1 = l + sixth
+                let e5 = r - sixth
+                let e3 = (l + r) >>> 1
+                let e4 = e3 + sixth
+                let e2 = e3 - sixth
+
+                if cmp (a.Get(e1)) (a.Get(e2)) > 0 then ( let t = (a.Get(e1)) in a.Set(e1, a.Get(e2)); a.Set(e2, t) )
+                if cmp (a.Get(e4)) (a.Get(e5)) > 0 then ( let t = (a.Get(e4)) in a.Set(e4, a.Get(e5)); a.Set(e5, t) )
+                if cmp (a.Get(e1)) (a.Get(e3)) > 0 then ( let t = (a.Get(e1)) in a.Set(e1, a.Get(e3)); a.Set(e3, t) )
+                if cmp (a.Get(e2)) (a.Get(e3)) > 0 then ( let t = (a.Get(e2)) in a.Set(e2, a.Get(e3)); a.Set(e3, t) )
+                if cmp (a.Get(e1)) (a.Get(e4)) > 0 then ( let t = (a.Get(e1)) in a.Set(e1, a.Get(e4)); a.Set(e4, t) )
+                if cmp (a.Get(e3)) (a.Get(e4)) > 0 then ( let t = (a.Get(e3)) in a.Set(e3, a.Get(e4)); a.Set(e4, t) )
+                if cmp (a.Get(e2)) (a.Get(e5)) > 0 then ( let t = (a.Get(e2)) in a.Set(e2, a.Get(e5)); a.Set(e5, t) )
+                if cmp (a.Get(e2)) (a.Get(e3)) > 0 then ( let t = (a.Get(e2)) in a.Set(e2, a.Get(e3)); a.Set(e3, t) )
+                if cmp (a.Get(e4)) (a.Get(e5)) > 0 then ( let t = (a.Get(e4)) in a.Set(e4, a.Get(e5)); a.Set(e5, t) )
+
+                let mutable p1 = a.Get e2
+                a.Set(e2, a.Get(l))
+                let mutable p2 = a.Get e4
+                a.Set(e4, a.Get(r))
+
+                let mutable lo = l + 1;
+                let mutable hi = r - 1;
+
+                let pivotsDiffer = cmp p1 p2 <> 0
+
+                if pivotsDiffer then
+                    let mutable i = lo
+                    while i <= hi do
+                        let mutable ai = a.Get(i)
+                        if cmp ai p1 < 0 then ( a.Set(i, a.Get(lo)); a.Set(lo, ai); lo <- lo + 1 )
+                        elif cmp ai p2 > 0 then
+                            while cmp (a.Get(hi)) p2 > 0 && i < hi do
+                                hi <- hi - 1
+                            a.Set(i, a.Get(hi))
+                            a.Set(hi, ai)
+                            hi <- hi - 1
+                            ai <- a.Get i
+                            if cmp ai p1 < 0 then 
+                                a.Set(i, a.Get lo)
+                                a.Set(lo, ai)
+                                lo <- lo + 1
+                        i <- i + 1
+                else
+                    let mutable i = lo
+                    while i <= hi do
+                        let mutable ai = a.Get i
+                        if cmp ai p1 = 0 then ()
+                        elif cmp ai p1 < 0 then ( a.Set(i, a.Get lo); a.Set(lo, ai); lo <- lo + 1 )
+                        else
+                            while cmp (a.Get hi) p1 > 0 do
+                                hi <- hi - 1
+                            a.Set(i, a.Get hi)
+                            a.Set(hi, ai)
+                            hi <- hi - 1
+                            ai <- a.Get i
+                            if cmp ai p1 < 0 then 
+                                a.Set(i, a.Get lo)
+                                a.Set(lo, ai)
+                                lo <- lo + 1
+
+                        i <- i + 1
+
+                a.Set(l, a.Get(lo - 1)); a.Set(lo - 1, p1)
+                a.Set(r, a.Get(hi + 1)); a.Set(hi + 1, p2)
+
+                let cl = lo - 2 - l
+                let cr = r - hi - 2
+
+                if pivotsDiffer then
+                    if lo < e1 && e5 < hi then
+                        if med <= lo - 2 then
+                            r <- lo - 2
+                            countSub1 <- cl
+                        elif med >= hi + 2 then 
+                            l <- hi + 2
+                            countSub1 <- cr
+                        else
+                            while cmp (a.Get lo) p1 = 0 do
+                                lo <- lo + 1
+
+                            let mutable i = lo + 1
+                            while i <= hi do
+                                if cmp (a.Get i) p1 = 0 then
+                                    p1 <- a.Get i
+                                    a.Set(i, a.Get lo)
+                                    a.Set(lo,p1)
+                                    lo <- lo + 1
+                                i <- i + 1
+                            while cmp (a.Get hi) p2 = 0 do
+                                hi <- hi - 1
+
+                            let mutable i = hi - 1
+                            while i >= lo do
+                                if cmp (a.Get i) p2 = 0 then
+                                    p2 <- a.Get i
+                                    a.Set(i, a.Get hi)
+                                    a.Set(hi, p2)
+                                    hi <- hi - 1
+                                i <- i - 1
+                            if (med < lo || med > hi) then ret <- true
+                            l <- lo
+                            r <- hi
+                            countSub1 <- hi - lo
+
+                    else
+                        if med <= lo - 2 then (r <- lo - 2; countSub1 <- cl )
+                        elif (med >= hi + 2) then (l <- hi + 2; countSub1 <- cr )
+                        elif (med >= lo && med <= hi) then ( l <- lo; r <- hi; countSub1 <- hi - lo )
+                        else ret <- true
+                else
+                    if (med <= lo - 2) then ( r <- lo - 2; countSub1 <- cl )
+                    elif (med >= hi + 2) then ( l <- hi + 2; countSub1 <- cr )
+                    else ret <- true
+                
+
+            if not ret then
+                let mutable i = l + 1
+                while i <= r do
+                    let mutable ai = a.Get i
+                        
+                    let mutable j = i - 1;
+                    while j >= l && cmp ai (a.Get j) < 0 do
+                        a.Set(j + 1, a.Get j)
+                        j <- j - 1
+                    a.Set(j + 1, ai)
+                    i <- i + 1
+
+        member inline x.QuickMedian(cmp : 'a -> 'a -> int, beginIncl : int, endExcl : int, med : int) =
+            x.QuickMedian(cmp, beginIncl, endExcl - 1, endExcl - beginIncl - 1, med)
+    type V3d with
+        member this.MajorDim =
+            let x = abs this.X
+            let y = abs this.Y
+            let z = abs this.Z
+
+            if x > y then
+                if z > y then 2
+                else 1
+            else
+                if z > x then 2
+                else 0
+
+    let rec private balance (eps : float) (cmps : array<int -> int -> int>) (data : RKdTree) (perm : Int32Buffer) (positions : IArrayBuffer<V3d>)
                              (top : int) (left : int) (row : int) (s : int) (e : int) (box : Box3d) =
 
         let mutable left = left
@@ -213,7 +213,7 @@ module RKdTree =
             data.axis.[top] <- dim
                 
 
-            (unbox<Int32Array> perm).QuickMedian(cmps.[dim], s, e, mid)
+            perm.QuickMedian(cmps.[dim], s, e, mid)
                 
             let splitPoint = positions.Get(perm.[mid])
             let vm = get dim splitPoint
@@ -253,28 +253,10 @@ module RKdTree =
         let p2 = Fun.PrevPowerOfTwo size
         let row = size + 1 - p2
         let left = p2 >>> 1
-        let tperm = FSharp.Collections.Array.init positions.Length id
+        let tperm = Int32Buffer.init positions.Length id
         balance eps (compares positions) data tperm positions 0 left row 0 size bounds
         data
 
-
-    let test () =
-        
-        let rand = System.Random()
-        for i in 1 .. 100 do
-            let arr = Int32Array.Create (1 + rand.Next(8192))
-            for i in 0 .. arr.length - 1 do
-                arr.[i] <- rand.Next(1 <<< 20)
-            let m = arr.length / 2
-            arr.QuickMedian(compare, 0, arr.length, m)
-            let med = arr.[m]
-
-            let l = Int32Array.Create(arr.buffer, arr.byteOffset, m)
-            let r = Int32Array.Create(arr.buffer, arr.byteOffset + (m + 1) * 4, arr.length - m - 1)
-            let a = l |> unbox<int[]> |> FSharp.Collections.Array.forall (fun v -> v <= med)
-            let b = r |> unbox<int[]> |> FSharp.Collections.Array.forall (fun v -> v >= med)
-            if a && b then Log.line "yeah"
-            else console.warn(arr)
 
 type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : int) =
 
@@ -382,6 +364,11 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
                 yield Durable.Octree.BoundingBoxExactGlobal, bounds :> obj
                 yield Durable.Octree.Colors3b, localcs :> obj
                 yield Durable.Octree.PositionsLocal3f, localps :> obj
+                match Map.tryFind Durable.Octree.AveragePointDistance data with
+                | Some v -> 
+                    yield Durable.Octree.AveragePointDistance, v
+                | None ->
+                    ()
                 if subnodes.Length > 0 then
                     yield Durable.Octree.SubnodesGuids, subnodes :> obj
             |]
@@ -426,7 +413,8 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
                 |> Map.remove Durable.Octree.PointCountCell
                 |> Map.remove Durable.Octree.MinTreeDepth
                 |> Map.remove Durable.Octree.SubnodesGuids
-
+                |> Map.remove Durable.Octree.AveragePointDistance
+                |> Map.remove Durable.Octree.AveragePointDistanceStdDev
 
             for (def, att) in Map.toSeq atts do
                 if def = Durable.Octree.PositionsLocal3f then
@@ -547,7 +535,7 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
                             c.Write v
         }
     
-    member x.BuildLod(r : DbRef<MutableOctnode>) : Promise<int * int>=    
+    member x.BuildLod(r : DbRef<MutableOctnode>, rel : float) : Promise<int * int>=    
         promise {
             let children = x.Children
             let mutable minDepth = System.Int32.MaxValue
@@ -557,11 +545,13 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
                 let children = children |> FSharp.Collections.Array.choose (fun i -> i)
                 let values = FSharp.Collections.Array.zeroCreate children.Length
 
+
                 for i in 0 .. children.Length - 1 do 
                     let c = children.[i]
                     let! r = c.Read()
                     values.[i] <- r
-                    let! (dMin, dMax) = r.BuildLod(c)
+                    let rel = r.TotalPointCount / totalCount
+                    let! (dMin, dMax) = r.BuildLod(c, rel)
                     minDepth <- min dMin minDepth
                     maxDepth <- max dMax maxDepth 
 
@@ -570,21 +560,7 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
                     let cnt = float splitLimit * (c.TotalPointCount / totalCount) |> int
                     let cc = c.CellCount
 
-                    let index = 
-                        Int32Buffer.init (min cc cnt) (fun i -> i) :> IArrayBuffer<int>
-                        //if cnt >= cc then
-                        //    Int32Buffer.init cc (fun i -> i) :> IArrayBuffer<int>
-                        //else
-                        //    let indices = Int32List(cnt + 1)
-                        //    let step = float cc / float cnt
-                        //    let mutable s = 0.0
-                        //    let mutable c = 0
-                        //    while c < cnt do
-                        //        indices.Add (int s)
-                        //        s <- s + step
-                        //        c <- c + 1
-                        //    indices :> IArrayBuffer<int>
-
+                    let index = Int32Buffer.init (min cc cnt) (fun i -> i) :> IArrayBuffer<int>
                     let offset = c.Cell.Center - cell.Center
 
                     let cData =
@@ -613,7 +589,6 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
                 data <- Map.add Durable.Octree.MinTreeDepth (minDepth :> obj) data
                 data <- Map.add Durable.Octree.MaxTreeDepth (maxDepth :> obj) data
                 
-                
 
                 //let perm = tree.perm
                 //let pos = V3fBuffer.init perm.length (fun i -> pos.[perm.[i]])
@@ -632,16 +607,13 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
             let t = Aardvark.Import.Browser.performance.now()
             let tree = RKdTree.build 1E-6 pos
             let dt = Aardvark.Import.Browser.performance.now() - t
-            Log.warn "kd: %.3fms" dt
+            Log.warn "kd (%d): %.3fms" pos.Length dt
 
             let pp = V3fBuffer.zeroCreate tree.perm.length
             let cc = Uint8Array.Create (tree.perm.length * 3)
-            let set = System.Collections.Generic.HashSet<int>()
-            Log.warn "%d %d" tree.perm.length pos.Length
             do
                 for i in 0 .. tree.perm.length - 1 do
                     let ii = tree.perm.[i]
-                    if not (set.Add ii) then failwithf "bad index: %A" ii
                     pp.[i] <- pos.Get ii
 
                     let di = 3 * i
@@ -649,7 +621,8 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
                     cc.[di+0] <- col.Get (ci+0) 
                     cc.[di+1] <- col.Get (ci+1) 
                     cc.[di+2] <- col.Get (ci+2) 
-
+                    
+            data <- Map.add Durable.Octree.AveragePointDistance (float32 rel :> obj) data
             data <- Map.add Durable.Octree.PositionsLocal3f (pp :> obj) data
             data <- Map.add Durable.Octree.Colors3b (Uint8Buffer(cc.buffer, cc.byteOffset, cc.length) :> obj) data
 
@@ -767,7 +740,7 @@ type MutableOctree(db : Database, splitLimit : int) =
         | Some r -> 
             promise {
                 let! rootRef = db.Ref(string id, r, MutableOctnode.pickle, MutableOctnode.unpickle db splitLimit)
-                let! _ = r.BuildLod(rootRef)
+                let! _ = r.BuildLod(rootRef, 1.0)
                 ()
             }
         | None -> 
