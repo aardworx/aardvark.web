@@ -11,7 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Aardvark.Base.Web\Aardvark.Base.Web.fsproj" />
-    <ProjectReference Include="..\Aardvark.Base.Rendering\Aardvark.Base.Rendering.fsproj" />
+    <ProjectReference Include="..\Aardvark.Rendering.Web\Aardvark.Rendering.Web.fsproj" />
     <ProjectReference Include="..\Aardvark.Rendering.WebGL\Aardvark.Rendering.WebGL.fsproj" />
     <ProjectReference Include="..\Aardvark.SceneGraph\Aardvark.SceneGraph.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Core\FShade.Core.fsproj" />
