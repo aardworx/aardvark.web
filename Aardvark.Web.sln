@@ -21,7 +21,7 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Imperative.Web", "sr
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Core.Web", "src\FShade\FShade.Core.Web\FShade.Core.Web.fsproj", "{B4019BFB-372F-4308-9F3B-3420B61D8844}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.GLSL", "src\FShade\FShade.GLSL\FShade.GLSL.fsproj", "{0C36D55E-65A7-4631-911C-DF7F4310925F}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.GLSL.Web", "src\FShade\FShade.GLSL.Web\FShade.GLSL.Web.fsproj", "{0C36D55E-65A7-4631-911C-DF7F4310925F}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Application.Utilities.Web", "src\Aardvark.Application.Utilities.Web\Aardvark.Application.Utilities.Web.fsproj", "{95FC46C5-8600-4F6D-8217-B439DB9D9BA8}"
 EndProject

@@ -12,7 +12,7 @@
     <ProjectReference Include="..\Aardvark.Base.Web\Aardvark.Base.Web.fsproj" />
     <ProjectReference Include="..\Aardvark.Rendering.Web\Aardvark.Rendering.Web.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Core.Web\FShade.Core.Web.fsproj" />
-    <ProjectReference Include="..\FShade\FShade.GLSL\FShade.GLSL.fsproj" />
+    <ProjectReference Include="..\FShade\FShade.GLSL.Web\FShade.GLSL.Web.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Imperative.Web\FShade.Imperative.Web.fsproj" />
     <ProjectReference Include="..\PointCloudViewer\Aardvark.Data\Aardvark.Data.fsproj" />
     <ProjectReference Include="..\Shared\Shared.fsproj" />
