@@ -8,3 +8,4 @@ bin/
 /public/worker.js
 /public/*/
 .domaincache
+dist/
