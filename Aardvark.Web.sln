@@ -9,7 +9,7 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Base.Web", "src\Aa
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Rendering.WebGL", "src\Aardvark.Rendering.WebGL\Aardvark.Rendering.WebGL.fsproj", "{14ACD6CE-607A-4D10-A8B7-56B478D38B1D}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Base.Rendering", "src\Aardvark.Base.Rendering\Aardvark.Base.Rendering.fsproj", "{BCD8BB2F-8DC3-4BF0-A3D0-1D46631C8760}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Rendering.Web", "src\Aardvark.Rendering.Web\Aardvark.Rendering.Web.fsproj", "{BCD8BB2F-8DC3-4BF0-A3D0-1D46631C8760}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Application.Web", "src\Aardvark.Application.Web\Aardvark.Application.Web.fsproj", "{CC5B159E-6CF8-46E2-9262-42F29F130846}"
 EndProject
