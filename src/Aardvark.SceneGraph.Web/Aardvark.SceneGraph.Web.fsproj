@@ -8,10 +8,10 @@
     <Compile Include="Primitives.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />
-    <ProjectReference Include="..\Aardvark.Base.Rendering\Aardvark.Base.Rendering.fsproj" />
-    <ProjectReference Include="..\FShade\FShade.Core\FShade.Core.fsproj" />
-    <ProjectReference Include="..\FShade\FShade.Imperative\FShade.Imperative.fsproj" />
+    <ProjectReference Include="..\Aardvark.Base.Web\Aardvark.Base.Web.fsproj" />
+    <ProjectReference Include="..\Aardvark.Rendering.Web\Aardvark.Rendering.Web.fsproj" />
+    <ProjectReference Include="..\FShade\FShade.Core.Web\FShade.Core.Web.fsproj" />
+    <ProjectReference Include="..\FShade\FShade.Imperative.Web\FShade.Imperative.Web.fsproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(Version)' != '1.0.0'">
     <Content Include="*.fsproj; **\*.fs" PackagePath="fable\" />
