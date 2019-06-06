@@ -13,7 +13,7 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Rendering.Web", "s
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Application.Web", "src\Aardvark.Application.Web\Aardvark.Application.Web.fsproj", "{CC5B159E-6CF8-46E2-9262-42F29F130846}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.SceneGraph", "src\Aardvark.SceneGraph\Aardvark.SceneGraph.fsproj", "{32994655-203B-4BD2-A583-7E500EA9828E}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.SceneGraph.Web", "src\Aardvark.SceneGraph.Web\Aardvark.SceneGraph.Web.fsproj", "{32994655-203B-4BD2-A583-7E500EA9828E}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FShade", "FShade", "{77185787-0A12-4FCD-BA95-95E81FFB64B5}"
 EndProject
