@@ -8,7 +8,7 @@
     <Compile Include="Primitives.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />
+    <ProjectReference Include="..\Aardvark.Base.Web\Aardvark.Base.Web.fsproj" />
     <ProjectReference Include="..\Aardvark.Base.Rendering\Aardvark.Base.Rendering.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Core\FShade.Core.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Imperative\FShade.Imperative.fsproj" />

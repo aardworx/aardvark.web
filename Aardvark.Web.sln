@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.28711.60
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Demo", "src\Demo\Demo.fsproj", "{E472F796-0912-4569-9BFA-811D89E4A1F0}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Base.Light", "src\Aardvark.Base.Light\Aardvark.Base.Light.fsproj", "{0663993F-FAAD-4432-A98B-B97A3034889F}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Base.Web", "src\Aardvark.Base.Web\Aardvark.Base.Web.fsproj", "{0663993F-FAAD-4432-A98B-B97A3034889F}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Rendering.WebGL", "src\Aardvark.Rendering.WebGL\Aardvark.Rendering.WebGL.fsproj", "{14ACD6CE-607A-4D10-A8B7-56B478D38B1D}"
 EndProject
