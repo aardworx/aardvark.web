@@ -12,7 +12,7 @@
     <Compile Include="Extensions.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />
+    <ProjectReference Include="..\..\Aardvark.Base.Web\Aardvark.Base.Web.fsproj" />
     <ProjectReference Include="..\FShade.Core\FShade.Core.fsproj" />
     <ProjectReference Include="..\FShade.Imperative\FShade.Imperative.fsproj" />
   </ItemGroup>
