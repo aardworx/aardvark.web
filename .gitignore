@@ -10,3 +10,4 @@ bin/
 .domaincache
 dist/
 *.g.fs
+/public/importer.js
