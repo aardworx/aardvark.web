@@ -17,7 +17,7 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.SceneGraph.Web", "
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FShade", "FShade", "{77185787-0A12-4FCD-BA95-95E81FFB64B5}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Imperative", "src\FShade\FShade.Imperative\FShade.Imperative.fsproj", "{06CFF9A3-01B1-431F-9A88-D754ECA46151}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Imperative.Web", "src\FShade\FShade.Imperative.Web\FShade.Imperative.Web.fsproj", "{06CFF9A3-01B1-431F-9A88-D754ECA46151}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Core", "src\FShade\FShade.Core\FShade.Core.fsproj", "{B4019BFB-372F-4308-9F3B-3420B61D8844}"
 EndProject
