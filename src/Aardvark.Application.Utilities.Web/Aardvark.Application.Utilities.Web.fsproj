@@ -1,22 +1,19 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
+
   <ItemGroup>
-    <Compile Include="Context.fs" />
-    <Compile Include="Resources\FramebufferSignature.fs" />
-    <Compile Include="Resources\Program.fs" />
-    <Compile Include="Resources\Buffer.fs" />
-    <Compile Include="Resources\UniformBuffer.fs" />
-    <Compile Include="Resources\Texture.fs" />
-    <Compile Include="ResourceManager.fs" />
-    <Compile Include="PreparedRenderObject.fs" />
-    <Compile Include="RenderTask.fs" />
+    <Compile Include="Utilities.fs" />
   </ItemGroup>
+
   <ItemGroup>
+    <ProjectReference Include="..\Aardvark.Application.Web\Aardvark.Application.Web.fsproj" />
     <ProjectReference Include="..\Aardvark.Base.Web\Aardvark.Base.Web.fsproj" />
     <ProjectReference Include="..\Aardvark.Rendering.Web\Aardvark.Rendering.Web.fsproj" />
+    <ProjectReference Include="..\Aardvark.Rendering.WebGL\Aardvark.Rendering.WebGL.fsproj" />
+    <ProjectReference Include="..\Aardvark.SceneGraph.Web\Aardvark.SceneGraph.Web.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Core.Web\FShade.Core.Web.fsproj" />
     <ProjectReference Include="..\FShade\FShade.GLSL.Web\FShade.GLSL.Web.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Imperative.Web\FShade.Imperative.Web.fsproj" />
@@ -25,5 +22,5 @@
     <Content Include="*.fsproj; **\*.fs" PackagePath="fable\" />
     <Content Remove="obj\**" />
   </ItemGroup>
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
+
 </Project>

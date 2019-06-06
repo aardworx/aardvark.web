@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+	<IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Octree.fs" />
+    <Compile Include="AtomicOperations.fs" />
+    <Compile Include="IPC.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Aardvark.Base.Web\Aardvark.Base.Web.fsproj" />
+    <ProjectReference Include="..\..\Aardvark.Rendering.Web\Aardvark.Rendering.Web.fsproj" />
+    <ProjectReference Include="..\..\Aardvark.Rendering.WebGL\Aardvark.Rendering.WebGL.fsproj" />
+    <ProjectReference Include="..\..\Aardvark.SceneGraph.Web\Aardvark.SceneGraph.Web.fsproj" />
+    <ProjectReference Include="..\..\FShade\FShade.Core.Web\FShade.Core.Web.fsproj" />
+    <ProjectReference Include="..\..\FShade\FShade.GLSL.Web\FShade.GLSL.Web.fsproj" />
+    <ProjectReference Include="..\..\FShade\FShade.Imperative.Web\FShade.Imperative.Web.fsproj" />
+    <ProjectReference Include="..\..\Aardvark.Data.Web\Aardvark.Data.Web.fsproj" />
+  </ItemGroup>
+  <Import Project="..\..\..\.paket\Paket.Restore.targets" />
+</Project>

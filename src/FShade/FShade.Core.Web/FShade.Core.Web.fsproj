@@ -23,8 +23,8 @@
     <Compile Include="Effect.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Aardvark.Base.Light\Aardvark.Base.Light.fsproj" />
-    <ProjectReference Include="..\FShade.Imperative\FShade.Imperative.fsproj" />
+    <ProjectReference Include="..\..\Aardvark.Base.Web\Aardvark.Base.Web.fsproj" />
+    <ProjectReference Include="..\FShade.Imperative.Web\FShade.Imperative.Web.fsproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(Version)' != '1.0.0'">
     <Content Include="*.fsproj; **\*.fs" PackagePath="fable\" />
