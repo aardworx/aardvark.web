@@ -31,9 +31,9 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Shared", "src\Shared\Shared
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PointCloudViewer", "PointCloudViewer", "{9C936F5F-0809-4293-B5AD-365978EB3541}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Importer", "src\PointCloudViewer\Importer\Importer.fsproj", "{3EBB8210-83D2-437E-ACF0-8C6C6AF17FFB}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Importer", "src\PointCloudViewer\Importer\Importer.fsproj", "{3EBB8210-83D2-437E-ACF0-8C6C6AF17FFB}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Aardvark.Data", "src\PointCloudViewer\Aardvark.Data\Aardvark.Data.fsproj", "{D577EF7B-E76C-45DE-B0A7-38AF08856165}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Data.Web", "src\Aardvark.Data.Web\Aardvark.Data.Web.fsproj", "{D577EF7B-E76C-45DE-B0A7-38AF08856165}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -106,7 +106,6 @@ Global
 		{B4019BFB-372F-4308-9F3B-3420B61D8844} = {77185787-0A12-4FCD-BA95-95E81FFB64B5}
 		{0C36D55E-65A7-4631-911C-DF7F4310925F} = {77185787-0A12-4FCD-BA95-95E81FFB64B5}
 		{3EBB8210-83D2-437E-ACF0-8C6C6AF17FFB} = {9C936F5F-0809-4293-B5AD-365978EB3541}
-		{D577EF7B-E76C-45DE-B0A7-38AF08856165} = {9C936F5F-0809-4293-B5AD-365978EB3541}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {5C89E353-D610-4FBC-9021-CB0980971C8C}
