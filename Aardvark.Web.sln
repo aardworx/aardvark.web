@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.28711.60
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Demo", "src\Demo\Demo.fsproj", "{E472F796-0912-4569-9BFA-811D89E4A1F0}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Demo", "src\PointCloudViewer\Demo\Demo.fsproj", "{E472F796-0912-4569-9BFA-811D89E4A1F0}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Base.Web", "src\Aardvark.Base.Web\Aardvark.Base.Web.fsproj", "{0663993F-FAAD-4432-A98B-B97A3034889F}"
 EndProject
@@ -25,9 +25,9 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.GLSL.Web", "src\FSha
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Aardvark.Application.Utilities.Web", "src\Aardvark.Application.Utilities.Web\Aardvark.Application.Utilities.Web.fsproj", "{95FC46C5-8600-4F6D-8217-B439DB9D9BA8}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Worker", "src\Worker\Worker.fsproj", "{EF2F0E54-1FC4-42F5-8821-D771952A9D0F}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Worker", "src\PointCloudViewer\Worker\Worker.fsproj", "{EF2F0E54-1FC4-42F5-8821-D771952A9D0F}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Shared", "src\Shared\Shared.fsproj", "{213E745D-3EBD-4E8D-8440-8CF0795DD416}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Shared", "src\PointCloudViewer\Shared\Shared.fsproj", "{213E745D-3EBD-4E8D-8440-8CF0795DD416}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PointCloudViewer", "PointCloudViewer", "{9C936F5F-0809-4293-B5AD-365978EB3541}"
 EndProject
@@ -102,9 +102,12 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{E472F796-0912-4569-9BFA-811D89E4A1F0} = {9C936F5F-0809-4293-B5AD-365978EB3541}
 		{06CFF9A3-01B1-431F-9A88-D754ECA46151} = {77185787-0A12-4FCD-BA95-95E81FFB64B5}
 		{B4019BFB-372F-4308-9F3B-3420B61D8844} = {77185787-0A12-4FCD-BA95-95E81FFB64B5}
 		{0C36D55E-65A7-4631-911C-DF7F4310925F} = {77185787-0A12-4FCD-BA95-95E81FFB64B5}
+		{EF2F0E54-1FC4-42F5-8821-D771952A9D0F} = {9C936F5F-0809-4293-B5AD-365978EB3541}
+		{213E745D-3EBD-4E8D-8440-8CF0795DD416} = {9C936F5F-0809-4293-B5AD-365978EB3541}
 		{3EBB8210-83D2-437E-ACF0-8C6C6AF17FFB} = {9C936F5F-0809-4293-B5AD-365978EB3541}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
