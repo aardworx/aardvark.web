@@ -48,7 +48,8 @@ type mlist<'a>(initial : plist<'a>) =
     new(s : seq<'a>) = mlist(PList.ofSeq s)
     new(s : list<'a>) = mlist(PList.ofList s)
     new(s : array<'a>) = mlist(PList.ofArray s)
-        
+ 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]       
 module MList =
     let empty<'a> : mlist<'a> = mlist(PList.empty)
     

@@ -7,4 +7,4 @@ bin/
 /public/bundle.js
 /public/worker.js
 /public/*/
-
+.domaincache

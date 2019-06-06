@@ -13,6 +13,7 @@
     <ProjectReference Include="..\FShade\FShade.Core\FShade.Core.fsproj" />
     <ProjectReference Include="..\FShade\FShade.GLSL\FShade.GLSL.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Imperative\FShade.Imperative.fsproj" />
+    <ProjectReference Include="..\PointCloudViewer\Aardvark.Data\Aardvark.Data.fsproj" />
     <ProjectReference Include="..\Shared\Shared.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />

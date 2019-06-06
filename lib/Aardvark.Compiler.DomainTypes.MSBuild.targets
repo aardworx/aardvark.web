@@ -1,0 +1,22 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <TaskAssembly Condition=" '$(MSBuildRuntimeType)' == 'Core'">Aardvark.Compiler.DomainTypes.MSBuild.DotNet.dll</TaskAssembly>
+    <TaskAssembly Condition=" '$(MSBuildRuntimeType)' != 'Core'">Aardvark.Compiler.DomainTypes.MSBuild.VisualStudio.dll</TaskAssembly>
+  </PropertyGroup>
+  <UsingTask TaskName="Aardvark.Compiler.DomainTypes.Preprocess" AssemblyFile="$(TaskAssembly)" />
+  <Target Name="UpdateGeneratedFiles" AfterTargets="AfterResolveReferences" Condition="'@(Compile)' != ''">
+    <ItemGroup>
+      <OldItems Include="@(Compile)" />
+    </ItemGroup>
+    <Preprocess TargetFramework="$(TargetFramework)" Debug="$(DebugHate)" Files="@(OldItems)" References="@(_ResolveAssemblyReferenceResolvedFiles)" ProjectFile="$(MSBuildProjectFullPath)" OutputType="$(OutputType)">
+      <Output TaskParameter="Results" ItemName="Results" />
+    </Preprocess>
+    <ItemGroup>
+      <Compile Remove="@(OldItems)" />
+      <Compile Include="@(Results)" />
+      <OldItems Remove="@(OldItems)" />
+      <Results Remove="@(Results)" />
+    </ItemGroup>
+  </Target>
+</Project>
+  

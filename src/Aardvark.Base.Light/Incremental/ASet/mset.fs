@@ -40,6 +40,7 @@ type mset<'a>(initial : hset<'a>) =
         member x.GetReader() = history.NewReader("SetReader")
         member x.Content = history :> IMod<_>
 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module MSet =
     let empty<'a> : mset<'a> = mset(HSet.empty)
     

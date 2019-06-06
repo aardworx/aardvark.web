@@ -4,6 +4,7 @@ open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.SceneGraph
 open Aardvark.Base.Rendering
+open Aardvark.Application
 
 type AttributeValue<'msg> =
     | String of string
@@ -171,13 +172,15 @@ module AttributeMapBuilder =
         }
 
 
+
+
 [<RequireQualifiedAccess>]
 type Node<'msg> =
     internal
     | NEmpty
     | NText of tag : string * attributes : AttributeMap<'msg> * value : IMod<string>
     | NNode of tag : string * attributes : AttributeMap<'msg> * children : alist<Node<'msg>>
-    | NRender of attributes : AttributeMap<'msg> * scene : ISg
+    | NRender of attributes : AttributeMap<'msg> * scene : (RenderControl -> ISg)
     | NMap of mapping : (obj -> seq<'msg>) * child : Node<obj>
 
     member x.Attributes : AttributeMap<'msg> =
@@ -200,7 +203,8 @@ type Node<'msg> =
     static member Empty : Node<'msg> = NEmpty
     static member Text(tag : string, attributes : AttributeMap<'msg>, value : IMod<string>) = NText(tag, attributes, value)
     static member Node(tag : string, attributes : AttributeMap<'msg>, children : alist<Node<'msg>>) = NNode(tag, attributes, children)
-    static member Render(attributes : AttributeMap<'msg>, scene : ISg) = NRender(attributes, scene)
+    static member Render(attributes : AttributeMap<'msg>, scene : ISg) = NRender(attributes, fun _ -> scene)
+    static member Render(attributes : AttributeMap<'msg>, scene : RenderControl -> ISg) = NRender(attributes, scene)
     static member Map(mapping : 'a -> 'b, m : Node<'a>) = NMap((fun o -> Seq.singleton (mapping (unbox o))), unbox m)
     static member Choose (mapping : 'a -> Option<'b>, m : Node<'a>) : Node<'b> = NMap((fun o -> match mapping (unbox o) with | Some v -> Seq.singleton v | None -> Seq.empty), unbox m)
     static member Collect (mapping : 'a -> seq<'b>, m : Node<'a>) : Node<'b> = NMap((fun o -> mapping (unbox o)), unbox m)
@@ -301,8 +305,12 @@ module Updater =
 
                 for (k,o) in ops do
                     match o with
-                    | Set _ -> Log.warn "set %s" k
-                    | Remove -> Log.warn "remove %s" k
+                    | Set v -> 
+                        match v with
+                        | AttributeValue.String v -> Log.warn "set %s = %s" k v
+                        | _ -> Log.warn "set %s" k
+                    | Remove -> 
+                        Log.warn "remove %s" k
 
                 reader.Dispose()
                 attributes <- newAttributes
@@ -527,7 +535,7 @@ module Updater =
             | _ -> 
                 false
 
-    and RenderUpdater<'msg>(scope : Scope<'msg>, node : HTMLElement, attributes : AttributeMap<'msg>, scene : ISg) =
+    and RenderUpdater<'msg>(scope : Scope<'msg>, node : HTMLElement, attributes : AttributeMap<'msg>, scene : RenderControl -> ISg) =
         inherit NodeUpdater<'msg>(scope)
 
         let canvas = unbox<HTMLCanvasElement> node
@@ -535,18 +543,9 @@ module Updater =
         
         let att = AttributeUpdater<'msg>(node, attributes)
 
-        let wrap(scene : ISg) =
-            let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
-            let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
-            let color = Mod.init true
-
-            let view = cam |> Mod.map (fun v -> v |> CameraView.viewTrafo)
-            let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
-
-            scene
-            |> Sg.viewTrafo view
-            |> Sg.projTrafo proj
-
+        let wrap(scene : RenderControl -> ISg) =
+            scene control
+            |> Sg.uniform "ViewportSize" control.Size
 
         let mutable scene = scene
         let mutable objects = (wrap scene).RenderObjects()

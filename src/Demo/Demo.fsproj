@@ -11,6 +11,7 @@
     <Compile Include="Future.fs" />
     <Compile Include="Sample.fs" />
     <Compile Include="ElmishTest.fs" />
+    <Compile Include="Model.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
@@ -28,4 +29,5 @@
     <ProjectReference Include="..\Shared\Shared.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
+  <Import Project="..\..\lib\Aardvark.Compiler.DomainTypes.MSBuild.targets" />
 </Project>
