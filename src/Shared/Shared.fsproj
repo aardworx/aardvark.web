@@ -15,7 +15,7 @@
     <ProjectReference Include="..\Aardvark.Rendering.WebGL\Aardvark.Rendering.WebGL.fsproj" />
     <ProjectReference Include="..\Aardvark.SceneGraph.Web\Aardvark.SceneGraph.Web.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Core.Web\FShade.Core.Web.fsproj" />
-    <ProjectReference Include="..\FShade\FShade.GLSL\FShade.GLSL.fsproj" />
+    <ProjectReference Include="..\FShade\FShade.GLSL.Web\FShade.GLSL.Web.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Imperative.Web\FShade.Imperative.Web.fsproj" />
     <ProjectReference Include="..\PointCloudViewer\Aardvark.Data\Aardvark.Data.fsproj" />
   </ItemGroup>
