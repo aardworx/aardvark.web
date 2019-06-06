@@ -782,57 +782,33 @@ type IDBFactory with
     member x.databases : unit -> Aardvark.Import.JS.Promise<IDBInfo[]> = jsNative
 
 module UITest =
+    open System
     open Aardvark.UI
     open Aardvark.UI.Generic
-
-    //type Tag(tag : string) =
-    //    member x.Tag = tag
-    //    static member Node(t : Tag, attributes : AttributeMap<'msg>, children : alist<Node<'msg>>) =
-    //        Aardvark.UI.Node.node t.Tag attributes children
-            
-    //    static member Node(t : Tag, attributes : list<string * AttributeValue<'msg>>, children : list<Node<'msg>>) =
-    //        Aardvark.UI.Node.node t.Tag (AttributeMap.ofList attributes) (AList.ofList children)
-
-    //let inline create (tag : ^a) (att : ^b) (children : ^c) = ((^a or ^b) : (static member Node : ^a * ^b * ^c -> ^x) (tag, att, children))
-
-
-    //let inline bla a b c = create (Tag a) b c
-
-
-    //type Model =
-    //    {
-    //        elements : plist<string>
-    //        box : bool
-    //    }
-
-    //type MModel(initial : Model) =
-    //    let _elements = mlist initial.elements
-    //    let _box = Mod.init initial.box
-
-    //    member x.elements = _elements :> alist<_>
-    //    member x.box = _box :> IMod<_>
-
-    //    member x.Update(v : Model) =
-    //        _elements.Update v.elements
-    //        _box.Value <- v.box
-
-    //    static member Create (m : Model) = MModel m
-    //    static member Update (m : MModel, v : Model) = m.Update v
     open Example
 
-    type Message =
+    let fix (create : Lazy<'a> -> 'a) =
+        let ref = ref Unchecked.defaultof<'a>
+        ref := create (lazy (!ref ))
+
+    type Message = 
+        | Stop
         | Reset 
         | Append of string
         | Prepend of string
         | Toggle
 
-    let initial = { elements = PList.ofList [ "YEAH" ]; box = true }
+    let initial = 
+        { 
+            elements = PList.ofList [ "YEAH" ]
+            box = true 
+        }
 
-
-
-
-    let update (m : TestModel) (msg : Message) =
+    let update (shutdown : Lazy<IDisposable>) (m : TestModel) (msg : Message) =
         match msg with
+        | Stop ->
+            shutdown.Value.Dispose()
+            initial
         | Toggle -> 
             { m with box = not m.box }
         | Reset ->
@@ -842,14 +818,14 @@ module UITest =
         | Prepend element -> 
             { m with elements = PList.prepend element m.elements }
 
-    open Example
-
     let view (m : MTestModel) =
         div [style "color: white"] [
             button [clazz "ui basic yellow button"; click (fun _ -> Toggle) ] (m.box |> Mod.map (function true -> "sphere" | false -> "box"))
             button [clazz "ui basic green button"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string |> Prepend) ] "prepend"
             button [clazz "ui basic green button"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string |> Append) ] "append"
             button [clazz "ui basic red button"; click (fun _ -> Reset) ] "reset"
+            
+            button [clazz "ui basic red button"; click (fun _ -> Stop) ] "stop"
 
             div [] (m.elements |> AList.map (fun v -> div [clazz "ui basic inverted label"] v))
 
@@ -893,58 +869,16 @@ module UITest =
 
         ]
 
-    let app = 
-        { 
-            initial = initial
-            update = update
-            view = view
-            unpersist = Unpersist.instance
-        }
-
-    let rec test() =
-        let d = App.run document.body app
-
-        //Aardvark.Import.JS.setTimeout (fun () -> 
-        //    d.Dispose()
-        //    Log.warn "reboot"
-        //    test()
-        //) 10000 |> ignore
-
-        ()
-        //let values = mlist [ "YEAH" ]
-        //let ui = 
-        //    div [style "color: white"] [
-        //        button [style "background: red"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string) ] "clock"
-
-        //        div [] (values |> AList.map (fun v -> div [] v))
-
-        //        Aardvark.UI.Node.Render(
-        //            AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"], 
-        //            Sg.box Box3d.Unit
-        //                |> Sg.shader {
-        //                    do! FShadeTest.trafo
-        //                    do! FShadeTest.constantColor V4d.IIII
-        //                    do! FShadeTest.simpleLight
-        //                }
-        //        )
-
-        //    ]
-
-        //let scope = { Updater.emit = Seq.iter (fun m -> transact (fun () -> values.Update(PList.append m values.Value))) }
-        //let u = Aardvark.UI.Node.newUpdater document.body scope ui
-
-        //let rec kill() =
-        //    let now = performance.now() |> MicroTime.FromMilliseconds |> string
-        //    transact (fun () -> values.Update(PList.single now) |> ignore)
-        //    u.Update(AdaptiveToken.Top)
-        //    Aardvark.Import.JS.setTimeout kill 2000 |> ignore
-            
-
-        //let rec update () =
-        //    u.Update(AdaptiveToken.Top)
-        //    Aardvark.Import.JS.setTimeout update 50 |> ignore
-        //update()
-        //kill()
+    let rec run() =
+        fix (fun shutdown ->
+            App.run document.body { 
+                initial = initial
+                update = update shutdown
+                view = view
+                unpersist = Unpersist.instance
+            }
+        ) 
+       
 
 [<EntryPoint>]
 let main argv =
@@ -978,7 +912,7 @@ let main argv =
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
 
-            UITest.test()
+            UITest.run()
             if false then
                 let select = document.getElementById "clouds" |> unbox<HTMLSelectElement>
                 if unbox indexedDB.databases then
