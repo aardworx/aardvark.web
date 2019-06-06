@@ -18,5 +18,9 @@
     <ProjectReference Include="..\FShade\FShade.Core\FShade.Core.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Imperative\FShade.Imperative.fsproj" />
   </ItemGroup>
+  <ItemGroup Condition="'$(Version)' != '1.0.0'">
+    <Content Include="*.fsproj; **\*.fs" PackagePath="fable\" />
+    <Content Remove="obj\**" />
+  </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

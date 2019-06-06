@@ -2,10 +2,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <Authors>Aardworx</Authors>
+    <Description />
+    <Copyright>Aardworx</Copyright>
+    <RepositoryUrl>https://github.com/aardworx/aardvark.web</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/aardworx/aardvark.web</PackageProjectUrl>
+    <PackageIconUrl>https://avatars2.githubusercontent.com/u/47594647?s=200&amp;v=4</PackageIconUrl>
+    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Fable.Import.JS.fs" />
     <Compile Include="Fable.Import.Browser.fs" />
+    
     <None Include="ArrayBufferGen.fsx" />
     <None Include="VectorGen.fsx" />
     <None Include="MatrixGen.fsx" />
@@ -55,6 +63,10 @@
 	<Compile Include="Incremental\DomainTypes\DomainTypeCore.fs" />
 	<Compile Include="Incremental\DomainTypes\Resettables.fs" />
 	<Compile Include="Incremental\Builders.fs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Version)' != '1.0.0'">
+    <Content Include="*.fsproj; **\*.fs" PackagePath="fable\" />
+    <Content Remove="obj\**" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
