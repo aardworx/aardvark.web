@@ -19,7 +19,7 @@
     <ProjectReference Include="..\Aardvark.Rendering.Web\Aardvark.Rendering.Web.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Core\FShade.Core.fsproj" />
     <ProjectReference Include="..\FShade\FShade.GLSL\FShade.GLSL.fsproj" />
-    <ProjectReference Include="..\FShade\FShade.Imperative\FShade.Imperative.fsproj" />
+    <ProjectReference Include="..\FShade\FShade.Imperative.Web\FShade.Imperative.Web.fsproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(Version)' != '1.0.0'">
     <Content Include="*.fsproj; **\*.fs" PackagePath="fable\" />
