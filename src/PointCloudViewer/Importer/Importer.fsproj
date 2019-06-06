@@ -11,7 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Aardvark.Base.Web\Aardvark.Base.Web.fsproj" />
-    <ProjectReference Include="..\Aardvark.Data\Aardvark.Data.fsproj" />
+    <ProjectReference Include="..\..\Aardvark.Data.Web\Aardvark.Data.Web.fsproj" />
   </ItemGroup>
   <Import Project="..\..\..\.paket\Paket.Restore.targets" />
 </Project>
