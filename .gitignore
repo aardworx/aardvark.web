@@ -9,3 +9,4 @@ bin/
 /public/*/
 .domaincache
 dist/
+*.g.fs
