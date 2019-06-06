@@ -78,6 +78,7 @@ module App =
                         app.unpersist.update mm model
                     )
             }
+
         let updater = LivingUpdater(Aardvark.UI.Node.newUpdater parent scope view)
         updater.Update(AdaptiveToken.Top)
         

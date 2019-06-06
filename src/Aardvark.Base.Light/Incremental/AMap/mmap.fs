@@ -43,7 +43,8 @@ type mmap<'k, 'v>(initial : hmap<'k, 'v>) =
         member x.IsConstant = false
         member x.Content = history :> IMod<_>
         member x.GetReader() = history.NewReader("MapReader")
-        
+ 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]       
 module MMap =
     let empty<'k, 'v> : mmap<'k, 'v> = mmap(HMap.empty)
     

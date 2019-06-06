@@ -799,54 +799,72 @@ module UITest =
     //let inline bla a b c = create (Tag a) b c
 
 
-    type Model =
-        {
-            elements : plist<string>
-            box : bool
-        }
+    //type Model =
+    //    {
+    //        elements : plist<string>
+    //        box : bool
+    //    }
 
-    type MModel(initial : Model) =
-        let _elements = mlist initial.elements
-        let _box = Mod.init initial.box
+    //type MModel(initial : Model) =
+    //    let _elements = mlist initial.elements
+    //    let _box = Mod.init initial.box
 
-        member x.elements = _elements :> alist<_>
-        member x.box = _box :> IMod<_>
+    //    member x.elements = _elements :> alist<_>
+    //    member x.box = _box :> IMod<_>
 
-        member x.Update(v : Model) =
-            _elements.Update v.elements
-            _box.Value <- v.box
+    //    member x.Update(v : Model) =
+    //        _elements.Update v.elements
+    //        _box.Value <- v.box
 
-        static member Create (m : Model) = MModel m
-        static member Update (m : MModel, v : Model) = m.Update v
+    //    static member Create (m : Model) = MModel m
+    //    static member Update (m : MModel, v : Model) = m.Update v
+    open Example
 
     type Message =
-        | Clear 
+        | Reset 
         | Append of string
         | Prepend of string
         | Toggle
 
-    let update (m : Model) (msg : Message) =
+    let initial = { elements = PList.ofList [ "YEAH" ]; box = true }
+
+
+
+
+    let update (m : TestModel) (msg : Message) =
         match msg with
         | Toggle -> 
             { m with box = not m.box }
-        | Clear ->
-            { m with elements = PList.ofList ["YEAH"] }
+        | Reset ->
+            initial
         | Append element -> 
             { m with elements = PList.append element m.elements }
         | Prepend element -> 
             { m with elements = PList.prepend element m.elements }
 
-    let view (m : MModel) =
+    open Example
+
+    let view (m : MTestModel) =
         div [style "color: white"] [
             button [clazz "ui basic yellow button"; click (fun _ -> Toggle) ] (m.box |> Mod.map (function true -> "sphere" | false -> "box"))
-            button [clazz "ui basic green button"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string |> Append) ] "append"
             button [clazz "ui basic green button"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string |> Prepend) ] "prepend"
-            button [clazz "ui basic red button"; click (fun _ -> Clear) ] "clear"
+            button [clazz "ui basic green button"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string |> Append) ] "append"
+            button [clazz "ui basic red button"; click (fun _ -> Reset) ] "reset"
 
             div [] (m.elements |> AList.map (fun v -> div [clazz "ui basic inverted label"] v))
 
             div [] (m.box |> Mod.map (fun box ->
                 [
+                    let withCam (sg : ISg) (control : Aardvark.Application.RenderControl) =
+                        let initial = CameraView.lookAt (V3d(1.0, 6.0, 4.0)) V3d.Zero V3d.OOI
+                        let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
+
+                        let view = cam |> Mod.map (fun v -> v |> CameraView.viewTrafo)
+                        let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
+                        sg
+                        |> Sg.viewTrafo view
+                        |> Sg.projTrafo proj
+
                     if box then 
                         yield Aardvark.UI.Node.Render(
                             AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"; clazz "hugo"], 
@@ -856,6 +874,7 @@ module UITest =
                                     do! FShadeTest.constantColor V4d.IIII
                                     do! FShadeTest.simpleLight
                                 }
+                                |> withCam
                         )
                     else
                         yield Aardvark.UI.Node.Render(
@@ -866,6 +885,7 @@ module UITest =
                                     do! FShadeTest.constantColor V4d.IIII
                                     do! FShadeTest.simpleLight
                                 }
+                                |> withCam
                         )
                         
                 ]
@@ -875,14 +895,21 @@ module UITest =
 
     let app = 
         { 
-            initial = { elements = PList.ofList [ "YEAH" ]; box = true }
+            initial = initial
             update = update
             view = view
             unpersist = Unpersist.instance
         }
 
-    let test() =
+    let rec test() =
         let d = App.run document.body app
+
+        //Aardvark.Import.JS.setTimeout (fun () -> 
+        //    d.Dispose()
+        //    Log.warn "reboot"
+        //    test()
+        //) 10000 |> ignore
+
         ()
         //let values = mlist [ "YEAH" ]
         //let ui = 
