@@ -496,17 +496,29 @@ type Conversion private() =
 module Prom = 
     open Aardvark.Import.Browser
     
-
-    let inline put (url : string) (data : ArrayBuffer) =
+    let inline post (url : string) (json : string) =
         Promise.Create(fun fin err ->
             let r = XMLHttpRequest.Create()
-            r.setRequestHeader("Content-Type", "application/octet-stream")
-            r.addEventListener_load(fun e -> fin ())
+            r.addEventListener_load(fun e -> fin r.responseText)
+            r.addEventListener_error(fun e -> err e.error)
+            r.``open``("POST", url, true)
+            r.setRequestHeader("Content-Type", "text/plain")
+            try r.send(json)
+            with e -> err e
+        ) |> unbox<Promise<string>>
+
+    let inline put (header : list<string * string>) (url : string) (data : ArrayBuffer) =
+        Promise.Create(fun fin err ->
+            let r = XMLHttpRequest.Create()
+            r.addEventListener_load(fun e -> fin r.responseText)
             r.addEventListener_error(fun e -> err e.error)
             r.``open``("PUT", url, true)
+            r.setRequestHeader("Content-Type", "application/octet-stream")
+            for (k, v) in header do
+                r.setRequestHeader(k, v)
             try r.send(data)
             with e -> err e
-        ) |> unbox<Promise<unit>>
+        ) |> unbox<Promise<string>>
         
         
     let inline putString (url : string) (data : string) =
@@ -572,6 +584,9 @@ module Prom =
         //        (fun err -> e err)
         //    ) |> ignore
         //)
+
+    let inline defaultValue (fallback : 'a) (p : Promise<'a>) =
+        p.catch (fun _ -> fallback)
 
 type Status =
     | Waiting   = 0

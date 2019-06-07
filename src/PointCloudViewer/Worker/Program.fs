@@ -222,16 +222,18 @@ module GlobalThings =
 let main _ =
     let cache = Dict<string, Promise<Octree>>(Unchecked.hash, Unchecked.equals)
 
-    let create (url : string) =
+    let create (url : Database) =
         let avgSize = 300.0 * 1024.0
         let totalMem = 512.0 * 1024.0 * 1024.0
         let store = 
-            if url.StartsWith "local://" then
-                let name = url.Substring 8
+            match url with
+            | Local name -> 
                 LocalBlobStore.connect name |> unbox<Promise<IBlobStore>>
-            else
+            | Url url ->
                 let db = HttpBlobStore(url)
                 Prom.value (db :> IBlobStore)
+            | Azure(token, id) ->
+                Azure.openRead token id
         store |> Prom.map (fun store -> Octree store)
 
     let mutable center = V3d.Zero
@@ -318,7 +320,11 @@ let main _ =
     self.addEventListener_message (fun e ->
         match unbox<Command> e.data with
         | Command.Add (url) ->
-            let tree = cache.GetOrCreate(url, fun _ -> create url)
+            let tree = cache.GetOrCreate(url, fun _ -> 
+                match Database.parse url with
+                | Some url -> create url
+                | None -> Log.error "bad url: %A" url; failwith ""
+            )
             
 
             tree.``then``(fun tree ->

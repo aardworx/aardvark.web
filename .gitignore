@@ -11,3 +11,4 @@ bin/
 dist/
 *.g.fs
 /public/importer.js
+/public/demo.js

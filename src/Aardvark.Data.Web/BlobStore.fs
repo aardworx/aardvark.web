@@ -137,6 +137,7 @@ type LocalBlobStore internal(name : string, tableName : string, db : IDBDatabase
                         success ()
                     )
             )
+
     member x.Delete(file : string) =
         ret true <| fun store ->
             Prom.create (fun success error ->
@@ -169,6 +170,33 @@ type LocalBlobStore internal(name : string, tableName : string, db : IDBDatabase
 
     member x.Exists (file : string) =
         x.TryGet(file) |> Prom.map (function Some _ -> true | None -> false)
+
+    member x.GetFiles() =
+        ret false <| fun store ->
+            Prom.create (fun success error ->
+                if closed then 
+                    error "closed"
+                else
+                    let request = store.openCursor()
+                    let res = System.Collections.Generic.List<string>()
+
+                    request.addEventListener_error(fun e ->
+                        error e.error
+                    )
+                    request.addEventListener_success(fun e ->
+                        let cursor : IDBCursor = Fable.Core.JsInterop.(?) e.target "result"
+                        if unbox cursor then 
+                            if unbox cursor.key then  
+                                match cursor.key with
+                                | :? string as key -> res.Add key
+                                | _ ->  ()
+                                cursor.``continue``()
+                            else
+                                success (unbox<string[]> res)
+                        else
+                            success (unbox<string[]> res)
+                    )
+            )
 
     interface IBlobStore with
         member x.CanWrite = true

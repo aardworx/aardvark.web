@@ -311,7 +311,7 @@ module Lod =
             if count = 0 then 1.0
             else sum / float count
 
-    type TreeReader2(urls : aset<string>, emitStats : Stats -> unit, control : Aardvark.Application.RenderControl, state : TraversalState, time : IMod<float>) as this =
+    type TreeReader2(urls : aset<Database>, emitStats : Stats -> unit, control : Aardvark.Application.RenderControl, state : TraversalState, time : IMod<float>) as this =
         inherit AbstractReader<hdeltaset<IRenderObject>>(HDeltaSet.monoid)
 
         let manager = control.Manager
@@ -580,8 +580,8 @@ module Lod =
 
             for op in urlReader.GetOperations token do
                 match op with
-                | Add(_,url) -> w.postMessage (Command.Add(url))
-                | Rem(_,url) -> w.postMessage (Command.Remove(url))
+                | Add(_,url) -> w.postMessage (Command.Add(Database.toString url))
+                | Rem(_,url) -> w.postMessage (Command.Remove(Database.toString url))
                 ()
 
 
@@ -649,12 +649,12 @@ module Lod =
             PreparedPipelineState.release pipeline
             ()
 
-    type TreeSg(ctrl : Aardvark.Application.RenderControl, urls : aset<string>, ?emitStats : (Stats -> unit)) =
+    type TreeSg(ctrl : Aardvark.Application.RenderControl, urls : aset<Database>, ?emitStats : (Stats -> unit)) =
         interface ISg with
             member x.RenderObjects(state) =
                 ASet.create (fun () -> new TreeReader2(urls, defaultArg emitStats ignore, ctrl, state, ctrl.Time))
 
-    let sg<'a> ctrl (urls : aset<string>) : ISg =
+    let sg<'a> ctrl (urls : aset<Database>) : ISg =
         TreeSg(ctrl, urls) :> ISg
 
 
@@ -663,7 +663,7 @@ open Fable.Core
 
 module Octbuild =
 
-    let test (update : string -> unit) =
+    let test (update : string -> (float -> unit) -> unit) =
 
         let load (file : File) =
             
@@ -678,8 +678,18 @@ module Octbuild =
             progress.style.color <- "black"
             progress.style.webkitUserSelect <- "none"
             progress.style.cursor <- "no-drop"
-            let setMessage fmt = Printf.kprintf (fun str -> progress.innerHTML <- str) fmt
+
+            let mutable timeout = Aardvark.Import.JS.setTimeout (fun () -> progress.style.display <- "none") 200000000
+            let setMessage fmt = 
+                Printf.kprintf (fun str -> 
+                    progress.style.display <- "block"
+                    progress.innerHTML <- str
+                    Aardvark.Import.JS.clearTimeout timeout
+                    timeout <- Aardvark.Import.JS.setTimeout (fun () -> progress.remove()) 2000
+                ) fmt
         
+            
+
             let data = 
                 PointCloudImporter.Import.Pts(file)
         
@@ -707,16 +717,15 @@ module Octbuild =
                         let! pointCount = import
                         
                         progress.style.cursor <- ""
-                        update config.store
+                        update config.store (fun v -> setMessage "progress: %.2f%%" (100.0 * v))
                         setMessage "imported <a href=\"./?local=%s\">%s</a> with %.0f points" config.store config.store pointCount
         
                         window.history.replaceState("", "", sprintf "./?local=%s" config.store)
 
-                        Aardvark.Import.JS.setTimeout (fun () -> progress.remove()) 1000 |> ignore
                     with e ->
                         setMessage "%A" e
                         progress.style.cursor <- ""
-                        Aardvark.Import.JS.setTimeout (fun () -> progress.remove()) 2000 |> ignore
+                        
                 }
         
             ()
@@ -878,23 +887,111 @@ module UITest =
                 unpersist = Unpersist.instance
             }
         ) 
-       
+     
+type URLSearchParams with
+    [<Fable.Core.Emit("$0.entries()")>]
+    member x.entries() : seq<string * string> = failwith ""
+      
 
 [<EntryPoint>]
 let main argv =
-    let query = 
-        window.location.search.Split([| '&'; '?' |], System.StringSplitOptions.RemoveEmptyEntries)
-        |> Array.map (fun str -> str.Split([| '=' |]))
-        |> Array.choose (fun kvp -> if kvp.Length = 2 then Some (kvp.[0], kvp.[1]) else None)
-        |> Map.ofArray
 
-    let url =
+    let query = 
+        let u = URL.Create(window.location.href)
+        let mutable res = FSharp.Collections.Map.empty
+        for (k, v) in u.searchParams.entries() do
+            res <- FSharp.Collections.Map.add k v res
+        res
+
+    let mutable token = ""
+    match Map.tryFind "code" query with
+    | Some code ->
+        let u = URL.Create(window.location.href)
+        u.searchParams.delete "code"
+        window.history.replaceState("", "", u.toString())
+        token <- code
+    | None ->
+        let url = Aardvark.Import.JS.encodeURIComponent window.location.href
+        window.location.href <- "https://aardworxportal.z6.web.core.windows.net/auth?redirect=" + url
+
+    let upload (progress : float -> unit) (localName : string) =
+        promise {
+
+            let! store = LocalBlobStore.connect localName
+            let! files = store.GetFiles()
+            let! infos = Azure.getPointCloudInfos token
+
+            let localName = 
+                if localName.EndsWith ".pts" then localName.Substring(0, localName.Length - 4)
+                else localName
+
+            let existing = infos.owned |> Array.tryFind (fun info -> info.name = localName)
+
+            let! id = 
+                match existing with
+                | Some e -> Prom.value e.id
+                | _ -> Azure.createPointCloudInfo token localName
+
+            match! Azure.tryCreateUploadUrl token id with
+            | Some url ->
+                let! existing = Azure.tryListBlobs url
+
+                let existing = System.Collections.Generic.HashSet<string>(existing)
+                let files = files |> FSharp.Collections.Array.filter (fun n -> not (existing.Contains n))
+
+
+
+                let mutable error = None
+                let mutable i = 0
+                while FSharp.Core.Option.isNone error && i < files.Length do
+                    let name = files.[i]
+                    let! data = store.Get name
+                    let! worked = Azure.tryPut url name (unbox data)
+                    if worked then
+                        progress (float i / float files.Length)
+                        Log.line "%s: %.2f%%" name (100.0 * float i / float files.Length)
+                    else
+                        Log.error "upload for %s failed" name
+                        error <- Some (sprintf "upload for %s failed" name)
+                    i <- i + 1
+
+                Log.line "done"
+                progress 1.0
+                do! store.Close()
+                match error with
+                | Some err ->
+                    return false
+                | None ->
+                    return true
+
+
+            | None ->
+                console.warn "no url"
+                return false
+        }
+ 
+    //let test =
+    //    promise {
+    //        let! infos = Azure.getPointCloudInfos token
+    //        let i = infos.owned.[0]
+
+    //        let! url = Azure.createDownloadUrl token i.id
+    //        let! blobs = Azure.tryListBlobs url
+
+    //        console.log blobs
+    //    }
+
+
+    let db =
         match Map.tryFind "blob" query with
-        | Some id -> "./" + id + "/{0}"
+        | Some id -> Url (Aardvark.Import.JS.decodeURIComponent id)
         | None -> 
             match Map.tryFind "local" query with
-            | Some l -> "local://" + l
-            | None -> "./navvis/{0}"
+            | Some l -> Local l
+            | None -> 
+                match Map.tryFind "azure" query with
+                | Some i -> Azure(token, System.Guid i)
+                | None -> Url ("./navvis/{0}")
 
     let largestr (unit : string) (v : float) =
         let a = abs v
@@ -912,35 +1009,41 @@ let main argv =
     document.addEventListener_readystatechange(fun e ->
         if document.readyState = "complete" then
 
-            UITest.run()
-            if false then
+            //UITest.run()
+            if true then
                 let select = document.getElementById "clouds" |> unbox<HTMLSelectElement>
-                if unbox indexedDB.databases then
-                    indexedDB.databases().``then``(fun dbs -> 
-                        select.innerHTML <- ""
-                        dbs |> Array.iter (fun db ->
-                            let name = db.name
-                            if unbox name then
-                                let e = document.createElement_option()
-                                e.value <- "local://" + name
-                                e.innerText <- name
-                                select.appendChild e |> ignore
-                        )
+                select.innerHTML <- ""
+
+                let e = document.createElement_option()
+                e.value <- Database.toString (Url ("./navvis/{0}"))
+                e.innerText <- "navvis"
+                select.appendChild e |> ignore
+
+                //if unbox indexedDB.databases then
+                //    indexedDB.databases().``then`` (fun dbs ->
+                //        dbs |> Array.iter (fun db ->
+                //            let e = document.createElement_option()
+                //            e.value <- Database.toString (Local db.name)
+                //            e.innerText <- db.name + " (local)"
+                //            select.appendChild e |> ignore
+                //        )
+                //    ) |> ignore
+                    
+
+                Azure.getPointCloudInfos(token).``then``(fun infos ->
+                    let all = Array.append (Array.map (fun a -> true, a) infos.owned) (Array.map (fun a -> false, a) infos.shared)
+
+                    all |> Array.iter (fun (owned, db) ->
                         let e = document.createElement_option()
-                        e.value <- "navvis"
-                        e.innerText <- "navvis"
+                        e.value <- Database.toString (Azure(token, db.id))
+                        e.innerText <- db.name + (if owned then " (mine)" else "")
                         select.appendChild e |> ignore
+                    )
 
-                        match Map.tryFind "local" query with
-                        | Some q -> 
-                            select.value <- "local://" + q
-                        | None ->
-                            select.value <- "navvis"
+                    select.value <- Database.toString db
 
-                    ) |> ignore
-                else
-                    let select = document.getElementById "clouds"
-                    select.parentElement.remove()
+                ) |> ignore
+           
 
                 let canvas = document.getElementById "target" |> unbox<HTMLCanvasElement>
                 canvas.tabIndex <- 1.0
@@ -965,87 +1068,42 @@ let main argv =
                     | _ -> ()
                 )
 
-                let url = Mod.init url
+                let database = Mod.init db
 
-
-                let set (u : string) =
-                    if u.StartsWith "local://" then
-                        let name = u.Substring 8
-                        transact (fun () -> url.Value <- u)
-                        window.history.replaceState("", "", sprintf "./?local=%s" name)
-                    else   
-                        transact (fun () -> url.Value <- "./" + u + "/{0}")
+                let set (u : Database) =
+                    transact (fun () -> database.Value <- u)
+                    match u with
+                    | Url u -> 
+                        let u = Aardvark.Import.JS.encodeURIComponent u
                         window.history.replaceState("", "", sprintf "./?blob=%s" u)
+                    | Local n -> window.history.replaceState("", "", sprintf "./?local=%s" n)
+                    | Azure(_,i) -> window.history.replaceState("", "", sprintf "./?azure=%s" (string i))
+                        
                     
                 select.addEventListener_change(fun e ->
-                    set select.value
+                    match Database.parse select.value with
+                    | Some db -> set db
+                    | None -> ()
                 )
 
-
-                let l = mlist<int> PList.empty
-
-                let test = l |> AList.map (fun v -> 2*v) |> AList.sort
-                let r = test.GetReader()
-
-                Log.line "%A" l.Value
-                r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
-                r.State |> Log.line "%A"
-
-                transact (fun () -> l.Update (PList.ofList [1;3]))
-            
-                Log.line "%A" l.Value
-                r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
-                r.State |> Log.line "%A"
-            
-                transact (fun () -> l.Update (PList.append 15 l.Value))
-            
-                Log.line "%A" l.Value
-                r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
-                r.State |> Log.line "%A"
-            
-                transact (fun () -> l.Update (PList.insertAt 1 7 l.Value))
-            
-                Log.line "%A" l.Value
-                r.GetOperations(AdaptiveToken.Top) |> Log.line "%A"
-                r.State |> Log.line "%A"
-
-                console.warn (PList.ofList [1;2;3])
-
-
-                Octbuild.test(fun store ->
-                    let u = "local://" + store
-                    transact (fun () -> url.Value <- u)
+                Octbuild.test(fun store progress ->
+                    let db = Local store
                     let e = document.createElement_option()
-                    e.value <- u
+                    e.value <- Database.toString db
                     e.innerText <- store
                     select.appendChild e |> ignore
                     select.value <- store
-                
-                    set u
+                    set db
+                    let upload = upload progress store
+
+                    upload.``then`` (fun v ->
+                        if v then Log.line "uploaded"
+                        else Log.error "upload failed"
+                    ) |> ignore
 
                 )
 
-                //for b in 0 .. 8 .. 1000 do
-                //    let mutable t = Index.zero
-                //    for i in 1 .. b do
-                //        t <- Index.after t
-
-                //    let mutable bla = t
-
-                //    let rep = 20
-                //    let mutable sum = 0.0
-                //    for i in -1 .. rep do
-                //        let t0 = performance.now()
-                //        let iter = 20000
-                //        for i in 1 .. iter do
-                //            bla <- Index.after t
-                //        if i > 0 then
-                //            let dt = (performance.now() - t0) / float iter
-                //            sum <- sum + dt
-                //    Log.line "%d: %.5fus" b (1000.0 * sum / float rep)
-
-                //console.warn "done"
-                let set = ASet.ofModSingle url
+                let set = ASet.ofModSingle database
 
                 let emitStats (s : Lod.Stats) =
                     let cnt = document.getElementById "pointCount"
