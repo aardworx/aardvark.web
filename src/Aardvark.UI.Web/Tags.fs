@@ -7,16 +7,16 @@ open Aardvark.SceneGraph
 module Incremental =
 
     let renderControl (attributes : AttributeMap<'msg>) (sg : ISg) =
-        Node.render attributes sg
+        DomNode.render attributes sg
         
-    let inline elem (tagName : string) (attrs : AttributeMap<'msg>) (children : alist<Node<'msg>>) = 
-        Node.node tagName attrs children
+    let inline elem (tagName : string) (attrs : AttributeMap<'msg>) (children : alist<DomNode<'msg>>) = 
+        DomNode.node tagName attrs children
 
     let inline voidElem (tagName : string) (attrs : AttributeMap<'msg>) = 
-        Node.text tagName attrs (Mod.constant "")
+        DomNode.text tagName attrs (Mod.constant "")
 
     let inline text (content : IMod<string>) =
-        Node.text "span" AttributeMap.empty content
+        DomNode.text "span" AttributeMap.empty content
         
     // Elements - list of elements here: https://developer.mozilla.org/en-US/docs/Web/HTML/Element
     // Void elements
@@ -67,7 +67,7 @@ module Incremental =
     let inline main x = elem "main" x
     let inline ol x = elem "ol" x
     let inline p x = elem "p" x
-    let inline pre a x = Node.text "pre" a x
+    let inline pre a x = DomNode.text "pre" a x
     let inline section x = elem "section" x
     let inline ul x = elem "ul" x
 
@@ -137,7 +137,7 @@ module Incremental =
     let inline output x = elem "output" x
     let inline progress x = elem "progress" x
     let inline select x = elem "select" x
-    let inline textarea a x = Node.text "textarea" a x
+    let inline textarea a x = DomNode.text "textarea" a x
 
     // Interactive elements
     let inline details x = elem "details" x
@@ -150,16 +150,16 @@ module Incremental =
 module Static =
 
     let renderControl (attributes : list<string * AttributeValue<'msg>>) (sg : ISg) =
-        Node.render (AttributeMap.ofList attributes) sg
+        DomNode.render (AttributeMap.ofList attributes) sg
 
-    let inline elem (tagName : string) (attrs : list<string * AttributeValue<'msg>>) (children : list<Node<'msg>>) =
-        Node.node tagName (AttributeMap.ofList attrs) (AList.ofList children)
+    let inline elem (tagName : string) (attrs : list<string * AttributeValue<'msg>>) (children : list<DomNode<'msg>>) =
+        DomNode.node tagName (AttributeMap.ofList attrs) (AList.ofList children)
 
     let inline voidElem (tagName : string) (attrs : list<string * AttributeValue<'msg>>) = 
-        Node.text tagName (AttributeMap.ofList attrs) (Mod.constant "")
+        DomNode.text tagName (AttributeMap.ofList attrs) (Mod.constant "")
 
     let inline text (content : string) =
-        Node.text "span" AttributeMap.empty (Mod.constant content)
+        DomNode.text "span" AttributeMap.empty (Mod.constant content)
 
     // Elements - list of elements here: https://developer.mozilla.org/en-US/docs/Web/HTML/Element
     // Void elements
@@ -211,7 +211,7 @@ module Static =
     let inline main x = elem "main" x
     let inline ol x = elem "ol" x
     let inline p x = elem "p" x
-    let inline pre a x = Node.text "pre" (AttributeMap.ofList a) (Mod.constant x)
+    let inline pre a x = DomNode.text "pre" (AttributeMap.ofList a) (Mod.constant x)
     let inline section x = elem "section" x
     let inline ul x = elem "ul" x
 
@@ -281,7 +281,7 @@ module Static =
     let inline output x = elem "output" x
     let inline progress x = elem "progress" x
     let inline select x = elem "select" x
-    let inline textarea a x = Node.text "textarea" (AttributeMap.ofList a) (Mod.constant x)
+    let inline textarea a x = DomNode.text "textarea" (AttributeMap.ofList a) (Mod.constant x)
 
     // Interactive elements
     let inline details x = elem "details" x
@@ -299,75 +299,75 @@ module Generic =
             attributes |> List.map (fun (k, v) -> v |> AMap.bind (function Some v -> AMap.ofList [k, v] | None -> AMap.empty) |> AttributeMap) |> AttributeMap.union
         
     type IDomContent<'msg> =
-        abstract member Create : tag : string * attributes : AttributeMap<'msg> -> Node<'msg>
+        abstract member Create : tag : string * attributes : AttributeMap<'msg> -> DomNode<'msg>
 
     type ContentCreator =
-        static member inline Content(l : list<Node<'msg>>) = { new IDomContent<'msg> with member x.Create(t,a) = Node.node t a (AList.ofList l) }
-        static member inline Content(l : IMod<list<Node<'msg>>>) = { new IDomContent<'msg> with member x.Create(t,a) = Node.node t a (AList.ofMod (Mod.map PList.ofList l)) }
-        static member inline Content(l : plist<Node<'msg>>) = { new IDomContent<'msg> with member x.Create(t,a) = Node.node t a (AList.ofList (PList.toList l)) }
-        static member inline Content(l : IMod<plist<Node<'msg>>>) = { new IDomContent<'msg> with member x.Create(t,a) = Node.node t a (AList.ofMod l) }
-        static member inline Content(l : alist<Node<'msg>>) = { new IDomContent<'msg> with member x.Create(t,a) = Node.node t a l }
+        static member inline Content(l : list<DomNode<'msg>>) = { new IDomContent<'msg> with member x.Create(t,a) = DomNode.node t a (AList.ofList l) }
+        static member inline Content(l : IMod<list<DomNode<'msg>>>) = { new IDomContent<'msg> with member x.Create(t,a) = DomNode.node t a (AList.ofMod (Mod.map PList.ofList l)) }
+        static member inline Content(l : plist<DomNode<'msg>>) = { new IDomContent<'msg> with member x.Create(t,a) = DomNode.node t a (AList.ofList (PList.toList l)) }
+        static member inline Content(l : IMod<plist<DomNode<'msg>>>) = { new IDomContent<'msg> with member x.Create(t,a) = DomNode.node t a (AList.ofMod l) }
+        static member inline Content(l : alist<DomNode<'msg>>) = { new IDomContent<'msg> with member x.Create(t,a) = DomNode.node t a l }
 
-        static member inline Content(l : IMod<string>) = { new IDomContent<'msg> with member x.Create(t,a) = Node.text t a l }
-        static member inline Content(l : string) = { new IDomContent<'msg> with member x.Create(t,a) = Node.text t a (Mod.constant l) }
+        static member inline Content(l : IMod<string>) = { new IDomContent<'msg> with member x.Create(t,a) = DomNode.text t a l }
+        static member inline Content(l : string) = { new IDomContent<'msg> with member x.Create(t,a) = DomNode.text t a (Mod.constant l) }
 
           
 
     type Creator(tag : string) =
         member x.Tag = tag
         // Children and dynamic attributes
-        static member Node(tag : Creator, attributes : AttributeMap<'msg>, children : alist<Node<'msg>>) =
-            Node.node tag.Tag attributes children
+        static member Node(tag : Creator, attributes : AttributeMap<'msg>, children : alist<DomNode<'msg>>) =
+            DomNode.node tag.Tag attributes children
             
-        static member Node(tag : Creator, attributes : AttributeMap<'msg>, children : IMod<list<Node<'msg>>>) =
-            Node.node tag.Tag attributes (children |> Mod.map PList.ofList |> AList.ofMod)
+        static member Node(tag : Creator, attributes : AttributeMap<'msg>, children : IMod<list<DomNode<'msg>>>) =
+            DomNode.node tag.Tag attributes (children |> Mod.map PList.ofList |> AList.ofMod)
             
-        static member Node(tag : Creator, attributes : AttributeMap<'msg>, children : IMod<plist<Node<'msg>>>) =
-            Node.node tag.Tag attributes (children |> AList.ofMod)
+        static member Node(tag : Creator, attributes : AttributeMap<'msg>, children : IMod<plist<DomNode<'msg>>>) =
+            DomNode.node tag.Tag attributes (children |> AList.ofMod)
 
-        static member Node(tag : Creator, attributes : AttributeMap<'msg>, children : list<Node<'msg>>) =
-            Node.node tag.Tag attributes (AList.ofList children)
+        static member Node(tag : Creator, attributes : AttributeMap<'msg>, children : list<DomNode<'msg>>) =
+            DomNode.node tag.Tag attributes (AList.ofList children)
  
-        static member Node(tag : Creator, attributes : AttributeMap<'msg>, children : plist<Node<'msg>>) =
-            Node.node tag.Tag attributes (AList.ofPList children)
+        static member Node(tag : Creator, attributes : AttributeMap<'msg>, children : plist<DomNode<'msg>>) =
+            DomNode.node tag.Tag attributes (AList.ofPList children)
             
             
         // Children and static attributes
-        static member Node(tag : Creator, attributes : list<string * AttributeValue<'msg>>, children : alist<Node<'msg>>) =
-            Node.node tag.Tag (AttributeMap.ofList attributes) children
+        static member Node(tag : Creator, attributes : list<string * AttributeValue<'msg>>, children : alist<DomNode<'msg>>) =
+            DomNode.node tag.Tag (AttributeMap.ofList attributes) children
             
-        static member Node(tag : Creator, attributes : list<string * AttributeValue<'msg>>, children : IMod<list<Node<'msg>>>) =
-            Node.node tag.Tag (AttributeMap.ofList attributes) (children |> Mod.map PList.ofList |> AList.ofMod)
+        static member Node(tag : Creator, attributes : list<string * AttributeValue<'msg>>, children : IMod<list<DomNode<'msg>>>) =
+            DomNode.node tag.Tag (AttributeMap.ofList attributes) (children |> Mod.map PList.ofList |> AList.ofMod)
             
-        static member Node(tag : Creator, attributes : list<string * AttributeValue<'msg>>, children : IMod<plist<Node<'msg>>>) =
-            Node.node tag.Tag (AttributeMap.ofList attributes) (children |> AList.ofMod)
+        static member Node(tag : Creator, attributes : list<string * AttributeValue<'msg>>, children : IMod<plist<DomNode<'msg>>>) =
+            DomNode.node tag.Tag (AttributeMap.ofList attributes) (children |> AList.ofMod)
 
-        static member Node(tag : Creator, attributes : list<string * AttributeValue<'msg>>, children : list<Node<'msg>>) =
-            Node.node tag.Tag (AttributeMap.ofList attributes) (AList.ofList children)
+        static member Node(tag : Creator, attributes : list<string * AttributeValue<'msg>>, children : list<DomNode<'msg>>) =
+            DomNode.node tag.Tag (AttributeMap.ofList attributes) (AList.ofList children)
  
-        static member Node(tag : Creator, attributes : list<string * AttributeValue<'msg>>, children : plist<Node<'msg>>) =
-            Node.node tag.Tag (AttributeMap.ofList attributes) (AList.ofPList children)
+        static member Node(tag : Creator, attributes : list<string * AttributeValue<'msg>>, children : plist<DomNode<'msg>>) =
+            DomNode.node tag.Tag (AttributeMap.ofList attributes) (AList.ofPList children)
             
 
         // Content and dynamic attributes
         static member Node(tag : Creator, attributes : AttributeMap<'msg>, content : IMod<string>) =
-            Node.text tag.Tag attributes content
+            DomNode.text tag.Tag attributes content
             
         static member Node(tag : Creator, attributes : AttributeMap<'msg>, content : string) =
-            Node.text tag.Tag attributes (Mod.constant content)
+            DomNode.text tag.Tag attributes (Mod.constant content)
 
         // Content and static attributes
         static member Node(tag : Creator, attributes : list<string * AttributeValue<'msg>>, content : IMod<string>) =
-            Node.text tag.Tag (AttributeMap.ofList attributes) content
+            DomNode.text tag.Tag (AttributeMap.ofList attributes) content
             
         static member Node(tag : Creator, attributes : list<string * AttributeValue<'msg>>, content : string) =
-            Node.text tag.Tag (AttributeMap.ofList attributes) (Mod.constant content)
+            DomNode.text tag.Tag (AttributeMap.ofList attributes) (Mod.constant content)
 
         static member Void(tag : Creator, attributes : AttributeMap<'msg>) =
-            Node.text tag.Tag attributes (Mod.constant "")
+            DomNode.text tag.Tag attributes (Mod.constant "")
 
         static member Void(tag : Creator, attributes : list<string * AttributeValue<'msg>>) =
-            Node.text tag.Tag (AttributeMap.ofList attributes) (Mod.constant "")
+            DomNode.text tag.Tag (AttributeMap.ofList attributes) (Mod.constant "")
 
     let inline attributes (dummy : ^a) (attrs : ^b) =
         ((^a or ^b) : (static member AttributeMap : ^b -> AttributeMap<'msg>) (attrs))
@@ -377,10 +377,10 @@ module Generic =
     
 
     let inline node (tagName : ^a) (attrs : ^b) (children : ^c) =
-        ((^a or ^b or ^c) : (static member Node : ^a * ^b * ^c -> Node<'msg>) (tagName, attrs, children))
+        ((^a or ^b or ^c) : (static member Node : ^a * ^b * ^c -> DomNode<'msg>) (tagName, attrs, children))
         
     let inline leaf (tagName : ^a) (attrs : ^b)=
-        ((^a or ^b) : (static member Void : ^a * ^b -> Node<'msg>) (tagName, attrs))
+        ((^a or ^b) : (static member Void : ^a * ^b -> DomNode<'msg>) (tagName, attrs))
         
     let inline att a = attributes Unchecked.defaultof<AttributeCreator> a
     let inline content a = contentInternal Unchecked.defaultof<ContentCreator> a

@@ -842,7 +842,7 @@ module UITest =
                         |> Sg.projTrafo proj
 
                     if box then 
-                        yield Aardvark.UI.Node.Render(
+                        yield Aardvark.UI.DomNode.Render(
                             AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"; clazz "hugo"], 
                             Sg.box Box3d.Unit
                                 |> Sg.shader {
@@ -853,7 +853,7 @@ module UITest =
                                 |> withCam
                         )
                     else
-                        yield Aardvark.UI.Node.Render(
+                        yield Aardvark.UI.DomNode.Render(
                             AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"], 
                             Sg.sphere 3
                                 |> Sg.shader {

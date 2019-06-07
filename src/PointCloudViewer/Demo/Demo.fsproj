@@ -6,9 +6,6 @@
 	<IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Ui.fs" />
-    <Compile Include="Tags.fs" />
-    <Compile Include="Attributes.fs" />
     <Compile Include="Future.fs" />
     <Compile Include="Sample.fs" />
     <Compile Include="ElmishTest.fs" />
@@ -22,6 +19,7 @@
     <ProjectReference Include="..\..\Aardvark.Rendering.Web\Aardvark.Rendering.Web.fsproj" />
     <ProjectReference Include="..\..\Aardvark.Rendering.WebGL\Aardvark.Rendering.WebGL.fsproj" />
     <ProjectReference Include="..\..\Aardvark.SceneGraph.Web\Aardvark.SceneGraph.Web.fsproj" />
+    <ProjectReference Include="..\..\Aardvark.UI.Web\Aardvark.UI.Web.fsproj" />
     <ProjectReference Include="..\..\FShade\FShade.GLSL.Web\FShade.GLSL.Web.fsproj" />
     <ProjectReference Include="..\..\FShade\FShade.Imperative.Web\FShade.Imperative.Web.fsproj" />
     <ProjectReference Include="..\..\FShade\FShade.Core.Web\FShade.Core.Web.fsproj" />
