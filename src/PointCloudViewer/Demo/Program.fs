@@ -891,239 +891,318 @@ module UITest =
 type URLSearchParams with
     [<Fable.Core.Emit("$0.entries()")>]
     member x.entries() : seq<string * string> = failwith ""
-      
+     
+module API = 
+    open System
+    open Aardvark.Import.JS
+    open Aardvark.Import.Browser
+
+    type ImportConfig =
+        {
+            format          : Ascii.Token[]
+            minDistance     : float
+            splitLimit      : int
+            compress        : bool
+            // ?????
+        }
+
+    type ImportTask =
+        {
+            name    : string
+            token   : string
+            files   : array<File * ImportConfig>
+        }
+         
+    type Message =
+        | Start of taskName : string
+        | Finished of taskName : string
+        | Progress of taskName : string * progress : float
+        | Done of azureId : Guid
+        | Cancelled
+        | Error of string
+
+    type Command =
+        | Import of ImportTask
+        | Cancel
+
+
+let ready =
+    Prom.create (fun s _ ->
+        document.addEventListener_readystatechange(fun e ->
+            if document.readyState = "complete" then
+                s ()
+        )
+    )
+
+let largestr (unit : string) (v : float) =
+    let a = abs v
+    if a = 0.0 then "0" + unit
+    elif a >= 1000000000.0 then sprintf "%.3fG%s" (v / 1000000000.0) unit
+    elif a >= 1000000.0 then sprintf "%.2fM%s" (a / 1000000.0) unit
+    elif a >= 1000.0 then sprintf "%.1fk%s" (a / 1000.0) unit
+    elif a >= 1.0 then sprintf "%.0f%s" a unit
+    elif a >= 0.001 then sprintf "%.0fm%s" (a * 1000.0) unit
+    elif a >= 0.000001 then sprintf "%.0fu%s" (a * 1000000.0) unit
+    elif a >= 0.000000001 then sprintf "%.0fn%s" (a * 1000000000.0) unit
+    else string v
+
+let upload (token : string) (progress : float -> unit) (localName : string) =
+    promise {
+        let! store = LocalBlobStore.connect localName
+        let! files = store.GetFiles()
+        let! infos = Azure.getPointCloudInfos token
+
+        let localName = 
+            if localName.EndsWith ".pts" then localName.Substring(0, localName.Length - 4)
+            else localName
+
+        let existing = infos.owned |> Array.tryFind (fun info -> info.name = localName)
+
+        let! id = 
+            match existing with
+            | Some e -> Prom.value e.id
+            | _ -> Azure.createPointCloudInfo token localName
+
+        match! Azure.tryCreateUploadUrl token id with
+        | Some url ->
+            let! existing = Azure.listBlobs token id
+            let existing = System.Collections.Generic.HashSet<string>(existing)
+            let files = files |> FSharp.Collections.Array.filter (fun n -> not (existing.Contains n))
+
+
+
+            let mutable error = None
+            let mutable i = 0
+            while FSharp.Core.Option.isNone error && i < files.Length do
+                let name = files.[i]
+                let! data = store.Get name
+                let! worked = Azure.tryPut url name (unbox data)
+                if worked then
+                    progress (float i / float files.Length)
+                    Log.line "%s: %.2f%%" name (100.0 * float i / float files.Length)
+                else
+                    Log.error "upload for %s failed" name
+                    error <- Some (sprintf "upload for %s failed" name)
+                i <- i + 1
+
+            Log.line "done"
+            progress 1.0
+            do! store.Close()
+            match error with
+            | Some err ->
+                return false
+            | None ->
+                return true
+
+
+        | None ->
+            console.warn "no url"
+            return false
+    }
+ 
+
+[<Emit("$($0).dropdown();")>]
+let dropdown(selector : string) = jsNative
+
+let getCurrentPointCloud (query : Map<string, string>) (token : string) =
+    promise {
+    
+        let current =
+            match Map.tryFind "blob" query with
+            | Some id -> Url (Aardvark.Import.JS.decodeURIComponent id)
+            | None -> 
+                match Map.tryFind "local" query with
+                | Some l -> Local l
+                | None -> 
+                    match Map.tryFind "azure" query with
+                    | Some i -> Azure(token, System.Guid i)
+                    | None -> Url ("./navvis/{0}")
+
+
+        let select = document.getElementById "clouds" |> unbox<HTMLSelectElement>
+        select.innerHTML <- ""
+
+        let e = document.createElement_option()
+        e.value <- Database.toString (Url ("./navvis/{0}"))
+        e.innerText <- "navvis"
+        select.appendChild e |> ignore
+
+
+        let! infos = Azure.getPointCloudInfos(token)
+        let all = Array.append (Array.map (fun a -> true, a) infos.owned) (Array.map (fun a -> false, a) infos.shared)
+        all |> Array.iter (fun (owned, db) ->
+            let e = document.createElement_option()
+            
+            e.value <- Database.toString (Azure(token, db.id))
+            if owned then
+                e.innerText <- db.name
+            else
+                let d = document.createElement_div()
+                let t = document.createElement_span()
+                t.innerText <- db.name + " "
+                d.appendChild t |> ignore
+                let l = document.createElement_label()
+                l.className <- "ui mini basic green inverted label"
+                l.innerText <- "shared"
+                d.appendChild l |> ignore
+                e.appendChild d |> ignore
+
+
+            select.appendChild e |> ignore
+        )
+
+
+        if unbox indexedDB.databases then
+            let! dbs = indexedDB.databases()
+            dbs |> Array.iter (fun db ->
+                let e = document.createElement_option()
+                e.value <- Database.toString (Local db.name)
+                let d = document.createElement_div()
+                let t = document.createElement_span()
+                t.innerText <- db.name + " "
+                d.appendChild t |> ignore
+                let l = document.createElement_label()
+                l.className <- "ui mini basic yellow inverted label"
+                l.innerText <- "local"
+                d.appendChild l |> ignore
+                e.appendChild d |> ignore
+                select.appendChild e |> ignore          
+
+            )
+
+        select.value <- Database.toString current
+        let current = Mod.init current
+
+        let set (u : Database) =
+            transact (fun () -> current.Value <- u)
+            select.value <- Database.toString u
+            match u with
+            | Url u -> 
+                let u = Aardvark.Import.JS.encodeURIComponent u
+                window.history.replaceState("", "", sprintf "./?blob=%s" u)
+            | Local n ->
+                window.history.replaceState("", "", sprintf "./?local=%s" n)
+            | Azure(_,i) -> 
+                window.history.replaceState("", "", sprintf "./?azure=%s" (string i))
+                        
+                   
+        select.addEventListener_change(fun e ->
+            match Database.parse select.value with
+            | Some db -> set db
+            | None -> Log.warn "no parse"
+        )
+
+        dropdown("#clouds")
+        select.parentElement.style.width <- "300px"
+        select.style.display <- "block"
+
+
+
+        Octbuild.test(fun store progress ->
+            let db = Local store
+            let e = document.createElement_option()
+            e.value <- Database.toString db
+            e.innerText <- store
+            select.appendChild e |> ignore
+            set db
+            let upload = upload token progress store
+
+            upload.``then`` (fun v ->
+                if v then Log.line "uploaded"
+                else Log.error "upload failed"
+            ) |> ignore
+
+        )
+
+        return current :> IMod<_>
+    }
+
+let run() =
+    promise {
+        do! ready
+
+        let query = 
+            let u = URL.Create(window.location.href)
+            let mutable res = FSharp.Collections.Map.empty
+            for (k, v) in u.searchParams.entries() do
+                res <- FSharp.Collections.Map.add k v res
+            res
+
+        let! token = 
+            match Map.tryFind "code" query with
+            | Some code ->
+                let u = URL.Create(window.location.href)
+                u.searchParams.delete "code"
+                window.history.replaceState("", "", u.toString())
+                localStorage.setItem("accesstoken", code)
+                Prom.value code
+            | None ->
+                let t = localStorage.getItem "accesstoken" |> unbox<string>
+                if unbox t then
+                    Azure.tryRenew t |> Prom.map (fun p ->
+                        match p with
+                        | Some t -> t
+                        | None ->
+                            let url = Aardvark.Import.JS.encodeURIComponent window.location.href
+                            window.location.href <- "https://aardworxportal.z6.web.core.windows.net/auth?redirect=" + url
+                            ""
+                    )
+                else    
+                    let url = Aardvark.Import.JS.encodeURIComponent window.location.href
+                    window.location.href <- "https://aardworxportal.z6.web.core.windows.net/auth?redirect=" + url
+                    Prom.value ""
+
+        let! current = getCurrentPointCloud query token
+           
+
+        let canvas = document.getElementById "target" |> unbox<HTMLCanvasElement>
+        canvas.tabIndex <- 1.0
+        canvas.addEventListener_click(fun _ -> canvas.focus())
+
+        let control = new Aardvark.Application.RenderControl(canvas, false, true, ClearColor = V4d.OOOO)
+        let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
+        let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
+        let color = Mod.init true
+
+        let view = cam |> Mod.map (fun v -> v |> CameraView.viewTrafo)
+        let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
+
+
+        control.Keyboard.DownWithRepeats.Add (fun k ->
+            match k with
+            | Aardvark.Application.Keys.V -> transact (fun () -> color.Value <- not color.Value)
+            | _ -> ()
+        )
+
+        
+
+        let set = ASet.ofModSingle current
+
+        let emitStats (s : Lod.Stats) =
+            let cnt = document.getElementById "pointCount"
+            cnt.innerText <- sprintf "%s (%s)" (largestr "" s.totalPoints) (largestr "" s.visiblePoints)
+            let cnt = document.getElementById "nodeCount"
+            cnt.innerText <- sprintf "%s (%s)" (largestr "" s.totalNodes) (largestr "" s.visibleNodes)
+
+        let sg =
+            Lod.TreeSg(control, set, emitStats) :> ISg
+            |> Sg.shader {
+                do! FShadeTest.depthVertex
+                do! FShadeTest.circularPoint
+            }
+            |> Sg.viewTrafo view
+            |> Sg.projTrafo proj
+            |> Sg.uniform "ViewportSize" control.Size
+            |> Sg.uniform "ShowColor" color
+        let objects = sg.RenderObjects()
+        let task() = new RenderTask(control.FramebufferSignature, control.Manager, objects) :> IRenderTask
+
+        control.RenderTask <- task()
+
+    } |> ignore
+
 
 [<EntryPoint>]
 let main argv =
-
-    let query = 
-        let u = URL.Create(window.location.href)
-        let mutable res = FSharp.Collections.Map.empty
-        for (k, v) in u.searchParams.entries() do
-            res <- FSharp.Collections.Map.add k v res
-        res
-
-    let mutable token = ""
-    match Map.tryFind "code" query with
-    | Some code ->
-        let u = URL.Create(window.location.href)
-        u.searchParams.delete "code"
-        window.history.replaceState("", "", u.toString())
-        token <- code
-    | None ->
-        let url = Aardvark.Import.JS.encodeURIComponent window.location.href
-        window.location.href <- "https://aardworxportal.z6.web.core.windows.net/auth?redirect=" + url
-
-    let upload (progress : float -> unit) (localName : string) =
-        promise {
-
-            let! store = LocalBlobStore.connect localName
-            let! files = store.GetFiles()
-            let! infos = Azure.getPointCloudInfos token
-
-            let localName = 
-                if localName.EndsWith ".pts" then localName.Substring(0, localName.Length - 4)
-                else localName
-
-            let existing = infos.owned |> Array.tryFind (fun info -> info.name = localName)
-
-            let! id = 
-                match existing with
-                | Some e -> Prom.value e.id
-                | _ -> Azure.createPointCloudInfo token localName
-
-            match! Azure.tryCreateUploadUrl token id with
-            | Some url ->
-                let! existing = Azure.tryListBlobs url
-
-                let existing = System.Collections.Generic.HashSet<string>(existing)
-                let files = files |> FSharp.Collections.Array.filter (fun n -> not (existing.Contains n))
-
-
-
-                let mutable error = None
-                let mutable i = 0
-                while FSharp.Core.Option.isNone error && i < files.Length do
-                    let name = files.[i]
-                    let! data = store.Get name
-                    let! worked = Azure.tryPut url name (unbox data)
-                    if worked then
-                        progress (float i / float files.Length)
-                        Log.line "%s: %.2f%%" name (100.0 * float i / float files.Length)
-                    else
-                        Log.error "upload for %s failed" name
-                        error <- Some (sprintf "upload for %s failed" name)
-                    i <- i + 1
-
-                Log.line "done"
-                progress 1.0
-                do! store.Close()
-                match error with
-                | Some err ->
-                    return false
-                | None ->
-                    return true
-
-
-            | None ->
-                console.warn "no url"
-                return false
-        }
- 
-    //let test =
-    //    promise {
-    //        let! infos = Azure.getPointCloudInfos token
-    //        let i = infos.owned.[0]
-
-    //        let! url = Azure.createDownloadUrl token i.id
-    //        let! blobs = Azure.tryListBlobs url
-
-    //        console.log blobs
-    //    }
-
-
-    let db =
-        match Map.tryFind "blob" query with
-        | Some id -> Url (Aardvark.Import.JS.decodeURIComponent id)
-        | None -> 
-            match Map.tryFind "local" query with
-            | Some l -> Local l
-            | None -> 
-                match Map.tryFind "azure" query with
-                | Some i -> Azure(token, System.Guid i)
-                | None -> Url ("./navvis/{0}")
-
-    let largestr (unit : string) (v : float) =
-        let a = abs v
-        if a = 0.0 then "0" + unit
-        elif a >= 1000000000.0 then sprintf "%.3fG%s" (v / 1000000000.0) unit
-        elif a >= 1000000.0 then sprintf "%.2fM%s" (a / 1000000.0) unit
-        elif a >= 1000.0 then sprintf "%.1fk%s" (a / 1000.0) unit
-        elif a >= 1.0 then sprintf "%.0f%s" a unit
-        elif a >= 0.001 then sprintf "%.0fm%s" (a * 1000.0) unit
-        elif a >= 0.000001 then sprintf "%.0fu%s" (a * 1000000.0) unit
-        elif a >= 0.000000001 then sprintf "%.0fn%s" (a * 1000000000.0) unit
-        else string v
-
-   
-    document.addEventListener_readystatechange(fun e ->
-        if document.readyState = "complete" then
-
-            //UITest.run()
-            if true then
-                let select = document.getElementById "clouds" |> unbox<HTMLSelectElement>
-                select.innerHTML <- ""
-
-                let e = document.createElement_option()
-                e.value <- Database.toString (Url ("./navvis/{0}"))
-                e.innerText <- "navvis"
-                select.appendChild e |> ignore
-
-                //if unbox indexedDB.databases then
-                //    indexedDB.databases().``then`` (fun dbs ->
-                //        dbs |> Array.iter (fun db ->
-                //            let e = document.createElement_option()
-                //            e.value <- Database.toString (Local db.name)
-                //            e.innerText <- db.name + " (local)"
-                //            select.appendChild e |> ignore
-                //        )
-                //    ) |> ignore
-                    
-
-                Azure.getPointCloudInfos(token).``then``(fun infos ->
-                    let all = Array.append (Array.map (fun a -> true, a) infos.owned) (Array.map (fun a -> false, a) infos.shared)
-
-                    all |> Array.iter (fun (owned, db) ->
-                        let e = document.createElement_option()
-                        e.value <- Database.toString (Azure(token, db.id))
-                        e.innerText <- db.name + (if owned then " (mine)" else "")
-                        select.appendChild e |> ignore
-                    )
-
-                    select.value <- Database.toString db
-
-                ) |> ignore
-           
-
-                let canvas = document.getElementById "target" |> unbox<HTMLCanvasElement>
-                canvas.tabIndex <- 1.0
-            
-
-                canvas.addEventListener_click(fun _ ->
-                    canvas.focus()
-                )
-
-                let control = new Aardvark.Application.RenderControl(canvas, false, true, ClearColor = V4d.OOOO)
-                let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
-                let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
-                let color = Mod.init true
-
-                let view = cam |> Mod.map (fun v -> v |> CameraView.viewTrafo)
-                let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
-
-
-                control.Keyboard.DownWithRepeats.Add (fun k ->
-                    match k with
-                    | Aardvark.Application.Keys.V -> transact (fun () -> color.Value <- not color.Value)
-                    | _ -> ()
-                )
-
-                let database = Mod.init db
-
-                let set (u : Database) =
-                    transact (fun () -> database.Value <- u)
-                    match u with
-                    | Url u -> 
-                        let u = Aardvark.Import.JS.encodeURIComponent u
-                        window.history.replaceState("", "", sprintf "./?blob=%s" u)
-                    | Local n -> window.history.replaceState("", "", sprintf "./?local=%s" n)
-                    | Azure(_,i) -> window.history.replaceState("", "", sprintf "./?azure=%s" (string i))
-                        
-                    
-                select.addEventListener_change(fun e ->
-                    match Database.parse select.value with
-                    | Some db -> set db
-                    | None -> ()
-                )
-
-                Octbuild.test(fun store progress ->
-                    let db = Local store
-                    let e = document.createElement_option()
-                    e.value <- Database.toString db
-                    e.innerText <- store
-                    select.appendChild e |> ignore
-                    select.value <- store
-                    set db
-                    let upload = upload progress store
-
-                    upload.``then`` (fun v ->
-                        if v then Log.line "uploaded"
-                        else Log.error "upload failed"
-                    ) |> ignore
-
-                )
-
-                let set = ASet.ofModSingle database
-
-                let emitStats (s : Lod.Stats) =
-                    let cnt = document.getElementById "pointCount"
-                    cnt.innerText <- sprintf "%s (%s)" (largestr "" s.totalPoints) (largestr "" s.visiblePoints)
-                    let cnt = document.getElementById "nodeCount"
-                    cnt.innerText <- sprintf "%s (%s)" (largestr "" s.totalNodes) (largestr "" s.visibleNodes)
-
-                let sg =
-                    Lod.TreeSg(control, set, emitStats) :> ISg
-                    |> Sg.shader {
-                        do! FShadeTest.depthVertex
-                        do! FShadeTest.circularPoint
-                    }
-                    |> Sg.viewTrafo view
-                    |> Sg.projTrafo proj
-                    |> Sg.uniform "ViewportSize" control.Size
-                    |> Sg.uniform "ShowColor" color
-                let objects = sg.RenderObjects()
-                let task() = new RenderTask(control.FramebufferSignature, control.Manager, objects) :> IRenderTask
-
-                control.RenderTask <- task()
-    )
+    run()
     0
