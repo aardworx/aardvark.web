@@ -258,7 +258,7 @@ module RKdTree =
         data
 
 
-type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : int) =
+type MutableOctnode(db : Database, nid : System.Guid, cell : Cell, splitLimit : int) =
 
     static let ref (db : Database) (splitLimit : int) (n : MutableOctnode) = db.Ref(string n.Id, n, MutableOctnode.pickle, MutableOctnode.unpickle db splitLimit)
 
@@ -382,8 +382,8 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
         let stream = Stream(data)
         let _def, data = DurableDataCodec.decode stream
         let data = unbox<Map<Durable.Def, obj>> data
-        let id = System.Guid name
-        let n = MutableOctnode(db, id, unbox data.[Durable.Octree.Cell], splitLimit)
+        let nid = System.Guid name
+        let n = MutableOctnode(db, nid, unbox data.[Durable.Octree.Cell], splitLimit)
         n.SetData(data) |> Prom.map (fun () -> n)
 
     member private x.SetData(d : Map<Durable.Def, obj>) : Promise<unit> =
@@ -397,11 +397,11 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
                 let ids = unbox<System.Guid[]> ids
                 children <- FSharp.Collections.Array.zeroCreate ids.Length
                 for i in 0 .. ids.Length - 1 do
-                    let id = ids.[i]
-                    if id = System.Guid.Empty then 
+                    let nid = ids.[i]
+                    if nid = System.Guid.Empty then 
                         children.[i] <- None
                     else
-                        let! r = db.GetRef(string id, MutableOctnode.pickle, MutableOctnode.unpickle db splitLimit)
+                        let! r = db.GetRef(string nid, MutableOctnode.pickle, MutableOctnode.unpickle db splitLimit)
                         children.[i] <- Some r
 
             | None ->
@@ -430,14 +430,14 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
                     data <- Map.add Durable.Octree.Colors3b (dst :> obj) data
         }
 
-    member x.Id : System.Guid = id
+    member x.Id : System.Guid = nid
 
     static member Build(db : Database, cell : Cell, splitLimit : int, bb : Box3d, index : IArrayBuffer<int>, pb : IArrayBuffer<V3d>, atts : Map<Durable.Def, obj>) : Option<Promise<DbRef<MutableOctnode>>> =
         if index.Length <= 0 then
             None
         else
-            let id = System.Guid.NewGuid()
-            let c = MutableOctnode(db, id, cell, splitLimit)
+            let nid = System.Guid.NewGuid()
+            let c = MutableOctnode(db, nid, cell, splitLimit)
             c.AddContained(bb, index, pb, atts) |> Prom.bind (fun v ->
                 (ref db splitLimit c)
             ) |> Some
@@ -638,8 +638,8 @@ type MutableOctnode(db : Database, id : System.Guid, cell : Cell, splitLimit : i
             Some (Prom.value (snd ts.[0]))
         else
             promise {
-                let id = System.Guid.NewGuid()
-                let n = MutableOctnode(db, id, cell, splitLimit)
+                let nid = System.Guid.NewGuid()
+                let n = MutableOctnode(db, nid, cell, splitLimit)
                 let groups = ts |> FSharp.Collections.Array.groupBy (fun (c, _) -> cell.GetOctant c.Center)
                 let children = FSharp.Collections.Array.zeroCreate 8
                 let mutable total = 0.0
@@ -739,9 +739,14 @@ type MutableOctree(db : Database, splitLimit : int) =
         match root with
         | Some r -> 
             promise {
-                let! rootRef = db.Ref(string id, r, MutableOctnode.pickle, MutableOctnode.unpickle db splitLimit)
-                let! _ = r.BuildLod(rootRef, 1.0)
-                ()
+                match root with
+                | Some root ->
+                    let! rootRef = db.Ref(string root.Id, r, MutableOctnode.pickle, MutableOctnode.unpickle db splitLimit)
+                    let! _ = r.BuildLod(rootRef, 1.0)
+                    ()
+                | _ ->
+                    
+                    ()
             }
         | None -> 
             Prom.value ()
@@ -750,7 +755,7 @@ type MutableOctree(db : Database, splitLimit : int) =
         promise {
             match root with
             | Some r ->
-                let id = r.Id
+                let nid = r.Id
                 let bb = r.BoundingBox
 
                 //let centroid = sum / cnt
@@ -759,7 +764,7 @@ type MutableOctree(db : Database, splitLimit : int) =
 
                 let rootInfo = 
                     Fable.Core.JsInterop.createObj [
-                        "RootId", string id :> obj
+                        "RootId", string nid :> obj
                         "PointCount", r.TotalPointCount :> obj
                         "Bounds", Fable.Core.JsInterop.createObj [
                             "Min", Fable.Core.JsInterop.createObj [
@@ -792,7 +797,7 @@ type MutableOctree(db : Database, splitLimit : int) =
                     ]
                 let str = JSON.stringify rootInfo
 
-                let! rootRef = db.Ref(string id, r, MutableOctnode.pickle, MutableOctnode.unpickle db splitLimit)
+                let! rootRef = db.Ref(string nid, r, MutableOctnode.pickle, MutableOctnode.unpickle db splitLimit)
                 rootRef.Write r
                 do! db.Store.SetString("root.json", str)
             | None ->
