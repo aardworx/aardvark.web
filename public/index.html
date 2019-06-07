@@ -55,14 +55,14 @@
     <canvas style="position: fixed; top:0; left:0; width: 100%; height: 100%; margin: 0; padding: 0; background: transparent; outline: none" id="target"></canvas>
 
 
-    <div style="position: fixed; top:6pt; right: 10pt; opacity: 0.7" >
-        <select id="clouds" class="ui inverted dropdown">
+    <div style="position: fixed; top:6pt; right: 10pt; opacity: 0.9; width: 300px" >
+        <select id="clouds" class="ui inverted dropdown" style="width: 300px; display: none">
         </select>
     </div>
 
 
     <div style="position: fixed; top:6pt; left:6pt; pointer-events:none; user-select: none">
-        <table class="ui small very compact inverted celled striped table" style="opacity: 0.7">
+        <table class="ui small very compact inverted celled striped table" style="opacity: 0.9">
             <tr><td>WASD</td><td>move</td></tr>
             <tr><td>Left Mouse</td><td>rotate camera</td></tr>
             <tr><td>Right Mouse</td><td>move forward/backward</td></tr>
@@ -78,9 +78,6 @@
 
     </div>
 
-    <script>
-        $("#clouds").dropdown();
-    </script>
 
 </body>
 </html>

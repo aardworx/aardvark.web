@@ -123,6 +123,50 @@ module Azure =
         )
         |> Prom.defaultValue { owned = [||]; shared = [||]; continuationToken = None }
 
+    let checkToken (token : string) =   
+        let url = apiUrl + "PointCloudInfos?token=" + token
+        Prom.fetchBuffer url 
+        |> Prom.map (fun _ -> true)
+        |> Prom.defaultValue false
+
+    let tryRenew (token : string) =   
+        let url = apiUrl + "Renew/" + token + "?token=" + token
+        Prom.fetchString url 
+        |> Prom.map (fun j ->
+            let o = JSON.parse j
+            match o?token with
+            | Some (t : string) -> Some t
+            | None -> None
+        )
+        |> Prom.defaultValue None
+
+    let listBlobs (token : string) (name : Guid) : Promise<string[]> =
+        let url = apiUrl + "PointCloudListBlobs/" + string name + "?token=" + token
+        Prom.fetchString url |> Prom.map (fun json ->
+            let o = JSON.parse json |> unbox<obj[]>
+            match o?blobs with
+            | Some o -> o |> FSharp.Collections.Array.choose (fun o -> o?name)
+            | None -> [||]
+        )
+        |> Prom.defaultValue [||]
+
+    //let tryListBlobs (sas : StorageUrl) =
+    //    let url = URL.Create (sas.url + sas.queryString)
+    //    url.searchParams.set("restype", "container")
+    //    url.searchParams.set("comp", "list")
+    //    Prom.fetchString (url.toString()) |> Prom.map (fun xml ->
+    //        let d = DOMParser.Create()
+    //        let d = d.parseFromString(xml, "text/xml")
+    //        let blobs = d.getElementsByTagName "Blob"
+    //        let res = System.Collections.Generic.List<string>()
+    //        for bi in 0 .. int blobs.length - 1 do
+    //            let blob = blobs.[bi]
+    //            let name = blob.getElementsByTagName("Name")
+    //            if name.length > 0.0 then
+    //                res.Add name.[0].textContent
+    //        unbox<string[]> res
+    //    )
+
     let tryGetPointCloudInfo (token : string) (id : Guid) =
         let url = apiUrl + "PointCloudInfos/" + string id + "?token=" + token
         Prom.fetchString url |> Prom.map (fun str ->
@@ -254,8 +298,9 @@ module Azure =
 
 
     type AzureStore(token : string, url : StorageUrl, id : Guid) =
-        static let refreshInterval = 15 * 60 * 1000
+        static let refreshInterval = 5 * 60 * 1000
 
+        let mutable token = token
         let mutable url = url
         let mutable refreshToken = Unchecked.defaultof<_>
 
@@ -264,22 +309,26 @@ module Azure =
             | Some p -> p.Contains "c" && p.Contains "w"
             | _ -> false
             
-        let rec refresh() =
-            let create = 
-                if canWrite then tryCreateUploadUrl token id
-                else tryCreateDownloadUrl token id
-            create |> Prom.map (fun v ->
-                match v with
-                | Some newUrl ->
-                    Log.line "refreshed"
+        let refresh() =
+            promise {
+                match! tryRenew token with
+                | Some t -> 
+                    Log.line "got new token: %s" t
+                    token <- t
+                | None -> ()
+
+                let! newUrl = 
+                    if canWrite then tryCreateUploadUrl token id
+                    else tryCreateDownloadUrl token id
+
+                match newUrl with
+                | Some newUrl -> 
+                    Log.line "got new url: %A" newUrl
                     url <- newUrl
-                | _ ->
-                    ()
-
-                refreshToken <- setTimeout (fun () -> refresh() |> ignore) refreshInterval 
-            )
-
-        do refreshToken <- setTimeout (fun () -> refresh() |> ignore) refreshInterval 
+                | None -> ()
+            }
+        let rec run() = refresh().``then`` (fun () -> refreshToken <- setTimeout run refreshInterval) |> ignore
+        do refreshToken <- setTimeout run refreshInterval  
         
 
         member x.Close() = 
