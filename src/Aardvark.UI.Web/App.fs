@@ -5,19 +5,6 @@ open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.SceneGraph
 
-[<AutoOpen>]
-module Attributes =
-
-    let click (callback : MouseEvent -> 'msg) =
-        "click", AttributeValue.Event (fun e -> unbox e |> callback |> Seq.singleton)
-        
-    let style (value : string) =
-        "style", AttributeValue.String value
-
-    let clazz (value : string) =
-        "class", AttributeValue.String value
-
-
 type Unpersist<'model, 'mmodel> =
     {
         create : 'model -> 'mmodel
@@ -35,7 +22,7 @@ type App<'model, 'mmodel, 'msg> =
     {
         initial     : 'model
         update      : 'model -> 'msg -> 'model
-        view        : 'mmodel -> Node<'msg>
+        view        : 'mmodel -> DomNode<'msg>
         unpersist   : Unpersist<'model, 'mmodel>
     }
 
@@ -79,7 +66,7 @@ module App =
                     )
             }
 
-        let updater = LivingUpdater(Aardvark.UI.Node.newUpdater parent scope view)
+        let updater = LivingUpdater(Aardvark.UI.DomNode.newUpdater parent scope view)
         updater.Update(AdaptiveToken.Top)
         
         { new System.IDisposable with
