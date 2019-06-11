@@ -92,7 +92,7 @@ module Azure =
             member x.entries() : seq<string * string> = failwith ""
     
     let getPointCloudInfos (token : string) =
-        let url = apiUrl + "PointCloudInfos?token=" + token
+        let url = apiUrl + "PointClouds?token=" + token
         Prom.fetchString url |> Prom.map (fun str ->
             let o = JSON.parse str
 
@@ -124,7 +124,7 @@ module Azure =
         |> Prom.defaultValue { owned = [||]; shared = [||]; continuationToken = None }
 
     let checkToken (token : string) =   
-        let url = apiUrl + "PointCloudInfos?token=" + token
+        let url = apiUrl + "PointClouds?token=" + token
         Prom.fetchBuffer url 
         |> Prom.map (fun _ -> true)
         |> Prom.defaultValue false
@@ -168,7 +168,7 @@ module Azure =
     //    )
 
     let tryGetPointCloudInfo (token : string) (id : Guid) =
-        let url = apiUrl + "PointCloudInfos/" + string id + "?token=" + token
+        let url = apiUrl + "PointClouds/" + string id + "?token=" + token
         Prom.fetchString url |> Prom.map (fun str ->
             let o = JSON.parse str
             tryParsePointCloudInfo o
@@ -176,7 +176,7 @@ module Azure =
         |> Prom.defaultValue None
         
     let tryCreatePointCloudInfo (token : string) (name : string) =
-        let url = apiUrl + "PointCloudInfos?token=" + token
+        let url = apiUrl + "PointClouds?token=" + token
 
         let o = obj()
         o?name <- name
