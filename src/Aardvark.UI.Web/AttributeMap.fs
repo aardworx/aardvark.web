@@ -50,6 +50,10 @@ type EventCallbacks<'msg>(store : MapExt<bool, list<Aardvark.Import.Browser.Even
     static member (+) (l : EventCallbacks<'msg>, r : EventCallbacks<'msg>) =
         MapExt.unionWith List.append l.Store r.Store |> EventCallbacks
 
+    static member Create (callback : Aardvark.Import.Browser.Event -> 'msg) = EventCallbacks(MapExt.ofList [false, [callback >> Seq.singleton]])
+    static member Create (callback : Aardvark.Import.Browser.Event -> seq<'msg>) = EventCallbacks(MapExt.ofList [false, [callback]])
+    static member Create (callback : Aardvark.Import.Browser.Event -> Option<'msg>) = EventCallbacks(MapExt.ofList [false, [fun v -> match callback v with | Some m -> Seq.singleton m | _ -> Seq.empty ]])
+
 module EventCallbacks =
     let inline isEmpty (callbacks : EventCallbacks<'msg>) = callbacks.IsEmpty
     let inline toSeq (callbacks : EventCallbacks<'msg>) = callbacks.AsSeq

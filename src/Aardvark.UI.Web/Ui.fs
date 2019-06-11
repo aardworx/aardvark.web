@@ -29,7 +29,7 @@ module Updater =
             | DomNode.NNode(a,b,c) -> InnerNodeUpdater<'msg>(scope, createNode(a), a, b, c) :> NodeUpdater<_>
             | DomNode.NMap(mapping,b) -> MapUpdater<'msg>(scope, b, createNode, mapping) :> NodeUpdater<_>
             | DomNode.NRender(att, scene) -> RenderUpdater<'msg>(scope, createNode "canvas", att, scene) :> NodeUpdater<_>
-
+            | DomNode.NBoot(b, s, i) -> BootUpdater<'msg>(scope, defaultArg b ignore, defaultArg s ignore, i, createNode) :> NodeUpdater<_>
         static member Create(parent : HTMLElement, scope : Scope<'msg>, n : DomNode<'msg>) =
             let createNode (tag : string) =
                 let n = document.createElement(tag)
@@ -396,9 +396,58 @@ module Updater =
 
         override x.Node = node
 
+    and BootUpdater<'msg>(scope : Scope<'msg>, boot : HTMLElement -> unit, shutdown : HTMLElement -> unit, inner : DomNode<'msg>, createNode : string -> HTMLElement) =
+        inherit NodeUpdater<'msg>(scope)
+        
+        let mutable boot = boot
+        let mutable shutdown = shutdown
+        
+        let inner = NodeUpdater<'msg>.Create(createNode, scope, inner)
+        let mutable node = null
+
+        override x.Kill() = 
+            if unbox node then shutdown node
+            inner.Destroy()
+            node <- null
+            boot <- ignore
+            shutdown <- ignore
+
+        override x.Node = inner.Node
+        override x.Compute(t) = 
+            x.EvaluateIfNeeded t () (fun t -> 
+                inner.Update(t)
+                if node <> inner.Node then
+                    if unbox node then shutdown node
+                    if unbox inner.Node then boot inner.Node
+                    node <- inner.Node
+            )
+
+        override x.TryReplace (t : AdaptiveToken, n : DomNode<'msg>) =
+            match n with
+            | DomNode.NBoot(b, s, i) ->
+                x.EvaluateAlways t (fun t ->
+                    let b = defaultArg b ignore
+                    let s = defaultArg s ignore
+
+                    if inner.TryReplace(t, i) then
+                        if unbox node then shutdown node
+                        if unbox inner.Node then b inner.Node
+                        node <- inner.Node
+                        boot <- b
+                        shutdown <- s
+                        true
+                    else
+                        false
+                )
+            | _ ->
+                false
+        
+
+
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module DomNode =
+    open Aardvark.Import.Browser
 
     let inline empty<'msg> : DomNode<'msg> = DomNode.Empty
     let inline text (tag : string) (att : AttributeMap<'msg>) (value : IMod<string>) = DomNode.Text(tag, att, value)
@@ -408,7 +457,32 @@ module DomNode =
     let inline choose (mapping : 'a -> Option<'b>) (m : DomNode<'a>) = DomNode.Choose(mapping, m)
     let inline collect (mapping : 'a -> seq<'b>) (m : DomNode<'a>) = DomNode.Collect(mapping, m)
     let inline ignore (m : DomNode<'a>) : DomNode<'b> = DomNode.Ignore(m)
-    let inline attributes<'msg>(n : DomNode<'msg>) : AttributeMap<'msg> = n.Attributes
     let inline tag (n : DomNode<'msg>) = n.TagName
 
-    let inline newUpdater (parent : Aardvark.Import.Browser.HTMLElement) (scope : Updater.Scope<'msg>) (n : DomNode<'msg>) = Updater.NodeUpdater<'msg>.Create(parent, scope, n)
+    let inline onBoot (boot : HTMLElement -> unit) (n : DomNode<'msg>) =
+        match n with
+        | DomNode.NBoot(b, s, i) ->
+            match b with
+            | Some b -> 
+                DomNode.NBoot(Some (fun e -> b e; boot e), s, i)
+            | None ->
+                DomNode.NBoot(Some boot, s, i)
+        | _ ->
+            DomNode.NBoot(Some boot, None, n)
+
+    let inline onShutdown (shutdown : HTMLElement -> unit) (n : DomNode<'msg>) =
+        match n with
+        | DomNode.NBoot(b, s, i) ->
+            match s with
+            | Some s -> 
+                DomNode.NBoot(b, Some (fun e -> s e; shutdown e), i)
+            | None ->
+                DomNode.NBoot(b, Some shutdown, i)
+        | _ ->
+            DomNode.NBoot(None, Some shutdown, n)
+                
+                 
+
+
+    let inline newUpdater (parent : Aardvark.Import.Browser.HTMLElement) (scope : Updater.Scope<'msg>) (n : DomNode<'msg>) = 
+        Updater.NodeUpdater<'msg>.Create(parent, scope, n)

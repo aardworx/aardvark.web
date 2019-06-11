@@ -26,6 +26,33 @@ type App<'model, 'mmodel, 'msg> =
         unpersist   : Unpersist<'model, 'mmodel>
     }
 
+type MutableApp<'mmodel, 'msg>(model : 'mmodel, kill : System.IDisposable, emit : seq<'msg> -> unit) =
+    
+    let callbacks = System.Collections.Generic.List<Result<unit, obj> -> unit>()
+    let mutable exit = 
+        Prom.create( fun success _error -> 
+            callbacks.Add success
+        )
+
+    member x.Exit = exit
+
+    member x.Cancel() = 
+        kill.Dispose()
+        for c in callbacks do c (Ok ())
+        callbacks.Clear()
+        exit <- Prom.value (Ok ())
+        
+    member x.Faulted(err : obj) = 
+        kill.Dispose()
+        for c in callbacks do c (Error err)
+        callbacks.Clear()
+        exit <- Prom.value (Error err)
+
+    member x.Model = model
+    member x.Emit msgs = emit msgs
+
+
+
 module App =
     open Aardvark.UI
     open Aardvark.Import.JS
@@ -52,26 +79,38 @@ module App =
             inner.RemoveOutput x
 
 
+    let private fix (create : Lazy<'a> -> 'a) =
+        let ref = ref Unchecked.defaultof<'a>
+        ref := create (lazy (!ref ))
+        !ref
+
     let run (parent : HTMLElement) (app : App<'model, 'mmodel, 'msg>) =
+        let old = parent.innerHTML
         let mutable model = app.initial
         let mm = app.unpersist.create model
         let view = app.view mm
 
-        let scope = 
-            {
-                Updater.emit = fun msgs ->
-                    model <- msgs |> Seq.fold app.update model
-                    transact (fun () ->
-                        app.unpersist.update mm model
-                    )
-            }
+        fix (fun (self : Lazy<MutableApp<_,_>>) ->
+            let scope = 
+                {
+                    Updater.emit = fun msgs ->
+                        try
+                            model <- msgs |> Seq.fold app.update model
+                            transact (fun () ->
+                                app.unpersist.update mm model
+                            )
+                        with e ->
+                            self.Value.Faulted e
+                }
 
-        let updater = LivingUpdater(Aardvark.UI.DomNode.newUpdater parent scope view)
-        updater.Update(AdaptiveToken.Top)
+            let updater = LivingUpdater(Aardvark.UI.DomNode.newUpdater parent scope view)
+            updater.Update(AdaptiveToken.Top)
         
-        { new System.IDisposable with
-            member x.Dispose() =
-                updater.Dispose()
-                let all = FSharp.Collections.Array.init (int parent.children.length) (fun i -> parent.children.[i])
-                all |> FSharp.Collections.Array.iter (fun c -> c.remove())
-        }
+            let kill = 
+                { new System.IDisposable with
+                    member x.Dispose() =
+                        updater.Dispose()
+                        parent.innerHTML <- old
+                }
+            new MutableApp<_,_>(mm, kill, scope.emit)
+        )

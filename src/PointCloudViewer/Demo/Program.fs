@@ -799,6 +799,7 @@ module UITest =
     let fix (create : Lazy<'a> -> 'a) =
         let ref = ref Unchecked.defaultof<'a>
         ref := create (lazy (!ref ))
+        !ref
 
     type Message = 
         | Stop
@@ -813,10 +814,10 @@ module UITest =
             box = true 
         }
 
-    let update (shutdown : Lazy<IDisposable>) (m : TestModel) (msg : Message) =
+    let update (shutdown : Lazy<MutableApp<MTestModel, Message>>) (m : TestModel) (msg : Message) =
         match msg with
         | Stop ->
-            shutdown.Value.Dispose()
+            shutdown.Value.Cancel()
             initial
         | Toggle -> 
             { m with box = not m.box }
@@ -833,10 +834,15 @@ module UITest =
             button [clazz "ui basic green button"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string |> Prepend) ] "prepend"
             button [clazz "ui basic green button"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string |> Append) ] "append"
             button [clazz "ui basic red button"; click (fun _ -> Reset) ] "reset"
-            
             button [clazz "ui basic red button"; click (fun _ -> Stop) ] "stop"
 
-            div [] (m.elements |> AList.map (fun v -> div [clazz "ui basic inverted label"] v))
+            div [] (m.elements |> AList.map (fun v -> 
+                DomNode.onShutdown (fun e -> Log.line "shutdown: %A" e.innerHTML) (
+                    DomNode.onBoot (fun e -> e.addEventListener_click(fun _ -> console.warn "click"); Log.line "boot: %A" e.innerHTML) (
+                        div [clazz "ui basic inverted label"] v)
+                    )
+                )
+            )
 
             div [] (m.box |> Mod.map (fun box ->
                 [
@@ -879,14 +885,16 @@ module UITest =
         ]
 
     let rec run() =
-        fix (fun shutdown ->
-            App.run document.body { 
-                initial = initial
-                update = update shutdown
-                view = view
-                unpersist = Unpersist.instance
-            }
-        ) 
+        let mapp = 
+            fix (fun self ->
+                App.run document.body { 
+                    initial = initial
+                    update = update self
+                    view = view
+                    unpersist = Unpersist.instance
+                }
+            ) 
+        mapp.Exit
      
 type URLSearchParams with
     [<Fable.Core.Emit("$0.entries()")>]
@@ -996,7 +1004,7 @@ let upload (token : string) (progress : float -> unit) (localName : string) =
 
 
         | None ->
-            console.warn "no url"
+            Log.warn "no url"
             return false
     }
  
@@ -1117,16 +1125,19 @@ let getCurrentPointCloud (query : Map<string, string>) (token : string) =
         return current :> IMod<_>
     }
 
+let query = 
+    let u = URL.Create(window.location.href)
+    let mutable res = FSharp.Collections.Map.empty
+    for (k, v) in u.searchParams.entries() do
+        res <- FSharp.Collections.Map.add k v res
+    res
+
+
 let run() =
     promise {
         do! ready
 
-        let query = 
-            let u = URL.Create(window.location.href)
-            let mutable res = FSharp.Collections.Map.empty
-            for (k, v) in u.searchParams.entries() do
-                res <- FSharp.Collections.Map.add k v res
-            res
+        //let! _ =  UITest.run()
 
         let! token = 
             match Map.tryFind "code" query with
@@ -1154,12 +1165,11 @@ let run() =
 
         let! current = getCurrentPointCloud query token
            
-
         let canvas = document.getElementById "target" |> unbox<HTMLCanvasElement>
         canvas.tabIndex <- 1.0
         canvas.addEventListener_click(fun _ -> canvas.focus())
 
-        let control = new Aardvark.Application.RenderControl(canvas, false, true, ClearColor = V4d.OOOO)
+        let control = new Aardvark.Application.RenderControl(canvas, true, true, ClearColor = V4d.OOOO)
         let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
         let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
         let color = Mod.init true

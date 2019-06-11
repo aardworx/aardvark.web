@@ -569,6 +569,9 @@ module Prom =
         let res = Promise.resolve v
         Fable.Core.JsInterop.(?<-) res "resolved" v
         res
+        
+    let inline error (v : obj) : Promise<'a> =
+        Promise.reject v |> unbox
 
     let inline map (f : 'a -> 'b) (p : Promise<'a>) =
         p.``then`` f

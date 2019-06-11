@@ -5,6 +5,7 @@ open Aardvark.Base.Incremental
 open Aardvark.SceneGraph
 open Aardvark.Base.Rendering
 open Aardvark.Application
+open Aardvark.Import.Browser
 
 [<RequireQualifiedAccess>]
 type DomNode<'msg> =
@@ -14,15 +15,7 @@ type DomNode<'msg> =
     | NNode of tag : string * attributes : AttributeMap<'msg> * children : alist<DomNode<'msg>>
     | NRender of attributes : AttributeMap<'msg> * scene : (RenderControl -> ISg)
     | NMap of mapping : (obj -> seq<'msg>) * child : DomNode<obj>
-
-    member x.Attributes : AttributeMap<'msg> =
-        match x with
-        | NEmpty -> AttributeMap.empty
-        | NText(_,a,_) -> a
-        | NNode(_,a,_) -> a
-        | NRender(a,_) -> a
-        | NMap(mapping,inner) ->
-            inner.Attributes |> AttributeMap.collect (fun _ -> mapping)
+    | NBoot of boot : Option<HTMLElement -> unit> * shutdown : Option<HTMLElement -> unit> * inner : DomNode<'msg>
 
     member x.TagName : Option<string> =
         match x with
@@ -31,6 +24,7 @@ type DomNode<'msg> =
         | NNode(t,_,_) -> Some t
         | NRender _ -> Some "canvas"
         | NMap(_,i) -> i.TagName
+        | NBoot(_,_,i) -> i.TagName
 
     static member Empty : DomNode<'msg> = NEmpty
 

@@ -7,7 +7,6 @@ open Aardvark.SceneGraph
 
 [<AutoOpen>]
 module Attributes =
-
     let click (callback : MouseEvent -> 'msg) =
         "click", AttributeValue.Event (EventCallbacks.singleton { useCapture = false; callback = fun e -> unbox e |> callback |> Seq.singleton })
         
@@ -16,4 +15,14 @@ module Attributes =
 
     let clazz (value : string) =
         "class", AttributeValue.String value
+
+    let pointerdown (callback : PointerEvent -> 'msg) =
+        "pointerdown", AttributeValue.Event(EventCallbacks.singleton { useCapture = false; callback = fun e -> unbox e |> callback |> Seq.singleton })
+        
+    let pointerup (callback : PointerEvent -> 'msg) =
+        "pointerup", AttributeValue.Event(EventCallbacks.singleton { useCapture = false; callback = fun e -> unbox e |> callback |> Seq.singleton })
+        
+    let pointermove (callback : PointerEvent -> 'msg) =
+        "pointermove", AttributeValue.Event(EventCallbacks.singleton { useCapture = false; callback = fun e -> unbox e |> callback |> Seq.singleton })
+
 
