@@ -16,6 +16,7 @@ type RenderCommand =
     | Unordered of aset<RenderCommand>
 
 
+
 module FShadeTest =
     open FShade
 
@@ -807,15 +808,22 @@ module UITest =
         | Append of string
         | Prepend of string
         | Toggle
+        | Nop
+        | CameraMessage of FreeFlyController.Message
 
     let initial = 
         { 
+            camera = FreeFlyController.initial
             elements = PList.ofList [ "YEAH" ]
             box = true 
         }
 
     let update (shutdown : Lazy<MutableApp<MTestModel, Message>>) (m : TestModel) (msg : Message) =
         match msg with
+        | CameraMessage msg ->
+            { m with camera = FreeFlyController.update m.camera msg }
+        | Nop ->
+            m
         | Stop ->
             shutdown.Value.Cancel()
             initial
@@ -829,6 +837,7 @@ module UITest =
             { m with elements = PList.prepend element m.elements }
 
     let view (m : MTestModel) =
+        
         div [style "color: white"] [
             button [clazz "ui basic yellow button"; click (fun _ -> Toggle) ] (m.box |> Mod.map (function true -> "sphere" | false -> "box"))
             button [clazz "ui basic green button"; click (fun _ -> performance.now() |> MicroTime.FromMilliseconds |> string |> Prepend) ] "prepend"
@@ -844,39 +853,42 @@ module UITest =
                 )
             )
 
-            div [] (m.box |> Mod.map (fun box ->
+            div [style "width: 100%; height: 100%; position: fixed; z-index: 0"] (m.box |> Mod.map (fun box ->
                 [
-                    let withCam (sg : ISg) (control : Aardvark.Application.RenderControl) =
-                        let initial = CameraView.lookAt (V3d(1.0, 6.0, 4.0)) V3d.Zero V3d.OOI
-                        let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
-
-                        let view = cam |> Mod.map (fun v -> v |> CameraView.viewTrafo)
-                        let proj = control.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
-                        sg
-                        |> Sg.viewTrafo view
-                        |> Sg.projTrafo proj
-
                     if box then 
-                        yield Aardvark.UI.DomNode.Render(
-                            AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"; clazz "hugo"], 
-                            Sg.box Box3d.Unit
-                                |> Sg.shader {
-                                    do! FShadeTest.trafo
-                                    do! FShadeTest.constantColor V4d.IIII
-                                    do! FShadeTest.simpleLight
-                                }
-                                |> withCam
-                        )
+                        yield 
+                            Aardvark.UI.DomNode.Render(
+                                AttributeMap.union [
+                                    (AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"; clazz "nofocus"])
+                                    (FreeFlyController.attributes m.camera CameraMessage)
+                                ], 
+                                fun (ctrl : Aardvark.Application.RenderControl) -> 
+                                    let proj = ctrl.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
+                                    Sg.box Box3d.Unit
+                                    |> Sg.shader {
+                                        do! FShadeTest.trafo
+                                        do! FShadeTest.constantColor V4d.IOOI
+                                        do! FShadeTest.simpleLight
+                                    }
+                                    |> Sg.viewTrafo (m.camera.view |> Mod.map CameraView.viewTrafo)
+                                    |> Sg.projTrafo proj
+                            )
                     else
                         yield Aardvark.UI.DomNode.Render(
-                            AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"], 
-                            Sg.sphere 3
+                            AttributeMap.union [
+                                (AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"; clazz "nofocus"])
+                                (FreeFlyController.attributes m.camera CameraMessage)
+                            ], 
+                            fun (ctrl : Aardvark.Application.RenderControl) -> 
+                                let proj = ctrl.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
+                                Sg.sphere 3
                                 |> Sg.shader {
                                     do! FShadeTest.trafo
-                                    do! FShadeTest.constantColor V4d.IIII
+                                    do! FShadeTest.constantColor V4d.OIOI
                                     do! FShadeTest.simpleLight
                                 }
-                                |> withCam
+                                |> Sg.viewTrafo (m.camera.view |> Mod.map CameraView.viewTrafo)
+                                |> Sg.projTrafo proj
                         )
                         
                 ]
@@ -1137,7 +1149,7 @@ let run() =
     promise {
         do! ready
 
-        //let! _ =  UITest.run()
+        let! _ =  UITest.run()
 
         let! token = 
             match Map.tryFind "code" query with

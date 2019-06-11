@@ -295,6 +295,8 @@ type Fun private() =
     [<Extension>]
     static member IsTiny (v : float) = v >= -1E-16 && v <= 1E-16
     [<Extension>]
+    static member IsTiny (v : float, e : float)  = v >= -e && v <= e
+    [<Extension>]
     static member Sin(v : float) = sin v
     [<Extension>]
     static member Cos(v : float) = cos v
