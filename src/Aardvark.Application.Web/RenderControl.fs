@@ -50,11 +50,18 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool, alpha : bool) =
     let ctx = Context(gl)
     let manager = new ResourceManager(ctx)
 
+    let rendered = new Subject<unit>()
+
     do
         //let e = gl.getFramebufferAttachmentParameter(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING_EXT) |> unbox<float>
         //if e = gl.LINEAR then Log.error "linear"
         //elif e = gl.SRGB_EXT then Log.error "srgb"
         //else Log.error "strange: %A" e
+
+        canvas.tabIndex <- 0.0
+        canvas.classList.add("nofocus")
+        canvas.style.outline <- "none"
+        canvas.addEventListener_click(fun _ -> canvas.focus())
 
         canvas.addEventListener("webglcontextlost", EventListenerOrEventListenerObject.Case1 (fun _ -> Log.warn "context lost"))
         canvas.addEventListener("webglcontextrestored", EventListenerOrEventListenerObject.Case1 (fun _ -> Log.warn "context restored"))
@@ -167,28 +174,28 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool, alpha : bool) =
             e.preventDefault(); e.stopPropagation()
         ), true)
                
-        canvas.addEventListener("touchstart", EventListenerOrEventListenerObject.Case1 (fun e -> 
-            if document?fullscreenElement || document?mozFullScreenElement || document?webkitFullscreenElement || document?msFullscreenElement then
-                if document?exitFullscreen then document?exitFullscreen()
-                elif document?msExitFullscreen then document?msExitFullscreen()
-                elif document?mozCancelFullScreen then document?mozCancelFullScreen()
-                elif document?webkitExitFullscreen then document?webkitExitFullscreen()
-            else
-                if canvas?requestFullscreen then canvas?requestFullscreen()
-                elif canvas?msRequestFullscreen then canvas?msRequestFullscreen()
-                elif canvas?mozRequestFullScreen then canvas?mozRequestFullScreen()
-                elif canvas?webkitRequestFullscreen then canvas?webkitRequestFullscreen(ALLOW_KEYBOARD_INPUT)
-                elif canvas?webkitRequestFullScreen then canvas?webkitRequestFullScreen()
-            //if document?fullscreenElement || document?mozFullScreenElement || document?webkitFullscreenElement then
-            //    if document?cancelFullScreen then document?cancelFullScreen()
-            //    elif document?mozCancelFullScreen then document?mozCancelFullScreen()
-            //    elif document?webkitCancelFullScreen then document?webkitCancelFullScreen()
-            //else
-            //    if canvas?requestFullscreen then canvas?requestFullscreen()
-            //    elif canvas?webkitRequestFullscreen then canvas?webkitRequestFullscreen()
-            //    elif canvas?mozRequestFullScreen then canvas?mozRequestFullScreen()
-            e.preventDefault(); e.stopPropagation()
-        ), true)
+        //canvas.addEventListener("touchstart", EventListenerOrEventListenerObject.Case1 (fun e -> 
+        //    if document?fullscreenElement || document?mozFullScreenElement || document?webkitFullscreenElement || document?msFullscreenElement then
+        //        if document?exitFullscreen then document?exitFullscreen()
+        //        elif document?msExitFullscreen then document?msExitFullscreen()
+        //        elif document?mozCancelFullScreen then document?mozCancelFullScreen()
+        //        elif document?webkitExitFullscreen then document?webkitExitFullscreen()
+        //    else
+        //        if canvas?requestFullscreen then canvas?requestFullscreen()
+        //        elif canvas?msRequestFullscreen then canvas?msRequestFullscreen()
+        //        elif canvas?mozRequestFullScreen then canvas?mozRequestFullScreen()
+        //        elif canvas?webkitRequestFullscreen then canvas?webkitRequestFullscreen(ALLOW_KEYBOARD_INPUT)
+        //        elif canvas?webkitRequestFullScreen then canvas?webkitRequestFullScreen()
+        //    //if document?fullscreenElement || document?mozFullScreenElement || document?webkitFullscreenElement then
+        //    //    if document?cancelFullScreen then document?cancelFullScreen()
+        //    //    elif document?mozCancelFullScreen then document?mozCancelFullScreen()
+        //    //    elif document?webkitCancelFullScreen then document?webkitCancelFullScreen()
+        //    //else
+        //    //    if canvas?requestFullscreen then canvas?requestFullscreen()
+        //    //    elif canvas?webkitRequestFullscreen then canvas?webkitRequestFullscreen()
+        //    //    elif canvas?mozRequestFullScreen then canvas?mozRequestFullScreen()
+        //    e.preventDefault(); e.stopPropagation()
+        //), true)
         
         
         
@@ -253,13 +260,14 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool, alpha : bool) =
                 inRender <- false
                 clearTimeout hide
                 hide <- setTimeout hideOverlay 300
+                rendered.OnNext()
                 if rafap then 
                     setTimeout (fun () -> !render 0.0) 0 |> ignore //window.requestAnimationFrame(!render) |> ignore
 
             ) |> ignore
         !render 0.0
 
-
+    member x.Rendered = rendered :> System.IObservable<_>
     member x.ClearColor
         with get() = clearColor
         and set c = clearColor <- c

@@ -62,49 +62,63 @@ module Updater =
             x.Outputs.Consume(foo) |> ignore
             x.Kill()
 
-    and AttributeUpdater<'msg>(node : HTMLElement, attributes : AttributeMap<'msg>) =
+    and AttributeUpdater<'msg>(node : HTMLElement, attributes : AttributeMap<'msg>, trySubscribe : string -> Scope<'msg> -> EventCallbacks<'msg> -> System.IDisposable) =
         inherit AdaptiveObject()
         let mutable attributes = attributes
         let mutable reader = attributes.Values.GetReader()
+        let parentListenerIds = Dict<string, System.IDisposable>(Unchecked.hash, Unchecked.equals)
         let listeners = Dict<string, EventListenerObject * EventListenerObject>(Unchecked.hash, Unchecked.equals)
 
         let update (ops : hdeltamap<string,AttributeValue<'msg>>) (s : Scope<'msg>) =
             for (k, o) in ops do
                 match o with
                 | Remove ->
-                    match listeners.TryRemove k with
-                    | Some(capture, nonCaputre) ->
-                        if unbox capture then node.removeEventListener(k, U2.Case2 capture, true)
-                        if unbox nonCaputre then node.removeEventListener(k, U2.Case2 nonCaputre, false)
+                    match parentListenerIds.TryRemove k with
+                    | Some (id) ->
+                        id.Dispose()
                     | None -> 
-                        node.removeAttribute k
+                        match listeners.TryRemove k with
+                        | Some(capture, nonCaputre) ->
+                            if unbox capture then node.removeEventListener(k, U2.Case2 capture, true)
+                            if unbox nonCaputre then node.removeEventListener(k, U2.Case2 nonCaputre, false)
+                        | None -> 
+                            node.removeAttribute k
                 | Set value ->
                     match value with
                     | String v -> 
                         node.setAttribute(k, v)
                     | Event callbacks ->
-                        let capture, nonCaputre = callbacks |> EventCallbacks.toList |> List.partition (fun cb -> cb.useCapture)
-                        let capture, nonCaputre =
-                            listeners.GetOrCreate(k, fun k -> 
-                                let capture =  
-                                    match capture with 
-                                    | [] -> null
-                                    | _ -> 
-                                        { new EventListenerObject with
-                                            member x.handleEvent e = Seq.delay (fun () -> capture |> Seq.collect (fun cb -> cb.callback e)) |> s.emit
-                                        }
-                                let nonCaputre =  
-                                    match nonCaputre with 
-                                    | [] -> null
-                                    | _ -> 
-                                        { new EventListenerObject with
-                                            member x.handleEvent e = Seq.delay (fun () -> nonCaputre |> Seq.collect (fun cb -> cb.callback e)) |> s.emit
-                                        }
-                                capture, nonCaputre
+                        if k = "boot" then
+                            callbacks.AsSeq |> Seq.iter (fun cb ->
+                                cb.callback (unbox (node, s)) |> ignore
                             )
-                        //Log.warn "addEventListener(%s)" k
-                        if unbox capture then node.addEventListener(k, U2.Case2 capture, true)
-                        if unbox nonCaputre then node.addEventListener(k, U2.Case2 nonCaputre, false)
+                        else
+                            let id = trySubscribe k s callbacks
+                            if unbox id then
+                                parentListenerIds.[k] <- id
+                            else 
+                                let capture, nonCaputre = callbacks |> EventCallbacks.toList |> List.partition (fun cb -> cb.useCapture)
+                                let capture, nonCaputre =
+                                    listeners.GetOrCreate(k, fun k -> 
+                                        let capture =  
+                                            match capture with 
+                                            | [] -> null
+                                            | _ -> 
+                                                { new EventListenerObject with
+                                                    member x.handleEvent e = Seq.delay (fun () -> capture |> Seq.collect (fun cb -> cb.callback e)) |> s.emit
+                                                }
+                                        let nonCaputre =  
+                                            match nonCaputre with 
+                                            | [] -> null
+                                            | _ -> 
+                                                { new EventListenerObject with
+                                                    member x.handleEvent e = Seq.delay (fun () -> nonCaputre |> Seq.collect (fun cb -> cb.callback e)) |> s.emit
+                                                }
+                                        capture, nonCaputre
+                                    )
+                                //Log.warn "addEventListener(%s)" k
+                                if unbox capture then node.addEventListener(k, U2.Case2 capture, true)
+                                if unbox nonCaputre then node.addEventListener(k, U2.Case2 nonCaputre, false)
 
         override x.Kind = "AttributeUpdater"
 
@@ -146,6 +160,8 @@ module Updater =
             listeners.Clear()
             reader.Dispose()
      
+        new(node : HTMLElement, attributes : AttributeMap<'msg>) = AttributeUpdater<'msg>(node, attributes, (fun _ _ _ -> null))
+
     and EmptyUpdater<'msg>(s : Scope<'msg>) =
         inherit NodeUpdater<'msg>(s)
 
@@ -353,7 +369,18 @@ module Updater =
         let canvas = unbox<HTMLCanvasElement> node
         let control = new Aardvark.Application.RenderControl(canvas, true, true, ClearColor = V4d.OOOO)
         
-        let att = AttributeUpdater<'msg>(node, attributes)
+        let trySubscribe (name : string) (s : Scope<'msg>) (cb : EventCallbacks<'msg>) =
+            if name = "rendered" then
+                control.Rendered.Subscribe(fun () -> 
+                    for cb in cb.AsSeq do
+                        s.emit (cb.callback null)
+                )
+            else 
+                null
+                
+
+
+        let att = AttributeUpdater<'msg>(node, attributes, trySubscribe)
 
         let wrap(scene : RenderControl -> ISg) =
             scene control
@@ -459,7 +486,7 @@ module DomNode =
     let inline ignore (m : DomNode<'a>) : DomNode<'b> = DomNode.Ignore(m)
     let inline tag (n : DomNode<'msg>) = n.TagName
 
-    let inline onBoot (boot : HTMLElement -> unit) (n : DomNode<'msg>) =
+    let onBoot (boot : HTMLElement -> unit) (n : DomNode<'msg>) =
         match n with
         | DomNode.NBoot(b, s, i) ->
             match b with
@@ -470,7 +497,7 @@ module DomNode =
         | _ ->
             DomNode.NBoot(Some boot, None, n)
 
-    let inline onShutdown (shutdown : HTMLElement -> unit) (n : DomNode<'msg>) =
+    let onShutdown (shutdown : HTMLElement -> unit) (n : DomNode<'msg>) =
         match n with
         | DomNode.NBoot(b, s, i) ->
             match s with

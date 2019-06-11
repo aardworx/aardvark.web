@@ -11,6 +11,8 @@
     <Compile Include="ElmishTest.fs" />
     <Compile Include="Azure.fs" />
     <Compile Include="Model.fs" />
+    <Compile Include="Hammer.fs" />
+    <Compile Include="CameraController.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
