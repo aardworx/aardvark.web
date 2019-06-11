@@ -10,15 +10,15 @@
     "build": "webpack -p"
   },
   "dependencies": {
-    "@babel/core": "^7.3.4",
-    "cache-loader": "^3.0.0",
-    "fable-compiler": "^2.1.12",
-    "fable-loader": "^2.1.5",
+    "@babel/core": "^7.4.5",
+    "cache-loader": "^3.0.1",
+    "fable-compiler": "^2.3.11",
+    "fable-loader": "^2.1.7",
     "pako": "^1.0.10",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
-    "webpack": "^4.29.6",
-    "webpack-cli": "^3.2.3",
-    "webpack-dev-server": "^3.2.1"
+    "webpack": "^4.33.0",
+    "webpack-cli": "^3.3.3",
+    "webpack-dev-server": "^3.7.1"
   }
 }
