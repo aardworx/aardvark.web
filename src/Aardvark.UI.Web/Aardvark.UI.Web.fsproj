@@ -22,5 +22,9 @@
     <ProjectReference Include="..\FShade\FShade.Core.Web\FShade.Core.Web.fsproj" />
     <ProjectReference Include="..\FShade\FShade.Imperative.Web\FShade.Imperative.Web.fsproj" />
   </ItemGroup>
+  <ItemGroup Condition="'$(Version)' != '1.0.0'">
+    <Content Include="*.fsproj; **\*.fs" PackagePath="fable\" />
+    <Content Remove="obj\**" />
+  </ItemGroup>
 
 </Project>
