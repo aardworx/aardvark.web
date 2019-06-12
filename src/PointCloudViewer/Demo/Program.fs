@@ -139,7 +139,7 @@ module FShadeTest =
                 else V3d.III
 
             let c = V4d((0.5 + 0.5 * z) * c, 1.0)
-            return { c = c; d = newDepth }
+            return c //{ c = c; d = newDepth }
 
             //let sn = 0.5 * (V3d(c, sqrt (1.0 - l2)) + V3d.III)
             //return V4d(sn, 1.0)
@@ -809,19 +809,20 @@ module UITest =
         | Prepend of string
         | Toggle
         | Nop
-        | CameraMessage of FreeFlyController.Message
+        | CameraMessage of OrbitMessage
 
     let initial = 
         { 
-            camera = FreeFlyController.initial
+            camera = OrbitState.create V3d.Zero 1.0 1.1 6.0
             elements = PList.ofList [ "YEAH" ]
             box = true 
         }
 
+
     let update (shutdown : Lazy<MutableApp<MTestModel, Message>>) (m : TestModel) (msg : Message) =
         match msg with
         | CameraMessage msg ->
-            { m with camera = FreeFlyController.update m.camera msg }
+            { m with camera = OrbitController.update m.camera msg }
         | Nop ->
             m
         | Stop ->
@@ -856,40 +857,51 @@ module UITest =
             div [style "width: 100%; height: 100%; position: fixed; z-index: 0"] (m.box |> Mod.map (fun box ->
                 [
                     if box then 
+
                         yield 
-                            Aardvark.UI.DomNode.Render(
-                                AttributeMap.union [
-                                    (AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"; clazz "nofocus"])
-                                    (FreeFlyController.attributes m.camera CameraMessage)
-                                ], 
-                                fun (ctrl : Aardvark.Application.RenderControl) -> 
-                                    let proj = ctrl.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
-                                    Sg.box Box3d.Unit
-                                    |> Sg.shader {
-                                        do! FShadeTest.trafo
-                                        do! FShadeTest.constantColor V4d.IOOI
-                                        do! FShadeTest.simpleLight
-                                    }
-                                    |> Sg.viewTrafo (m.camera.view |> Mod.map CameraView.viewTrafo)
-                                    |> Sg.projTrafo proj
-                            )
+                            OrbitController.control 
+                                m.camera 
+                                [style "width: 100%; height: 100%; tab-index: 0"; clazz "nofocus"] 
+                                CameraMessage
+                                (fun (ctrl : Aardvark.Application.RenderControl) -> 
+                                        let proj = ctrl.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
+                                        Sg.box (Box3d(-V3d.III, V3d.III))
+                                        |> Sg.shader {
+                                            do! FShadeTest.trafo
+                                            do! FShadeTest.constantColor V4d.IOOI
+                                            do! FShadeTest.simpleLight
+                                        }
+                                        |> Sg.viewTrafo (m.camera.view |> Mod.map CameraView.viewTrafo)
+                                        |> Sg.projTrafo proj
+                                )
                     else
-                        yield Aardvark.UI.DomNode.Render(
-                            AttributeMap.union [
-                                (AttributeMap.ofList [style "width: 100%; height: 100%; tab-index: 0"; clazz "nofocus"])
-                                (FreeFlyController.attributes m.camera CameraMessage)
-                            ], 
-                            fun (ctrl : Aardvark.Application.RenderControl) -> 
-                                let proj = ctrl.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
-                                Sg.sphere 3
-                                |> Sg.shader {
-                                    do! FShadeTest.trafo
-                                    do! FShadeTest.constantColor V4d.OIOI
-                                    do! FShadeTest.simpleLight
-                                }
-                                |> Sg.viewTrafo (m.camera.view |> Mod.map CameraView.viewTrafo)
-                                |> Sg.projTrafo proj
-                        )
+                        yield 
+                            OrbitController.control 
+                                m.camera 
+                                [style "width: 100%; height: 100%; tab-index: 0"; clazz "nofocus"] 
+                                CameraMessage
+                                (fun (ctrl : Aardvark.Application.RenderControl) -> 
+                                    let current = Mod.constant (Database.Url "./blubber/{0}")
+                                    let proj = ctrl.Size |> Mod.map (fun s ->  Frustum.perspective 70.0 1.0 100000.0 (float s.X / float s.Y) |> Frustum.projTrafo)
+                                    let set = ASet.ofModSingle current
+
+                                    let emitStats (s : Lod.Stats) = ()
+                                    
+                                    let view = 
+                                        m.camera.view |> Mod.map (fun c ->
+                                            Trafo3d.FromBasis(V3d.IOO, V3d.OOI, -V3d.OIO, V3d.Zero) * CameraView.viewTrafo c
+                                        )
+
+                                    Lod.TreeSg(ctrl, set, emitStats) :> ISg
+                                    |> Sg.shader {
+                                        do! FShadeTest.depthVertex
+                                        do! FShadeTest.circularPoint
+                                    }
+                                    |> Sg.viewTrafo view
+                                    |> Sg.projTrafo proj
+                                    |> Sg.uniform "ViewportSize" ctrl.Size
+                                    |> Sg.uniform "ShowColor" (Mod.constant true)
+                                )
                         
                 ]
             ))
@@ -899,6 +911,7 @@ module UITest =
     let rec run() =
         let mapp = 
             fix (fun self ->
+                document.body.style.position <- "fixed"
                 App.run document.body { 
                     initial = initial
                     update = update self
@@ -1181,7 +1194,7 @@ let run() =
         canvas.tabIndex <- 1.0
         canvas.addEventListener_click(fun _ -> canvas.focus())
 
-        let control = new Aardvark.Application.RenderControl(canvas, true, true, ClearColor = V4d.OOOO)
+        let control = new Aardvark.Application.RenderControl(canvas, false, true, ClearColor = V4d.OOOO)
         let initial = CameraView.lookAt (V3d(6.0, 6.0, 4.0)) V3d.Zero V3d.OOI
         let cam = Aardvark.Application.DefaultCameraController.control control.Mouse control.Keyboard control.Time initial
         let color = Mod.init true

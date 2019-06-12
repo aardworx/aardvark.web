@@ -34,6 +34,313 @@ module Integrator =
         else
             integrate maxDt f (f m0 maxDt) (dt - maxDt) 
 
+
+
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module OrbitState =
+    let clamp (min : float) (max : float) (value : float) =
+        if value > max then max
+        elif value < min then min
+        else value
+
+    let withView (s : OrbitState) =
+        let ct = cos s.theta
+        let l = 
+            V3d(
+                cos s.phi * ct * s.radius + s.center.X,
+                sin s.phi * ct * s.radius + s.center.Y,
+                sin s.theta * s.radius + s.center.Z
+            )
+        //let l = V2d(s.phi, s.theta).CartesianFromSpherical() * s.radius + s.center
+        { s with view = CameraView.lookAt l s.center s.sky }
+
+    let create (center : V3d) (phi : float) (theta : float) (r : float) =
+        let thetaRange = V2d(-Constant.PiHalf + 0.0001, Constant.PiHalf - 0.0001)
+        let radiusRange = V2d(0.1, 40000.0)
+
+        let r = clamp radiusRange.X radiusRange.Y r
+        let theta = clamp thetaRange.X thetaRange.Y theta
+
+        withView {
+            sky     = V3d.OOI
+            center  = center
+            phi     = phi
+            theta   = theta
+            radius  = r
+
+            targetPhi = phi
+            targetTheta = theta
+            targetRadius = r
+            targetCenter = center
+
+            lastTap = None
+            dragStarts = MapExt.empty
+            dragEnters = MapExt.empty
+            lastRender = None
+            view = Unchecked.defaultof<_>
+
+            radiusRange = radiusRange
+            thetaRange = thetaRange
+            moveSensitivity = 0.5
+            zoomSensitivity = 1.0
+            speed = 0.3
+        }
+
+
+
+type OrbitMessage =
+    | Tap of id : float * pos : V2i
+    | PointerDown of id : float * isTouch : bool * pos : V2i
+    | PointerUp of  id : float * isTouch : bool * V2i
+    | PointerMove of id : float * isTouch : bool * V2i
+    | Wheel of V2d
+
+
+    | Rendered
+    | SetTargetCenter of V3d
+    | SetTargetPhi of float
+    | SetTargetTheta of float
+    | SetTargetRadius of float
+
+
+
+module OrbitController = 
+    let time() = Aardvark.Import.Browser.performance.now() |> MicroTime.FromMilliseconds
+
+    let private clamp (min : float) (max : float) (value : float) =
+        if value > max then max
+        elif value < min then min
+        else value
+
+    let initial = OrbitState.create V3d.Zero Constant.PiQuarter Constant.PiQuarter 4.0
+
+    let rec update (model : OrbitState) (msg : OrbitMessage) =
+        match msg with
+        | Tap(id, pos) ->
+            let n = time()
+            match model.lastTap with
+            | Some (ot, op) ->
+                if (n - ot).TotalMilliseconds < 400.0 && (pos - op).Length < 40.0 then
+                    
+                    Aardvark.Import.Browser.document.getElementsByClassName("label").[0].innerHTML <- sprintf "dbl %.0f: %A" id pos
+            | None ->
+                ()
+            { model with lastTap = Some (n, pos) }
+            //Aardvark.Import.Browser.document.getElementsByClassName("label").[0].innerHTML <- sprintf "%.0f: %A" id pos
+
+            //model
+
+        | SetTargetPhi tphi ->
+            OrbitState.withView { model with targetPhi = tphi }
+        
+        | SetTargetTheta ttheta ->
+            OrbitState.withView { model with targetPhi = clamp model.thetaRange.X model.thetaRange.Y ttheta }
+        
+        | SetTargetRadius tr ->
+            OrbitState.withView { model with targetRadius = clamp model.radiusRange.X model.radiusRange.Y tr }
+
+        | SetTargetCenter tc ->
+            OrbitState.withView { model with targetCenter = tc }
+        
+
+        | PointerDown(id, isTouch, p) ->
+            let s = MapExt.add id p model.dragStarts
+            { model with 
+                dragStarts = s
+                dragEnters = MapExt.add id (p, time()) model.dragEnters
+                lastRender = None 
+            }
+
+        | PointerUp(id, isTouch, p) ->
+            
+            let s = MapExt.remove id model.dragStarts
+
+            let model = 
+                match MapExt.tryFind id model.dragEnters with
+                | Some (op, s) ->
+                    let n = time()
+                    let dt = n - s
+                    if dt.TotalMilliseconds < 400.0 && (p - op).Length < 20.0 then
+                        update model (Tap(id, p))
+                    else
+                        model
+                | None ->
+                    model
+
+
+
+            { model with 
+                dragStarts = s; 
+                dragEnters = MapExt.remove id model.dragEnters
+                lastRender = None 
+            }
+
+        | Wheel delta ->
+            OrbitState.withView { model with targetRadius = clamp model.radiusRange.X model.radiusRange.Y (model.targetRadius + delta.Y * model.zoomSensitivity) }
+
+        | PointerMove(id, isTouch, p) ->
+            let down = model.dragStarts.Count
+
+
+            match down with
+            | 1 -> 
+                match MapExt.tryFind id model.dragStarts with
+                | Some(start) ->
+                    let delta = p - start
+                    let dphi = float delta.X * -0.01 * model.moveSensitivity
+                    let dtheta = float delta.Y * 0.01 * model.moveSensitivity
+            
+                    OrbitState.withView 
+                        { model with
+                            dragStarts = MapExt.add id p model.dragStarts
+                            targetPhi = model.targetPhi + dphi
+                            targetTheta = clamp model.thetaRange.X model.thetaRange.Y (model.targetTheta + dtheta)
+                        }
+                | None ->
+                    model
+            | 2 when isTouch ->
+                match MapExt.tryFind id model.dragStarts with
+                | Some op ->
+                    let np = p
+                    let otherId, otherPos = model.dragStarts |> MapExt.toSeq |> Seq.find (fun (k,_) -> k <> id)
+
+                    let scale = Vec.length (np - otherPos) / Vec.length (op - otherPos)
+                    
+                    let r = clamp model.radiusRange.X model.radiusRange.Y (model.targetRadius / scale)
+
+                    OrbitState.withView 
+                        { model with
+                            dragStarts = MapExt.add id p model.dragStarts
+                            targetRadius = r
+                        }
+
+                | None ->
+                    model
+            | _ ->
+                model
+        | Rendered ->
+            let dphi = model.targetPhi - model.phi
+            let dtheta = model.targetTheta - model.theta
+            let dradius = model.targetRadius - model.radius
+            let dcenter = model.targetCenter - model.center
+
+            let now = time()
+            let dt =
+                match model.lastRender with
+                | Some last -> (now - last)
+                | None -> MicroTime.Zero
+            
+            let delta = model.speed * dt.TotalSeconds / 0.05
+            let part = if dt.TotalSeconds > 0.0 then clamp 0.0 1.0 delta else 0.0
+            let model = { model with lastRender = Some now }
+
+            let model = 
+                if abs dphi > 0.0 then
+                    if Fun.IsTiny(dphi, 1E-4) then
+                        Log.warn "phi done"
+                        OrbitState.withView { model with phi = model.targetPhi }
+                    else
+                        OrbitState.withView { model with phi = model.phi + part * dphi }
+                else
+                    model
+
+            let model = 
+                if abs dtheta > 0.0 then
+                    if Fun.IsTiny(dtheta, 1E-4) then
+                        Log.warn "theta done"
+                        OrbitState.withView { model with theta = model.targetTheta }
+                    else
+                        OrbitState.withView { model with theta  = model.theta + part * dtheta }
+                else
+                    model
+
+            let model = 
+                if abs dradius > 0.0 then
+                    if Fun.IsTiny(dradius, 1E-4) then
+                        Log.warn "radius done"
+                        OrbitState.withView { model with radius = model.targetRadius }
+                    else
+                        OrbitState.withView { model with radius  = model.radius + part * dradius }
+                else
+                    model
+
+            let model = 
+                if dcenter.Length > 0.0 then
+                    if dcenter.Length < 1E-4 then
+                        Log.warn "center done"
+                        OrbitState.withView { model with center = model.targetCenter }
+                    else
+                        OrbitState.withView { model with center  = model.center + part * dcenter }
+                else
+                    model
+
+            model
+
+    open Aardvark.Import.JS
+    open Aardvark.Import.Browser
+
+    let getAttributes (model : MOrbitState) (f : OrbitMessage -> 'msg) =
+        let down = model.dragEnters |> Mod.map (MapExt.isEmpty >> not)
+        attributes {
+            //yield style "touch-action: none"
+            yield always <| mousedown (fun e -> 
+                    let target = unbox<HTMLCanvasElement> e.target
+                    e.preventDefault()
+                    e.stopPropagation()
+                    PointerDown(e.which, false, V2i(int e.clientX, int e.clientY))|> f
+                )
+            yield always <| mouseup (fun e -> 
+                    let target = unbox<HTMLElement> e.target
+                    e.preventDefault()
+                    e.stopPropagation()
+                    PointerUp(e.which, false, V2i(int e.clientX, int e.clientY))|> f
+                )
+            yield always <| mousemove (fun e -> 
+                e.preventDefault()
+                e.stopPropagation()
+                PointerMove(e.which, false, V2i(int e.clientX, int e.clientY)) |> f
+            )
+            yield always <| rendered (fun _ -> Rendered |> f)
+            yield always <| wheel (fun e -> Wheel (V2d(0.0, -e.wheelDeltaY / 120.0)) |> f)
+
+            yield always <| touchstart (fun e ->
+                e.preventDefault()
+                e.stopPropagation()
+                seq {
+                    for i in 0 .. int e.touches.length - 1 do
+                        let t = e.touches.[i]
+                        yield PointerDown(t.identifier, true, V2i(int t.clientX, int t.clientY)) |> f
+                }
+            )
+            yield always <| touchend (fun e ->
+                e.preventDefault()
+                e.stopPropagation()
+                seq {
+                    for i in 0 .. int e.changedTouches.length - 1 do
+                        let t = e.changedTouches.[i]
+                        yield PointerUp(t.identifier, true, V2i(int t.clientX, int t.clientY)) |> f
+                }
+            )
+
+            yield always <| touchmove (fun e ->
+                e.preventDefault()
+                e.stopPropagation()
+                seq {
+                    for i in 0 .. int e.touches.length - 1 do
+                        let t = e.touches.[i]
+                        yield PointerMove(t.identifier, true, V2i(int t.clientX, int t.clientY)) |> f
+                }
+            )
+        }
+       
+    let inline control (model : MOrbitState) attributes (mapping : OrbitMessage -> 'msg) (scene : Aardvark.Application.RenderControl -> ISg) =
+        let a = AttributeMap.ofList attributes
+        let att = AttributeMap.union [a; getAttributes model mapping]
+        DomNode.Render(att, scene)
+
+
+
 module FreeFlyController =
     open Aardvark.Base.Incremental.Operators
                         
@@ -574,23 +881,9 @@ module FreeFlyController =
 
 
     open Aardvark.Import.Browser
-    open Fable.Core
-    open Fable.Core.JsInterop
-
-    let hammerstuff (e : HTMLElement) (s : Updater.Scope<Message>) =
-        let hh = hammer.Hammer.Create(U2.Case1 e)
-        let r = hh.get("pan").set(Fable.Core.JsInterop.createObj ["direction", hammer.Hammer.DIRECTION_ALL :> obj] |> unbox)
-        hh.on("pan", fun (e) -> 
-            console.log(e.deltaX)
-            s.emit (seq { yield Message.Rotate (e.velocityX / 100.0) })
-            
-        )
-        window?hammer <- hh
-        window?hammer2 <- r
 
     let attributes (state : MCameraControllerState) (f : Message -> 'msg) = 
         attributes {
-            yield always <| boot (fun e s -> hammerstuff e { emit = Seq.map f >> s.emit })
             yield always (blur (fun () -> f Blur))
             yield always <| pointerdown (fun pe -> 
                     let target = unbox<HTMLElement> pe.target

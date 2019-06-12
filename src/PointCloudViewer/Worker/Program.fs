@@ -60,7 +60,7 @@ module Lod =
         let inline dec v = running := !running - v
 
 
-        let cap = 50000000.0
+        let cap = 1000000.0
 
 
         let inline collapse (e : MutableTree<'a>) =

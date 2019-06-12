@@ -34,6 +34,8 @@ type Command =
     | Remove of dburl : string
     | UpdateCamera of view : Trafo3d * proj : Trafo3d
     
+    //| Pick of origin : V3d * direction : V3d
+
 [<RequireQualifiedAccess>]
 type Reply =
     | SetRootCenter of url : string * center : V3d

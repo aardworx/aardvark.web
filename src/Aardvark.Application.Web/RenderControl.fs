@@ -47,6 +47,9 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool, alpha : bool) =
     let gl =
         if unbox gl then gl
         else canvas.getContext("webgl", config) |> unbox<WebGL2RenderingContext>
+
+    do Fable.Core.JsInterop.(?<-) canvas "ctx" gl
+
     let ctx = Context(gl)
     let manager = new ResourceManager(ctx)
 
@@ -174,6 +177,8 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool, alpha : bool) =
             e.preventDefault(); e.stopPropagation()
         ), true)
                
+        //canvas.addEventListener_touchmove ((fun e -> e.preventDefault()), false)
+
         //canvas.addEventListener("touchstart", EventListenerOrEventListenerObject.Case1 (fun e -> 
         //    if document?fullscreenElement || document?mozFullScreenElement || document?webkitFullscreenElement || document?msFullscreenElement then
         //        if document?exitFullscreen then document?exitFullscreen()
@@ -220,18 +225,86 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool, alpha : bool) =
     let mutable clearColor = V4d.OOOI
 
     do 
+        //let mutable fbo : Option<WebGLFramebuffer * WebGLTexture * WebGLTexture * V2i> = None
         checkSize()
         render := fun _ ->
             inRender <- true
             let rect = canvas.getBoundingClientRect()
             let s = V2i(int rect.width, int rect.height)
             if s <> size.Value then transact (fun () -> size.Value <- s)
+            //let fbo, color, depth =
+            //    let newSize = V2i(int rect.width, int rect.height)
+            //    match fbo with
+            //        | Some(h, c, d, s) when s = newSize ->
+            //            h, c, d
+            //        | _ ->
+            //            match fbo with
+            //            | Some (h,c,d,_) ->
+            //                gl.deleteFramebuffer h
+            //                gl.deleteTexture c
+            //                gl.deleteTexture d
+            //            | _ ->
+            //                ()
+
+            //            let h = gl.createFramebuffer()
+            //            let c =     
+            //                let c = gl.createTexture()
+            //                gl.bindTexture(gl.TEXTURE_2D, c)
+            //                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+            //                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+            //                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+            //                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+            //                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, 0.0)
+            //                if gl.IsGL2 then
+            //                    gl.texImage2D(gl.TEXTURE_2D, 0.0, gl.RGBA, float newSize.X, float newSize.Y, 0.0, gl.RGBA, gl.UNSIGNED_BYTE, Unchecked.defaultof<obj>)
+            //                else
+            //                    gl.texImage2D(gl.TEXTURE_2D, 0.0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, Unchecked.defaultof<ImageData>)
+            //                gl.bindTexture(gl.TEXTURE_2D, null)
+            //                c
+                                
+            //            let dFormat = 
+            //                if gl.IsGL2 then    
+            //                    gl.DEPTH24_STENCIL8
+            //                else    
+            //                    gl.DEPTH_COMPONENT16
+            //                    //let ext = gl.getExtension("WEBGL_depth_texture") |> unbox<WEBGL_depth_texture>
+            //                    //ext.UNSIGNED_INT_24_8_WEBGL
+
+
+            //            let d = 
+            //                let d = gl.createTexture()
+            //                gl.bindTexture(gl.TEXTURE_2D, d)
+            //                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+            //                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+            //                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+            //                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+            //                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, 0.0)
+            //                if gl.IsGL2 then
+            //                    gl.texImage2D(gl.TEXTURE_2D, 0.0, gl.DEPTH24_STENCIL8, float newSize.X, float newSize.Y, 0.0, gl.DEPTH_STENCIL, gl.UNSIGNED_INT_24_8, Unchecked.defaultof<obj>)
+            //                else
+            //                    gl.texImage2D(gl.TEXTURE_2D, 0.0, dFormat, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, Unchecked.defaultof<ImageData>)
+            //                gl.bindTexture(gl.TEXTURE_2D, null)
+            //                d
+
+            //            gl.bindFramebuffer(gl.FRAMEBUFFER, h)
+            //            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, c, 0.0)
+            //            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.TEXTURE_2D, d, 0.0)
+
+            //            let status = gl.checkFramebufferStatus(gl.FRAMEBUFFER)
+            //            Log.warn "status: %A" status
+            //            gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+
+            //            fbo <- Some (h, c, d, newSize)
+            //            h, c, d
             let pp = 
                 caller.EvaluateAlways AdaptiveToken.Top (fun token ->
+
+
 
                     if canvas.width <> rect.width then canvas.width <- rect.width
                     if canvas.height <> rect.height then canvas.height <- rect.height
                     //console.log(sprintf "%.0fx%.0f" rect.width rect.height)
+                    //gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
                     gl.viewport(0.0, 0.0, rect.width, rect.height)
                     gl.clearColor(clearColor.X, clearColor.Y, clearColor.Z, clearColor.W)
                     gl.clearDepth(1.0)
@@ -260,6 +333,12 @@ type RenderControl(canvas : HTMLCanvasElement, antialias : bool, alpha : bool) =
                 inRender <- false
                 clearTimeout hide
                 hide <- setTimeout hideOverlay 300
+                //gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+
+
+                //let ctx = canvas.getContext("2d") |> unbox<CanvasRenderingContext2D>
+                //gl.put
+
                 rendered.OnNext()
                 if rafap then 
                     setTimeout (fun () -> !render 0.0) 0 |> ignore //window.requestAnimationFrame(!render) |> ignore

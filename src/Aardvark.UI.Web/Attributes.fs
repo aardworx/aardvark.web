@@ -17,14 +17,35 @@ module Attributes =
         "class", AttributeValue.String value
 
     let pointerdown (callback : PointerEvent -> 'msg) =
-        "pointerdown", AttributeValue.Event(EventCallbacks.singleton { useCapture = false; callback = fun e -> unbox e |> callback |> Seq.singleton })
+        "pointerdown", AttributeValue.Event(EventCallbacks.singleton { useCapture = true; callback = fun e -> unbox e |> callback |> Seq.singleton })
         
     let pointerup (callback : PointerEvent -> 'msg) =
         "pointerup", AttributeValue.Event(EventCallbacks.singleton { useCapture = true; callback = fun e -> unbox e |> callback |> Seq.singleton })
         
     let pointermove (callback : PointerEvent -> 'msg) =
-        "pointermove", AttributeValue.Event(EventCallbacks.singleton { useCapture = false; callback = fun e -> unbox e |> callback |> Seq.singleton })
+        "pointermove", AttributeValue.Event(EventCallbacks.singleton { useCapture = true; callback = fun e -> unbox e |> callback |> Seq.singleton })
+
+    let mousedown (callback : MouseEvent -> 'msg) =
+        "mousedown", AttributeValue.Event(EventCallbacks.singleton { useCapture = true; callback = fun e -> unbox e |> callback |> Seq.singleton })
         
+    let mouseup (callback : MouseEvent -> 'msg) =
+        "mouseup", AttributeValue.Event(EventCallbacks.singleton { useCapture = true; callback = fun e -> unbox e |> callback |> Seq.singleton })
+        
+    let mousemove (callback : MouseEvent -> 'msg) =
+        "mousemove", AttributeValue.Event(EventCallbacks.singleton { useCapture = true; callback = fun e -> unbox e |> callback |> Seq.singleton })
+
+
+
+    let touchstart (callback : TouchEvent -> seq<'msg>) =
+        "touchstart", AttributeValue.Event(EventCallbacks.singleton { useCapture = false; callback = fun e -> unbox e |> callback })
+        
+    let touchend (callback : TouchEvent -> seq<'msg>) =
+        "touchend", AttributeValue.Event(EventCallbacks.singleton { useCapture = false; callback = fun e -> unbox e |> callback })
+        
+    let touchmove (callback : TouchEvent -> seq<'msg>) =
+        "touchmove", AttributeValue.Event(EventCallbacks.singleton { useCapture = false; callback = fun e -> unbox e |> callback })
+        
+
     let wheel (callback : MouseWheelEvent -> 'msg) =
         "wheel", AttributeValue.Event(EventCallbacks.singleton { useCapture = false; callback = fun e -> unbox e |> callback |> Seq.singleton })
 

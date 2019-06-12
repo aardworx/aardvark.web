@@ -315,6 +315,19 @@ module Generic =
 
     type Creator(tag : string) =
         member x.Tag = tag
+
+        static member Render(c : Creator, attributes : AttributeMap<'msg>, sg : ISg) =
+            DomNode.Render(attributes, fun _ -> sg)
+
+        static member Render(c : Creator, attributes : AttributeMap<'msg>, sg : Aardvark.Application.RenderControl -> ISg) =
+            DomNode.Render(attributes, sg)
+
+        static member Render(c : Creator, attributes : list<string * AttributeValue<'msg>>, sg : ISg) =
+            DomNode.Render(AttributeMap.ofList attributes, fun _ -> sg)
+
+        static member Render(c : Creator, attributes : list<string * AttributeValue<'msg>>, sg : Aardvark.Application.RenderControl -> ISg) =
+            DomNode.Render(AttributeMap.ofList attributes, sg)
+
         // Children and dynamic attributes
         static member Node(tag : Creator, attributes : AttributeMap<'msg>, children : alist<DomNode<'msg>>) =
             DomNode.node tag.Tag attributes children
@@ -379,6 +392,9 @@ module Generic =
     let inline node (tagName : ^a) (attrs : ^b) (children : ^c) =
         ((^a or ^b or ^c) : (static member Node : ^a * ^b * ^c -> DomNode<'msg>) (tagName, attrs, children))
         
+    let inline renderE (tagName : ^a) (attrs : ^b) (children : ^c) =
+        ((^a or ^b or ^c) : (static member Render : ^a * ^b * ^c -> DomNode<'msg>) (tagName, attrs, children))
+        
     let inline leaf (tagName : ^a) (attrs : ^b)=
         ((^a or ^b) : (static member Void : ^a * ^b -> DomNode<'msg>) (tagName, attrs))
         
@@ -386,6 +402,7 @@ module Generic =
     let inline content a = contentInternal Unchecked.defaultof<ContentCreator> a
 
     let inline elem tag atts children = node (Creator(tag)) atts children
+    let inline render atts children = node (Creator("canvas")) atts children
     let inline voidElem tag atts = leaf (Creator(tag)) atts
     
     //let inline elemNS tag ns atts children = nodeNS Unchecked.defaultof<CreatorNamespace> tag ns atts children

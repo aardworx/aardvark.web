@@ -146,7 +146,12 @@ module AttributeMap =
 
     let inline single (key : string) (value : AttributeValue<'msg>) = AttributeMap<'msg>.Single(key, value)
     let inline add (key : string) (value : AttributeValue<'msg>) (m : AttributeMap<'msg>) = m.Add(key, value)
-    let inline union (l : #seq<AttributeMap<'msg>>) = l |> Seq.fold (fun l r -> AttributeMap.Union(l,r)) AttributeMap.Empty
+    let inline union (l : #seq<AttributeMap<'msg>>) = 
+        let mutable res = empty
+        for e in l do
+            res <- AttributeMap.Union(res, e)
+        res
+        //l |> Seq.fold (fun l r -> AttributeMap.Union(l,r)) AttributeMap.Empty
 
     let inline toAMap (m : AttributeMap<'msg>) = m.Values
 

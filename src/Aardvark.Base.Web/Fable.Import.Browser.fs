@@ -10640,6 +10640,10 @@ module Browser =
         abstract member waitSync : WebGLSync * float * float -> unit
         abstract member getSyncParameter : WebGLSync * float -> float
     
+        abstract member UNSIGNED_INT_24_8 : float
+        abstract member DEPTH24_STENCIL8 : float
+
+
     and [<AllowNullLiteral>] WEBGL_multi_draw_instanced =
         abstract member multiDrawArraysInstancedWEBGL : mode : float * firstsList : int[] * firstsOffset : int * countsList : int[] * countsOffset : int * instanceCountsList : int[] * instanceCountsOffset : int * drawcount : int -> unit
 

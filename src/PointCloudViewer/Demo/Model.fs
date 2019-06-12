@@ -106,12 +106,49 @@ type CameraControllerState =
         [<TreatAsValue>]
         stash : Option<CameraControllerState> 
     }
-    
+  
+  
+[<DomainType>]
+type OrbitState =
+    {
+        sky     : V3d
+        center  : V3d
+        phi     : float
+        theta   : float
+        radius  : float
+
+        targetPhi : float
+        targetTheta : float
+        targetRadius : float
+        targetCenter : V3d
+        
+        [<NonIncremental>]
+        lastTap : Option<MicroTime * V2i>
+        dragEnters : MapExt<float, V2i * MicroTime>
+        [<NonIncremental>]
+        dragStarts : MapExt<float, V2i>
+
+        [<NonIncremental>]
+        lastRender : Option<MicroTime>
+
+        view : CameraView
+        
+        radiusRange : V2d
+        thetaRange : V2d
+        moveSensitivity : float
+        zoomSensitivity : float
+        speed : float
+
+    }
+
     
 [<DomainType>]
 type TestModel =
     {
-        camera : CameraControllerState
+        camera : OrbitState
         elements : plist<string>
         box : bool
     }
+
+
+
